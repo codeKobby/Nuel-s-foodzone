@@ -15,6 +15,7 @@ let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 
+// This check is to prevent crashing during server-side rendering or in environments where env vars are not set.
 if (firebaseConfig.apiKey) {
     if (!getApps().length) {
         app = initializeApp(firebaseConfig);
@@ -23,6 +24,8 @@ if (firebaseConfig.apiKey) {
     }
     auth = getAuth(app);
     db = getFirestore(app);
+} else {
+    console.warn("Firebase configuration is missing. Firebase services will be disabled.");
 }
 
 export { app, db, auth };
