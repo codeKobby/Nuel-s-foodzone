@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
@@ -72,12 +72,14 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
                 } else { // This Month
                     startDate = new Date(now.getFullYear(), now.getMonth(), 1);
                 }
+                
+                const startDateTimestamp = Timestamp.fromDate(startDate);
 
                 const ordersRef = collection(db, `/artifacts/${appId}/public/data/orders`);
-                const ordersQuery = query(ordersRef, where("timestamp", ">=", startDate), orderBy("timestamp", "asc"));
+                const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp), orderBy("timestamp", "asc"));
                 
                 const miscExpensesRef = collection(db, `/artifacts/${appId}/public/data/miscExpenses`);
-                const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDate), where("settled", "==", true));
+                const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp));
                 
                 const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
 
@@ -103,7 +105,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
                 let totalMiscExpenses = 0;
                 miscSnapshot.forEach(doc => {
                     const expense = doc.data() as MiscExpense;
-                    totalMiscExpenses += expense.amount;
+                    if (expense.settled) {
+                        totalMiscExpenses += expense.amount;
+                    }
                 });
                 
                 const netSales = totalSales - totalMiscExpenses;
@@ -116,7 +120,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
                 setStats({ totalSales, totalMiscExpenses, netSales, orderCount, salesData, topItems, bottomItems });
             } catch (e) {
                 console.error("Error fetching dashboard data:", e);
-                setError("Failed to load dashboard data.");
+                setError("Failed to load dashboard data. You may need to create a Firestore index. Check the browser console for a link.");
             } finally {
                 setLoading(false);
             }
@@ -147,21 +151,23 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
                     </CardHeader>
                     <CardContent>
                         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                            <BarChart data={stats.salesData} margin={{ top: 20, right: 20, bottom: 5, left: 0 }}>
-                                <CartesianGrid vertical={false} />
-                                <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} />
-                                <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
-                                <Tooltip
-                                    cursor={false}
-                                    content={<ChartTooltipContent
-                                        formatter={(value) => formatCurrency(Number(value))}
-                                        labelClassName="font-bold"
-                                        indicator="dot"
-                                    />}
-                                />
-                                <Legend />
-                                <Bar dataKey="sales" fill="var(--color-sales)" radius={4} />
-                            </BarChart>
+                            <ResponsiveContainer>
+                                <BarChart data={stats.salesData} margin={{ top: 20, right: 20, bottom: 5, left: 0 }}>
+                                    <CartesianGrid vertical={false} />
+                                    <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} />
+                                    <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
+                                    <Tooltip
+                                        cursor={false}
+                                        content={<ChartTooltipContent
+                                            formatter={(value) => formatCurrency(Number(value))}
+                                            labelClassName="font-bold"
+                                            indicator="dot"
+                                        />}
+                                    />
+                                    <Legend />
+                                    <Bar dataKey="sales" fill="var(--color-sales)" radius={4} />
+                                </BarChart>
+                            </ResponsiveContainer>
                         </ChartContainer>
                     </CardContent>
                 </Card>
@@ -196,3 +202,5 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
 };
 
 export default DashboardView;
+
+    
