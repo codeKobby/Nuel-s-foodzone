@@ -27,10 +27,22 @@ const OrderCart: React.FC<{
     currentOrder: Record<string, OrderItem>;
     total: number;
     updateQuantity: (itemId: string, amount: number) => void;
+    setQuantity: (itemId: string, quantity: number) => void;
     clearOrder: () => void;
     onPlaceOrder: () => void;
     isSheet?: boolean;
-}> = ({ currentOrder, total, updateQuantity, clearOrder, onPlaceOrder, isSheet = false }) => {
+}> = ({ currentOrder, total, updateQuantity, setQuantity, clearOrder, onPlaceOrder, isSheet = false }) => {
+    
+    const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>, itemId: string) => {
+        const newQuantity = parseInt(e.target.value, 10);
+        if (!isNaN(newQuantity) && newQuantity > 0) {
+            setQuantity(itemId, newQuantity);
+        } else if (e.target.value === '') {
+            // allows deleting the value to type a new one
+        } else {
+             setQuantity(itemId, 1);
+        }
+    };
     
     const CartContent = () => (
         <>
@@ -51,7 +63,13 @@ const OrderCart: React.FC<{
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.id, -1)}><Minus size={14} /></Button>
-                                    <span className="font-bold w-6 text-center">{item.quantity}</span>
+                                    <Input 
+                                        type="number"
+                                        value={item.quantity}
+                                        onChange={(e) => handleQuantityChange(e, item.id)}
+                                        onBlur={(e) => { if (e.target.value === '') setQuantity(item.id, 1); }}
+                                        className="font-bold w-12 text-center h-8"
+                                    />
                                     <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.id, 1)}><Plus size={14} /></Button>
                                 </div>
                             </div>
@@ -200,6 +218,20 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
             return newOrder;
         });
     }, []);
+    
+    const setQuantity = useCallback((itemId: string, quantity: number) => {
+        setCurrentOrder(prev => {
+            const newOrder = { ...prev };
+            if (!newOrder[itemId]) return prev;
+
+            if (quantity > 0) {
+                newOrder[itemId].quantity = quantity;
+            } else {
+                delete newOrder[itemId];
+            }
+            return newOrder;
+        });
+    }, []);
 
     const clearOrder = () => setCurrentOrder({});
 
@@ -272,7 +304,7 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
                     </div>
                 )}
             </div>
-            <OrderCart currentOrder={currentOrder} total={total} updateQuantity={updateQuantity} clearOrder={clearOrder} onPlaceOrder={handlePlaceOrder} />
+            <OrderCart currentOrder={currentOrder} total={total} updateQuantity={updateQuantity} setQuantity={setQuantity} clearOrder={clearOrder} onPlaceOrder={handlePlaceOrder} />
             
             <div className="md:hidden fixed bottom-4 right-4 z-20">
                  <Sheet open={isCartSheetOpen} onOpenChange={setIsCartSheetOpen}>
@@ -295,6 +327,7 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
                                 currentOrder={currentOrder}
                                 total={total}
                                 updateQuantity={updateQuantity}
+                                setQuantity={setQuantity}
                                 clearOrder={clearOrder}
                                 onPlaceOrder={handlePlaceOrder}
                                 isSheet={true}
