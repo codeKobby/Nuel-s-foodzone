@@ -1,7 +1,8 @@
+
 "use client";
 
 import Image from 'next/image';
-import { Home, ClipboardList, Settings, BarChart2, Sun, Moon } from 'lucide-react';
+import { Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import logo from '@/app/logo.png';
 
@@ -18,6 +19,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
         { id: 'pos', icon: Home, label: 'POS' },
         { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
         { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
+        { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
         { id: 'admin', icon: Settings, label: 'Admin' },
     ];
 
@@ -25,7 +27,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
         <TooltipProvider>
             <nav className="w-20 bg-card border-r border-border flex flex-col items-center justify-between py-6 shadow-md z-20">
                 <div>
-                    <Image src={logo} alt="Nuel's Food Zone Logo" width={48} height={48} className="mb-10 mx-auto rounded-full shadow-md" />
+                    <Image src={logo} alt="Nuel's Food Zone Logo" width={48} height={48} className="mb-10 mx-auto rounded-md shadow-md" />
                     <ul className="space-y-4">
                         {navItems.map(item => (
                              <li key={item.id} className="relative">

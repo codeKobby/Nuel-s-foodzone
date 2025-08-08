@@ -1,11 +1,12 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order } from '@/lib/types';
+import type { Order, MiscExpense } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, Briefcase } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +21,8 @@ interface DashboardViewProps {
 
 interface Stats {
     totalSales: number;
+    totalMiscExpenses: number;
+    netSales: number;
     orderCount: number;
     salesData: { date: string; sales: number }[];
     topItems: { name: string; count: number }[];
@@ -46,7 +49,7 @@ const chartConfig = {
 } satisfies ChartConfig
 
 const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
-    const [stats, setStats] = useState<Stats>({ totalSales: 0, orderCount: 0, salesData: [], topItems: [], bottomItems: [] });
+    const [stats, setStats] = useState<Stats>({ totalSales: 0, totalMiscExpenses: 0, netSales: 0, orderCount: 0, salesData: [], topItems: [], bottomItems: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [timeRange, setTimeRange] = useState('Today');
@@ -56,7 +59,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
             setLoading(true);
             setError(null);
             try {
-                const ordersRef = collection(db, `/artifacts/${appId}/public/data/orders`);
                 const now = new Date();
                 let startDate;
 
@@ -71,14 +73,19 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
                     startDate = new Date(now.getFullYear(), now.getMonth(), 1);
                 }
 
-                const q = query(ordersRef, where("timestamp", ">=", startDate), orderBy("timestamp", "asc"));
-                const querySnapshot = await getDocs(q);
+                const ordersRef = collection(db, `/artifacts/${appId}/public/data/orders`);
+                const ordersQuery = query(ordersRef, where("timestamp", ">=", startDate), orderBy("timestamp", "asc"));
                 
+                const miscExpensesRef = collection(db, `/artifacts/${appId}/public/data/miscExpenses`);
+                const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDate));
+                
+                const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
+
                 let totalSales = 0, orderCount = 0;
                 const itemCounts: Record<string, number> = {};
                 const salesByDay: Record<string, number> = {};
 
-                querySnapshot.forEach(doc => {
+                ordersSnapshot.forEach(doc => {
                     const order = doc.data() as Order;
                     if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') totalSales += order.amountPaid;
                     orderCount++;
@@ -93,12 +100,20 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
                     }
                 });
 
+                let totalMiscExpenses = 0;
+                miscSnapshot.forEach(doc => {
+                    const expense = doc.data() as MiscExpense;
+                    totalMiscExpenses += expense.amount;
+                });
+                
+                const netSales = totalSales - totalMiscExpenses;
+
                 const salesData = Object.entries(salesByDay).map(([date, sales]) => ({ date, sales }));
                 const allItems = Object.entries(itemCounts).sort(([, a], [, b]) => b - a);
                 const topItems = allItems.slice(0, 5).map(([name, count]) => ({ name, count }));
                 const bottomItems = allItems.length > 5 ? allItems.slice(-5).reverse().map(([name, count]) => ({ name, count })) : [];
 
-                setStats({ totalSales, orderCount, salesData, topItems, bottomItems });
+                setStats({ totalSales, totalMiscExpenses, netSales, orderCount, salesData, topItems, bottomItems });
             } catch (e) {
                 console.error("Error fetching dashboard data:", e);
                 setError("Failed to load dashboard data.");
@@ -121,9 +136,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
             </div>
             {loading ? <div className="mt-8"><LoadingSpinner/></div> : error ? <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : (
             <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} color="border-green-500" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Net Sales" value={formatCurrency(stats.netSales)} color="border-green-500" />
                     <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.orderCount} color="border-blue-500" />
+                    <StatCard icon={<Briefcase className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.totalMiscExpenses)} color="border-orange-500" />
                 </div>
                 <Card className="mb-6">
                     <CardHeader>

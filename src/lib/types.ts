@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export interface MenuItem {
@@ -29,5 +30,12 @@ export interface Order {
   changeGiven: number;
   balanceDue: number;
   status: 'Pending' | 'Completed';
+  timestamp: Timestamp;
+}
+
+export interface MiscExpense {
+  id: string;
+  purpose: string;
+  amount: number;
   timestamp: Timestamp;
 }
