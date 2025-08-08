@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
 import Sidebar from '@/components/cafe/Sidebar';
 import PosView from '@/components/cafe/PosView';
@@ -27,34 +26,47 @@ export default function CafePage() {
         if (typeof window !== 'undefined') {
             const storedTheme = localStorage.getItem('theme') || 'light';
             setTheme(storedTheme);
+            document.documentElement.classList.add(storedTheme);
+            
+            // Set appId from environment variable on the client
+            const firebaseAppId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
+            if (firebaseAppId) {
+                setAppId(firebaseAppId);
+            } else {
+                console.error("Firebase App ID is not configured.");
+                setAuthError("Application is not configured correctly. Missing Firebase App ID.");
+            }
         }
     }, []);
 
-    useEffect(() => {
+    const toggleTheme = () => {
+        const newTheme = theme === 'light' ? 'dark' : 'light';
         const root = window.document.documentElement;
-        root.classList.remove(theme === 'light' ? 'dark' : 'light');
-        root.classList.add(theme);
-        localStorage.setItem('theme', theme);
-    }, [theme]);
+        root.classList.remove(theme);
+        root.classList.add(newTheme);
+        localStorage.setItem('theme', newTheme);
+        setTheme(newTheme);
+    };
 
     useEffect(() => {
+        // Firebase auth operations should only run on the client
+        if (typeof window === 'undefined') return;
+
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             try {
                 if (!user) {
                     await signInAnonymously(auth);
                 }
-                const token = await user?.getIdTokenResult();
-                const firebaseAppId = token?.claims.firebase.identities['firebase.appId']?.[0] || process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
-                if(firebaseAppId) {
-                    setAppId(firebaseAppId as string);
-                } else {
-                     setAppId(process.env.NEXT_PUBLIC_FIREBASE_APP_ID as string);
-                }
+                // Once user is available, auth is ready
+                 setIsAuthReady(true);
 
             } catch (e) {
                 console.error("Authentication Error:", e);
-                setAuthError("Failed to authenticate. Please refresh the page.");
-            } finally {
+                if (e instanceof Error && (e.message.includes("auth/invalid-api-key") || e.message.includes("Firebase: Error"))) {
+                     setAuthError("Firebase configuration is invalid. Please check your API key and other settings.");
+                } else {
+                     setAuthError("Failed to authenticate. Please check your connection and refresh the page.");
+                }
                 setIsAuthReady(true);
             }
         });
@@ -98,7 +110,7 @@ export default function CafePage() {
             <div className="h-screen w-screen bg-background flex items-center justify-center p-4">
                 <Alert variant="destructive" className="max-w-md">
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Authentication Error</AlertTitle>
+                    <AlertTitle>Application Error</AlertTitle>
                     <AlertDescription>{authError}</AlertDescription>
                 </Alert>
             </div>
@@ -111,7 +123,7 @@ export default function CafePage() {
                 activeView={activeView} 
                 setActiveView={setActiveView} 
                 theme={theme} 
-                setTheme={setTheme} 
+                setTheme={toggleTheme} 
                 pendingOrdersCount={pendingOrdersCount} 
             />
             <main className="flex-1 flex flex-col overflow-hidden">
