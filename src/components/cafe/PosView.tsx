@@ -1,10 +1,11 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { collection, onSnapshot, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { initialMenuData } from '@/data/initial-data';
-import { Search, ShoppingBag, Plus, Minus } from 'lucide-react';
+import { Search, ShoppingBag, Plus, Minus, PlusCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import type { MenuItem, OrderItem } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -15,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import OrderOptionsModal from './modals/OrderOptionsModal';
 import BreakfastModal from './modals/BreakfastModal';
+import CustomOrderModal from './modals/CustomOrderModal';
 
 interface PosViewProps {
     appId: string;
@@ -79,6 +81,7 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
     const [activeCategory, setActiveCategory] = useState('All');
     const [showOrderOptionsModal, setShowOrderOptionsModal] = useState(false);
     const [showBreakfastModal, setShowBreakfastModal] = useState(false);
+    const [showCustomOrderModal, setShowCustomOrderModal] = useState(false);
 
     useEffect(() => {
         setLoading(true);
@@ -145,6 +148,22 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
         setShowBreakfastModal(false);
     }, [menuItems]);
 
+    const addCustomItemToOrder = useCallback((item: { name: string; price: number }) => {
+        setCurrentOrder(prev => {
+            const newOrder = { ...prev };
+            const newItemId = crypto.randomUUID();
+            newOrder[newItemId] = {
+                id: newItemId,
+                name: item.name,
+                price: item.price,
+                quantity: 1,
+                category: 'Custom'
+            };
+            return newOrder;
+        });
+        setShowCustomOrderModal(false);
+    }, []);
+
     const updateQuantity = useCallback((itemId: string, amount: number) => {
         setCurrentOrder(prev => {
             const newOrder = { ...prev };
@@ -176,15 +195,24 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
                     <p className="text-muted-foreground">Select items to add to the order.</p>
                 </header>
                 <div className="sticky top-0 bg-secondary/50 dark:bg-background py-2 z-10 -mx-6 px-6">
-                    <div className="relative mb-4">
-                        <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            type="text"
-                            placeholder="Search menu..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full p-3 pl-12 h-12 text-lg bg-card border-border rounded-xl focus:ring-2 focus:ring-primary"
-                        />
+                    <div className="flex gap-2 mb-4">
+                        <div className="relative flex-grow">
+                            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Search menu..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full p-3 pl-12 h-12 text-lg bg-card border-border rounded-xl focus:ring-2 focus:ring-primary"
+                            />
+                        </div>
+                        <Button
+                            onClick={() => setShowCustomOrderModal(true)}
+                            className="h-12 px-4 rounded-xl"
+                            variant="outline"
+                        >
+                            <PlusCircle size={20} className="mr-2"/> Custom
+                        </Button>
                     </div>
                     <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2">
                         {categories.map(category => (
@@ -234,8 +262,17 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
             {showBreakfastModal && (
                 <BreakfastModal onSelect={addBreakfastToOrder} onClose={() => setShowBreakfastModal(false)} />
             )}
+            {showCustomOrderModal && (
+                 <CustomOrderModal
+                    menuItems={menuItems}
+                    onAddItem={addCustomItemToOrder}
+                    onClose={() => setShowCustomOrderModal(false)}
+                />
+            )}
         </div>
     );
 };
 
 export default PosView;
+
+    

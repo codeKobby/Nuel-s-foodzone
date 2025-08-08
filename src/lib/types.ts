@@ -15,6 +15,7 @@ export interface OrderItem {
   name: string;
   price: number;
   quantity: number;
+  category: string;
 }
 
 export interface Order {
@@ -22,7 +23,7 @@ export interface Order {
   simplifiedId: string;
   tag: string;
   orderType: 'Dine-In' | 'Takeout' | 'Delivery';
-  items: Omit<OrderItem, 'id'>[];
+  items: Omit<OrderItem, 'id' | 'category'>[];
   total: number;
   paymentMethod: 'cash' | 'momo' | 'Unpaid';
   paymentStatus: 'Paid' | 'Unpaid' | 'Partially Paid';
@@ -40,3 +41,5 @@ export interface MiscExpense {
   timestamp: Timestamp;
   settled: boolean;
 }
+
+    
