@@ -31,8 +31,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
     const [error, setError] = useState<string | null>(null);
 
     const amountPaidNum = parseFloat(cashPaid || '0');
-    const change = amountPaidNum > total ? amountPaidNum - total : 0;
-    const balanceDue = total > amountPaidNum ? total - amountPaidNum : 0;
+    const change = paymentMethod === 'cash' && amountPaidNum > total ? amountPaidNum - total : 0;
+    const balanceDue = paymentMethod === 'cash' && total > amountPaidNum ? total - amountPaidNum : 0;
 
     const processOrder = async (isPaid: boolean) => {
         setIsProcessing(true);
@@ -46,6 +46,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
             newCount = (counterSnap.exists() ? counterSnap.data().count : 0) + 1;
             await setDoc(counterRef, { count: newCount });
             
+            const finalAmountPaid = isPaid ? (paymentMethod === 'cash' ? amountPaidNum : total) : 0;
+            const finalBalanceDue = isPaid ? (paymentMethod === 'cash' ? balanceDue : 0) : total;
+
             const newOrder = {
                 simplifiedId: generateSimpleOrderId(newCount),
                 tag: orderTag,
@@ -53,10 +56,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
                 items: Object.values(orderItems).map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
                 total,
                 paymentMethod: isPaid ? paymentMethod : 'Unpaid',
-                paymentStatus: isPaid ? (balanceDue > 0 ? 'Partially Paid' : 'Paid') : 'Unpaid',
-                amountPaid: isPaid ? amountPaidNum : 0,
+                paymentStatus: isPaid ? (finalBalanceDue > 0 ? 'Partially Paid' : 'Paid') : 'Unpaid',
+                amountPaid: finalAmountPaid,
                 changeGiven: isPaid ? change : 0,
-                balanceDue: isPaid ? balanceDue : total,
+                balanceDue: finalBalanceDue,
                 status: 'Pending',
                 timestamp: serverTimestamp(),
             };
@@ -113,8 +116,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
                                 <div className="space-y-2">
                                     <Label htmlFor="cashPaid">Amount Paid</Label>
                                     <Input id="cashPaid" type="number" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="0.00" autoFocus className="text-lg h-12" />
-                                    {balanceDue > 0 && <p className="font-semibold text-yellow-500">Balance Due: {formatCurrency(balanceDue)}</p>}
-                                    {change > 0 && <p className="font-semibold text-green-500">Change: {formatCurrency(change)}</p>}
+                                    {cashPaid && balanceDue > 0 && <p className="font-semibold text-yellow-500">Balance Due: {formatCurrency(balanceDue)}</p>}
+                                    {cashPaid && change > 0 && <p className="font-semibold text-green-500">Change: {formatCurrency(change)}</p>}
                                 </div>
                             )}
                              {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
@@ -132,5 +135,3 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
 };
 
 export default OrderOptionsModal;
-
-    

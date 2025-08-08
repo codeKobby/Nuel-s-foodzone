@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { collection, onSnapshot, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { initialMenuData } from '@/data/initial-data';
-import { Search, ShoppingBag, Plus, Minus, PlusCircle, X } from 'lucide-react';
+import { Search, ShoppingBag, Plus, Minus, PlusCircle, X, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import type { MenuItem, OrderItem } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -18,6 +18,16 @@ import OrderOptionsModal from './modals/OrderOptionsModal';
 import BreakfastModal from './modals/BreakfastModal';
 import CustomOrderModal from './modals/CustomOrderModal';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter, SheetClose } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface PosViewProps {
     appId: string;
@@ -28,10 +38,11 @@ const OrderCart: React.FC<{
     total: number;
     updateQuantity: (itemId: string, amount: number) => void;
     setQuantity: (itemId: string, quantity: number) => void;
-    clearOrder: () => void;
+    removeItem: (itemId: string) => void;
+    onClearOrder: () => void;
     onPlaceOrder: () => void;
     isSheet?: boolean;
-}> = ({ currentOrder, total, updateQuantity, setQuantity, clearOrder, onPlaceOrder, isSheet = false }) => {
+}> = ({ currentOrder, total, updateQuantity, setQuantity, removeItem, onClearOrder, onPlaceOrder, isSheet = false }) => {
     
     const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>, itemId: string) => {
         const newQuantity = parseInt(e.target.value, 10);
@@ -72,6 +83,7 @@ const OrderCart: React.FC<{
                                     />
                                     <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.id, 1)}><Plus size={14} /></Button>
                                 </div>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full ml-2 text-red-500" onClick={() => removeItem(item.id)}><Trash2 size={16} /></Button>
                             </div>
                         ))}
                     </div>
@@ -84,7 +96,7 @@ const OrderCart: React.FC<{
                 </div>
                 <div className="space-y-3">
                     <Button onClick={onPlaceOrder} disabled={Object.keys(currentOrder).length === 0} className="w-full font-bold text-lg h-12">Place Order</Button>
-                    <Button onClick={clearOrder} disabled={Object.keys(currentOrder).length === 0} variant="secondary" className="w-full font-bold text-lg h-12">Clear Order</Button>
+                    <Button onClick={onClearOrder} disabled={Object.keys(currentOrder).length === 0} variant="secondary" className="w-full font-bold text-lg h-12">Clear Order</Button>
                 </div>
             </div>
         </>
@@ -118,6 +130,7 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
     const [showBreakfastModal, setShowBreakfastModal] = useState(false);
     const [showCustomOrderModal, setShowCustomOrderModal] = useState(false);
     const [isCartSheetOpen, setIsCartSheetOpen] = useState(false);
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
 
     useEffect(() => {
         setLoading(true);
@@ -157,9 +170,9 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
         }
         setCurrentOrder(prev => {
             const newOrder = { ...prev };
-            const existingItem = Object.values(newOrder).find(i => i.name === item.name);
+            const existingItem = newOrder[item.id];
             if (existingItem) {
-                newOrder[existingItem.id].quantity += 1;
+                existingItem.quantity++;
             } else {
                 newOrder[item.id] = { ...item, quantity: 1 };
             }
@@ -232,8 +245,19 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
             return newOrder;
         });
     }, []);
+    
+    const removeItem = useCallback((itemId: string) => {
+        setCurrentOrder(prev => {
+            const newOrder = { ...prev };
+            delete newOrder[itemId];
+            return newOrder;
+        });
+    }, []);
 
-    const clearOrder = () => setCurrentOrder({});
+    const handleClearOrder = () => {
+        setCurrentOrder({});
+        setShowClearConfirm(false);
+    };
 
     const handlePlaceOrder = () => {
         setIsCartSheetOpen(false);
@@ -304,7 +328,7 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
                     </div>
                 )}
             </div>
-            <OrderCart currentOrder={currentOrder} total={total} updateQuantity={updateQuantity} setQuantity={setQuantity} clearOrder={clearOrder} onPlaceOrder={handlePlaceOrder} />
+            <OrderCart currentOrder={currentOrder} total={total} updateQuantity={updateQuantity} setQuantity={setQuantity} removeItem={removeItem} onClearOrder={() => setShowClearConfirm(true)} onPlaceOrder={handlePlaceOrder} />
             
             <div className="md:hidden fixed bottom-4 right-4 z-20">
                  <Sheet open={isCartSheetOpen} onOpenChange={setIsCartSheetOpen}>
@@ -328,7 +352,8 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
                                 total={total}
                                 updateQuantity={updateQuantity}
                                 setQuantity={setQuantity}
-                                clearOrder={clearOrder}
+                                removeItem={removeItem}
+                                onClearOrder={() => setShowClearConfirm(true)}
                                 onPlaceOrder={handlePlaceOrder}
                                 isSheet={true}
                             />
@@ -344,7 +369,7 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
                     orderItems={currentOrder}
                     onClose={() => setShowOrderOptionsModal(false)}
                     onOrderPlaced={() => {
-                        clearOrder();
+                        setCurrentOrder({});
                         setShowOrderOptionsModal(false);
                     }}
                 />
@@ -358,6 +383,22 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
                     onAddItem={addCustomItemToOrder}
                     onClose={() => setShowCustomOrderModal(false)}
                 />
+            )}
+            {showClearConfirm && (
+                <AlertDialog open onOpenChange={() => setShowClearConfirm(false)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Clear Order</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Are you sure you want to clear the entire order? This action cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleClearOrder} className="bg-destructive hover:bg-destructive/90">Clear Order</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             )}
         </div>
     );
