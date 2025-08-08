@@ -45,13 +45,18 @@ const OrderCart: React.FC<{
 }> = ({ currentOrder, total, updateQuantity, setQuantity, removeItem, onClearOrder, onPlaceOrder, isSheet = false }) => {
     
     const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>, itemId: string) => {
-        const newQuantity = parseInt(e.target.value, 10);
-        if (!isNaN(newQuantity) && newQuantity > 0) {
+        const value = e.target.value;
+        if (value === '') return;
+        const newQuantity = parseInt(value, 10);
+        if (!isNaN(newQuantity) && newQuantity >= 1) {
             setQuantity(itemId, newQuantity);
-        } else if (e.target.value === '') {
-            // allows deleting the value to type a new one
-        } else {
-             setQuantity(itemId, 1);
+        }
+    };
+
+    const handleQuantityBlur = (e: React.FocusEvent<HTMLInputElement>, itemId: string) => {
+        const value = e.target.value;
+        if (value === '' || parseInt(value, 10) < 1) {
+            setQuantity(itemId, 1);
         }
     };
     
@@ -78,7 +83,7 @@ const OrderCart: React.FC<{
                                         type="number"
                                         value={item.quantity}
                                         onChange={(e) => handleQuantityChange(e, item.id)}
-                                        onBlur={(e) => { if (e.target.value === '') setQuantity(item.id, 1); }}
+                                        onBlur={(e) => handleQuantityBlur(e, item.id)}
                                         className="font-bold w-12 text-center h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                     <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.id, 1)}><Plus size={14} /></Button>
@@ -169,14 +174,12 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
             return;
         }
         setCurrentOrder(prev => {
-            const newOrder = { ...prev };
-            const existingItem = newOrder[item.id];
+            const existingItem = prev[item.id];
             if (existingItem) {
-                existingItem.quantity++;
+                return { ...prev, [item.id]: { ...existingItem, quantity: existingItem.quantity + 1 } };
             } else {
-                newOrder[item.id] = { ...item, quantity: 1 };
+                return { ...prev, [item.id]: { ...item, quantity: 1 } };
             }
-            return newOrder;
         });
     }, []);
     
@@ -187,70 +190,58 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
         const combinedName = `English Breakfast with ${drinkName}`;
         
         setCurrentOrder(prev => {
-            const newOrder = { ...prev };
-            const existingItem = Object.values(newOrder).find(i => i.name === combinedName);
-    
-            if (existingItem) {
-                newOrder[existingItem.id].quantity += 1;
+            const existingEntry = Object.entries(prev).find(([, item]) => item.name === combinedName);
+
+            if (existingEntry) {
+                const [existingId, existingItem] = existingEntry;
+                return { ...prev, [existingId]: { ...existingItem, quantity: existingItem.quantity + 1 } };
             } else {
                 const newItemId = crypto.randomUUID();
-                newOrder[newItemId] = { ...breakfastItem, id: newItemId, name: combinedName, quantity: 1 };
+                return { ...prev, [newItemId]: { ...breakfastItem, id: newItemId, name: combinedName, quantity: 1 } };
             }
-            return newOrder;
         });
         setShowBreakfastModal(false);
     }, [menuItems]);
 
     const addCustomItemToOrder = useCallback((item: { name: string; price: number }) => {
         setCurrentOrder(prev => {
-            const newOrder = { ...prev };
             const newItemId = crypto.randomUUID();
-            newOrder[newItemId] = {
-                id: newItemId,
-                name: item.name,
-                price: item.price,
-                quantity: 1,
-                category: 'Custom'
+            return {
+                ...prev,
+                [newItemId]: { id: newItemId, name: item.name, price: item.price, quantity: 1, category: 'Custom' }
             };
-            return newOrder;
         });
         setShowCustomOrderModal(false);
     }, []);
 
     const updateQuantity = useCallback((itemId: string, amount: number) => {
         setCurrentOrder(prev => {
-            const newOrder = { ...prev };
-            if (!newOrder[itemId]) return prev;
-
-            const newQuantity = newOrder[itemId].quantity + amount;
-            if (newQuantity > 0) {
-                newOrder[itemId].quantity = newQuantity;
-            } else {
-                delete newOrder[itemId];
+            const item = prev[itemId];
+            if (!item) return prev;
+            const newQuantity = item.quantity + amount;
+            if (newQuantity <= 0) {
+                const { [itemId]: removed, ...rest } = prev;
+                return rest;
             }
-            return newOrder;
+            return { ...prev, [itemId]: { ...item, quantity: newQuantity } };
         });
     }, []);
     
     const setQuantity = useCallback((itemId: string, quantity: number) => {
         setCurrentOrder(prev => {
-            const newOrder = { ...prev };
-            if (!newOrder[itemId]) return prev;
-
-            if (quantity > 0) {
-                newOrder[itemId].quantity = quantity;
-            } else {
-                delete newOrder[itemId];
+            if (!prev[itemId]) return prev;
+            if (quantity <= 0) {
+                const { [itemId]: removed, ...rest } = prev;
+                return rest;
             }
-            return newOrder;
+            return { ...prev, [itemId]: { ...prev[itemId], quantity: quantity } };
         });
     }, []);
     
     const removeItem = useCallback((itemId: string) => {
         setCurrentOrder(prev => {
-            const newOrder = { ...prev };
-            delete newOrder[itemId];
-            return newOrder;
+            const { [itemId]: removed, ...rest } = prev;
+            return rest;
         });
     }, []);
 
@@ -280,14 +271,25 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
                 <div className="sticky top-0 bg-secondary/50 dark:bg-background py-2 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6">
                     <div className="flex gap-2 mb-4">
                         <div className="relative flex-grow">
-                            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
                             <Input
                                 type="text"
                                 placeholder="Search menu..."
                                 value={searchQuery}
+                                onClick={(e) => e.currentTarget.select()}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full p-3 pl-12 h-12 text-lg bg-card border-border rounded-xl focus:ring-2 focus:ring-primary"
+                                className="w-full p-3 pl-12 h-12 text-lg bg-card border-border rounded-xl focus:ring-2 focus:ring-primary pr-10"
                             />
+                            {searchQuery && (
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full" 
+                                    onClick={() => setSearchQuery('')}
+                                >
+                                    <X size={18} />
+                                </Button>
+                            )}
                         </div>
                         <Button
                             onClick={() => setShowCustomOrderModal(true)}
