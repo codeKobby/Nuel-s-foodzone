@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -86,7 +87,7 @@ const AdminView: React.FC<AdminViewProps> = ({ appId }) => {
     }, [menuItems]);
 
     return (
-        <div className="flex h-full bg-secondary/50 dark:bg-background">
+        <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
             <div className="flex-1 p-6 overflow-y-auto">
                 <h2 className="text-3xl font-bold mb-6">Menu Management</h2>
                 {loading && <LoadingSpinner />}
@@ -117,7 +118,7 @@ const AdminView: React.FC<AdminViewProps> = ({ appId }) => {
                     </div>
                 )}
             </div>
-            <Card className="w-96 rounded-none border-t-0 border-b-0 border-r-0">
+            <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-r-0">
                 <CardHeader>
                     <CardTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</CardTitle>
                 </CardHeader>
@@ -168,3 +169,5 @@ const AdminView: React.FC<AdminViewProps> = ({ appId }) => {
 };
 
 export default AdminView;
+
+    
