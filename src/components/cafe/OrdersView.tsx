@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -6,7 +7,7 @@ import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Tag } from 'lucide-react';
+import { AlertTriangle, Tag, Coins, Hourglass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -41,7 +42,16 @@ const OrderCard: React.FC<{ order: Order, onDetailsClick: (order: Order) => void
             </CardHeader>
             <CardContent>
                 <p className="text-2xl font-bold text-primary">{formatCurrency(order.total)}</p>
-                {order.balanceDue > 0 && <p className="text-sm text-amber-500">Balance: {formatCurrency(order.balanceDue)}</p>}
+                {order.balanceDue > 0 && 
+                    <p className="text-sm text-amber-500 flex items-center">
+                        <Hourglass size={14} className="inline mr-2"/>Balance: {formatCurrency(order.balanceDue)}
+                    </p>
+                }
+                 {order.changeGiven > 0 && 
+                    <p className="text-sm text-green-500 flex items-center">
+                        <Coins size={14} className="inline mr-2"/>Change: {formatCurrency(order.changeGiven)}
+                    </p>
+                }
                 <p className="text-xs text-muted-foreground mt-2">{formatTimestamp(order.timestamp)}</p>
             </CardContent>
             <CardFooter className="flex space-x-2">
@@ -83,32 +93,35 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
     
     const pendingOrders = orders.filter(o => o.status === 'Pending');
     const completedOrders = orders.filter(o => o.status === 'Completed');
+    const unpaidOrders = orders.filter(o => o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid');
+
+    const renderOrderList = (orderList: Order[], emptyMessage: string) => {
+        if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
+        if (error) return <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
+        return (
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
+                {orderList.length > 0 ? orderList.map(order => <OrderCard key={order.id} order={order} onDetailsClick={setSelectedOrder} onStatusUpdate={updateOrderStatus} />) : <p className="text-muted-foreground italic col-span-full text-center mt-8">{emptyMessage}</p>}
+            </div>
+        )
+    }
 
     return (
         <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
             <h2 className="text-3xl font-bold mb-6">Order Management</h2>
             <Tabs defaultValue="pending" className="w-full">
-              <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsList className="grid w-full max-w-md grid-cols-3">
                 <TabsTrigger value="pending">Pending ({pendingOrders.length})</TabsTrigger>
+                <TabsTrigger value="unpaid">Unpaid ({unpaidOrders.length})</TabsTrigger>
                 <TabsTrigger value="completed">Completed ({completedOrders.length})</TabsTrigger>
               </TabsList>
               <TabsContent value="pending">
-                {loading && <div className="mt-8"><LoadingSpinner /></div>}
-                {error && <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-                {!loading && !error && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
-                        {pendingOrders.length > 0 ? pendingOrders.map(order => <OrderCard key={order.id} order={order} onDetailsClick={setSelectedOrder} onStatusUpdate={updateOrderStatus} />) : <p className="text-muted-foreground italic col-span-full text-center mt-8">No pending orders.</p>}
-                    </div>
-                )}
+                {renderOrderList(pendingOrders, "No pending orders.")}
+              </TabsContent>
+               <TabsContent value="unpaid">
+                {renderOrderList(unpaidOrders, "No unpaid orders.")}
               </TabsContent>
               <TabsContent value="completed">
-                {loading && <div className="mt-8"><LoadingSpinner /></div>}
-                {error && <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-                {!loading && !error && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
-                        {completedOrders.length > 0 ? completedOrders.map(order => <OrderCard key={order.id} order={order} onDetailsClick={setSelectedOrder} onStatusUpdate={updateOrderStatus} />) : <p className="text-muted-foreground italic col-span-full text-center mt-8">No completed orders.</p>}
-                    </div>
-                )}
+                {renderOrderList(completedOrders, "No completed orders.")}
               </TabsContent>
             </Tabs>
 
