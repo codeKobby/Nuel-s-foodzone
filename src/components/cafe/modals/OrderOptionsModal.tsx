@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { collection, doc, addDoc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface OrderOptionsModalProps {
     appId: string;
@@ -27,12 +28,25 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
     const [orderTag, setOrderTag] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'momo'>('cash');
     const [cashPaid, setCashPaid] = useState('');
+    const [changeGiven, setChangeGiven] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const amountPaidNum = parseFloat(cashPaid || '0');
-    const change = paymentMethod === 'cash' && amountPaidNum > total ? amountPaidNum - total : 0;
-    const balanceDue = paymentMethod === 'cash' && total > amountPaidNum ? total - amountPaidNum : 0;
+    const calculatedChange = paymentMethod === 'cash' && amountPaidNum > total ? amountPaidNum - total : 0;
+    
+    useEffect(() => {
+        if (paymentMethod === 'cash' && amountPaidNum > total) {
+            setChangeGiven(calculatedChange.toFixed(2));
+        } else {
+            setChangeGiven('');
+        }
+    }, [cashPaid, total, paymentMethod, calculatedChange]);
+
+    const changeGivenNum = parseFloat(changeGiven || '0');
+    const finalBalanceDue = paymentMethod === 'cash' 
+        ? (total > amountPaidNum ? total - amountPaidNum : calculatedChange - changeGivenNum)
+        : 0;
 
     const processOrder = async (isPaid: boolean) => {
         setIsProcessing(true);
@@ -47,7 +61,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
             await setDoc(counterRef, { count: newCount });
             
             const finalAmountPaid = isPaid ? (paymentMethod === 'cash' ? amountPaidNum : total) : 0;
-            const finalBalanceDue = isPaid ? (paymentMethod === 'cash' ? balanceDue : 0) : total;
+            const paymentStatus = isPaid 
+                ? (finalBalanceDue > 0 && total > amountPaidNum ? 'Partially Paid' : 'Paid')
+                : 'Unpaid';
 
             const newOrder = {
                 simplifiedId: generateSimpleOrderId(newCount),
@@ -56,10 +72,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
                 items: Object.values(orderItems).map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
                 total,
                 paymentMethod: isPaid ? paymentMethod : 'Unpaid',
-                paymentStatus: isPaid ? (finalBalanceDue > 0 ? 'Partially Paid' : 'Paid') : 'Unpaid',
+                paymentStatus,
                 amountPaid: finalAmountPaid,
-                changeGiven: isPaid ? change : 0,
-                balanceDue: finalBalanceDue,
+                changeGiven: isPaid && paymentMethod === 'cash' ? changeGivenNum : 0,
+                balanceDue: isPaid ? finalBalanceDue : total,
                 status: 'Pending',
                 timestamp: serverTimestamp(),
             };
@@ -113,11 +129,20 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
                                 <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'secondary'}>Momo/Card</Button>
                             </div>
                             {paymentMethod === 'cash' && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="cashPaid">Amount Paid</Label>
-                                    <Input id="cashPaid" type="number" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="0.00" autoFocus className="text-lg h-12" />
-                                    {cashPaid && balanceDue > 0 && <p className="font-semibold text-yellow-500">Balance Due: {formatCurrency(balanceDue)}</p>}
-                                    {cashPaid && change > 0 && <p className="font-semibold text-green-500">Change: {formatCurrency(change)}</p>}
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
+                                        <Input id="cashPaid" type="number" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="0.00" autoFocus className="text-lg h-12" />
+                                    </div>
+                                    {cashPaid && calculatedChange > 0 && (
+                                        <div>
+                                            <Label htmlFor="changeGiven">Change Given to Customer</Label>
+                                            <Input id="changeGiven" type="number" value={changeGiven} onChange={(e) => setChangeGiven(e.target.value)} placeholder="0.00" className="text-lg h-12" />
+                                            <p className="text-sm text-muted-foreground mt-1">Calculated change: {formatCurrency(calculatedChange)}</p>
+                                        </div>
+                                    )}
+                                    {cashPaid && total > amountPaidNum && <p className="font-semibold text-yellow-500">Balance Owed by Customer: {formatCurrency(total - amountPaidNum)}</p>}
+                                    {cashPaid && finalBalanceDue > 0 && amountPaidNum >= total && <p className="font-semibold text-red-500">Change Owed to Customer: {formatCurrency(finalBalanceDue)}</p>}
                                 </div>
                             )}
                              {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}

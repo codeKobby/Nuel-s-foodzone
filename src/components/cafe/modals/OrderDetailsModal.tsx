@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useRef } from 'react';
@@ -13,45 +14,51 @@ interface OrderDetailsModalProps {
     onClose: () => void;
 }
 
-const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, ref) => (
-    <div ref={ref} className="receipt p-4 bg-white text-black font-mono">
-        <div className="text-center">
-            <Image src="https://i.imgur.com/2Y5hB9w.png" alt="Logo" width={60} height={60} className="mx-auto" />
-            <h3 className="font-bold">Nuel's Food Zone</h3>
-        </div>
-        <hr className="my-2 border-dashed border-black" />
-        <p><strong>Order:</strong> {order.simplifiedId}</p>
-        <p><strong>Date:</strong> {formatTimestamp(order.timestamp)}</p>
-        <p><strong>Type:</strong> {order.orderType}</p>
-        {order.tag && <p><strong>Tag:</strong> {order.tag}</p>}
-        <hr className="my-2 border-dashed border-black" />
-        <table className="w-full text-sm">
-            <thead>
-                <tr>
-                    <th className="text-left">Item</th>
-                    <th className="text-center">Qty</th>
-                    <th className="text-right">Price</th>
-                </tr>
-            </thead>
-            <tbody>
-                {order.items.map((item, i) => (
-                    <tr key={i}>
-                        <td>{item.name}</td>
-                        <td className="text-center">{item.quantity}</td>
-                        <td className="text-right">{formatCurrency(item.price * item.quantity)}</td>
+const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, ref) => {
+    const isBalanceOwedByCustomer = order.paymentStatus === 'Partially Paid' && order.total > order.amountPaid;
+    const isChangeOwedToCustomer = order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total;
+
+    return (
+        <div ref={ref} className="receipt p-4 bg-white text-black font-mono">
+            <div className="text-center">
+                <Image src="/logo.png" alt="Logo" width={60} height={60} className="mx-auto rounded-md" />
+                <h3 className="font-bold">Nuel's Food Zone</h3>
+            </div>
+            <hr className="my-2 border-dashed border-black" />
+            <p><strong>Order:</strong> {order.simplifiedId}</p>
+            <p><strong>Date:</strong> {formatTimestamp(order.timestamp)}</p>
+            <p><strong>Type:</strong> {order.orderType}</p>
+            {order.tag && <p><strong>Tag:</strong> {order.tag}</p>}
+            <hr className="my-2 border-dashed border-black" />
+            <table className="w-full text-sm">
+                <thead>
+                    <tr>
+                        <th className="text-left">Item</th>
+                        <th className="text-center">Qty</th>
+                        <th className="text-right">Price</th>
                     </tr>
-                ))}
-            </tbody>
-        </table>
-        <hr className="my-2 border-dashed border-black" />
-        <p className="text-right font-bold">Total: {formatCurrency(order.total)}</p>
-        <p className="text-right">Paid ({order.paymentMethod}): {formatCurrency(order.amountPaid)}</p>
-        {order.balanceDue > 0 && <p className="text-right font-bold">Balance Due: {formatCurrency(order.balanceDue)}</p>}
-        {order.changeGiven > 0 && <p className="text-right">Change: {formatCurrency(order.changeGiven)}</p>}
-        <hr className="my-2 border-dashed border-black" />
-        <p className="text-center">Thank you!</p>
-    </div>
-));
+                </thead>
+                <tbody>
+                    {order.items.map((item, i) => (
+                        <tr key={i}>
+                            <td>{item.name}</td>
+                            <td className="text-center">{item.quantity}</td>
+                            <td className="text-right">{formatCurrency(item.price * item.quantity)}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            <hr className="my-2 border-dashed border-black" />
+            <p className="text-right font-bold">Total: {formatCurrency(order.total)}</p>
+            <p className="text-right">Paid ({order.paymentMethod}): {formatCurrency(order.amountPaid)}</p>
+            {isBalanceOwedByCustomer && <p className="text-right font-bold">Balance Due: {formatCurrency(order.balanceDue)}</p>}
+            <p className="text-right">Change Given: {formatCurrency(order.changeGiven)}</p>
+            {isChangeOwedToCustomer && <p className="text-right font-bold text-red-600">Change Owed: {formatCurrency(order.balanceDue)}</p>}
+            <hr className="my-2 border-dashed border-black" />
+            <p className="text-center">Thank you!</p>
+        </div>
+    );
+});
 Receipt.displayName = "Receipt";
 
 const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose }) => {
@@ -72,10 +79,11 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose })
                         .receipt { padding: 1rem; color: black; background: white; }
                         .text-center { text-align: center; }
                         .font-bold { font-weight: bold; }
+                        .text-red-600 { color: #dc2626; }
                         hr { border: none; border-top: 1px dashed black; margin: 0.5rem 0; }
                         table { width: 100%; font-size: 0.875rem; border-collapse: collapse; }
                         th, td { padding: 2px 0; } .text-left { text-align: left; } .text-right { text-align: right; }
-                        img { max-width: 60px; margin: 0 auto; }
+                        img { max-width: 60px; margin: 0 auto; border-radius: 0.375rem; }
                     </style>
                 </head>
                 <body>

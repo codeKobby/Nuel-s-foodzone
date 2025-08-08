@@ -29,7 +29,7 @@ export interface Order {
   paymentStatus: 'Paid' | 'Unpaid' | 'Partially Paid';
   amountPaid: number;
   changeGiven: number;
-  balanceDue: number;
+  balanceDue: number; // For amount owed by customer OR change owed to customer
   status: 'Pending' | 'Completed';
   timestamp: Timestamp;
 }

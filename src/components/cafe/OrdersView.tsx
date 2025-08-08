@@ -1,19 +1,21 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy } from 'firebase/firestore';
+import React, { useState, useEffect, useMemo } from 'react';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Tag, Coins, Hourglass } from 'lucide-react';
+import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import OrderDetailsModal from './modals/OrderDetailsModal';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import ChangeDueModal from './modals/ChangeDueModal';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface OrdersViewProps {
     appId: string;
@@ -25,6 +27,9 @@ const OrderCard: React.FC<{ order: Order, onDetailsClick: (order: Order) => void
         'Unpaid': 'destructive',
         'Partially Paid': 'secondary',
     } as const;
+    
+    const isBalanceOwedByCustomer = order.paymentStatus === 'Partially Paid' && order.total > order.amountPaid;
+    const isChangeOwedToCustomer = order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total;
 
     return (
         <Card className="flex flex-col justify-between transition hover:shadow-lg">
@@ -42,14 +47,14 @@ const OrderCard: React.FC<{ order: Order, onDetailsClick: (order: Order) => void
             </CardHeader>
             <CardContent>
                 <p className="text-2xl font-bold text-primary">{formatCurrency(order.total)}</p>
-                {order.balanceDue > 0 && 
+                {isBalanceOwedByCustomer && 
                     <p className="text-sm text-amber-500 flex items-center">
                         <Hourglass size={14} className="inline mr-2"/>Balance: {formatCurrency(order.balanceDue)}
                     </p>
                 }
-                 {order.changeGiven > 0 && 
-                    <p className="text-sm text-green-500 flex items-center">
-                        <Coins size={14} className="inline mr-2"/>Change: {formatCurrency(order.changeGiven)}
+                 {isChangeOwedToCustomer && 
+                    <p className="text-sm text-red-500 flex items-center">
+                        <Coins size={14} className="inline mr-2"/>Change Due: {formatCurrency(order.balanceDue)}
                     </p>
                 }
                 <p className="text-xs text-muted-foreground mt-2">{formatTimestamp(order.timestamp)}</p>
@@ -71,6 +76,7 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
 
     useEffect(() => {
         setLoading(true);
@@ -91,9 +97,21 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
         }
     };
     
-    const pendingOrders = orders.filter(o => o.status === 'Pending');
-    const completedOrders = orders.filter(o => o.status === 'Completed');
-    const unpaidOrders = orders.filter(o => o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid');
+    const settleChange = async (orderId: string) => {
+        const orderRef = doc(db, `/artifacts/${appId}/public/data/orders`, orderId);
+        try {
+            await updateDoc(orderRef, {
+                balanceDue: 0
+            });
+        } catch (e) {
+            setError("Failed to settle change.");
+        }
+    };
+    
+    const pendingOrders = useMemo(() => orders.filter(o => o.status === 'Pending'), [orders]);
+    const completedOrders = useMemo(() => orders.filter(o => o.status === 'Completed'), [orders]);
+    const unpaidOrders = useMemo(() => orders.filter(o => o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid'), [orders]);
+    const changeDueOrders = useMemo(() => orders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [orders]);
 
     const renderOrderList = (orderList: Order[], emptyMessage: string) => {
         if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
@@ -106,27 +124,45 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
     }
 
     return (
-        <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
-            <h2 className="text-3xl font-bold mb-6">Order Management</h2>
-            <Tabs defaultValue="pending" className="w-full">
-              <TabsList className="grid w-full max-w-md grid-cols-3">
-                <TabsTrigger value="pending">Pending ({pendingOrders.length})</TabsTrigger>
-                <TabsTrigger value="unpaid">Unpaid ({unpaidOrders.length})</TabsTrigger>
-                <TabsTrigger value="completed">Completed ({completedOrders.length})</TabsTrigger>
-              </TabsList>
-              <TabsContent value="pending">
-                {renderOrderList(pendingOrders, "No pending orders.")}
-              </TabsContent>
-               <TabsContent value="unpaid">
-                {renderOrderList(unpaidOrders, "No unpaid orders.")}
-              </TabsContent>
-              <TabsContent value="completed">
-                {renderOrderList(completedOrders, "No completed orders.")}
-              </TabsContent>
-            </Tabs>
+        <TooltipProvider>
+            <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
+                <div className="flex items-center space-x-4 mb-6">
+                    <h2 className="text-3xl font-bold">Order Management</h2>
+                    {changeDueOrders.length > 0 && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="outline" size="icon" className="relative" onClick={() => setIsChangeModalOpen(true)}>
+                                    <HandCoins className="text-red-500" />
+                                    <Badge className="absolute -top-2 -right-2 h-5 w-5 justify-center p-0">{changeDueOrders.length}</Badge>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>View Orders with Change Due</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
+                </div>
+                <Tabs defaultValue="pending" className="w-full">
+                  <TabsList className="grid w-full max-w-md grid-cols-3">
+                    <TabsTrigger value="pending">Pending ({pendingOrders.length})</TabsTrigger>
+                    <TabsTrigger value="unpaid">Unpaid ({unpaidOrders.length})</TabsTrigger>
+                    <TabsTrigger value="completed">Completed ({completedOrders.length})</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="pending">
+                    {renderOrderList(pendingOrders, "No pending orders.")}
+                  </TabsContent>
+                   <TabsContent value="unpaid">
+                    {renderOrderList(unpaidOrders, "No unpaid orders.")}
+                  </TabsContent>
+                  <TabsContent value="completed">
+                    {renderOrderList(completedOrders, "No completed orders.")}
+                  </TabsContent>
+                </Tabs>
 
-            {selectedOrder && <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />}
-        </div>
+                {selectedOrder && <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />}
+                {isChangeModalOpen && <ChangeDueModal orders={changeDueOrders} onSettle={settleChange} onClose={() => setIsChangeModalOpen(false)} />}
+            </div>
+        </TooltipProvider>
     );
 };
 
