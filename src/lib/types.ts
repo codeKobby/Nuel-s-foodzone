@@ -38,4 +38,5 @@ export interface MiscExpense {
   purpose: string;
   amount: number;
   timestamp: Timestamp;
+  settled: boolean;
 }

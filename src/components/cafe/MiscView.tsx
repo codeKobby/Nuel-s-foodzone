@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { MiscExpense } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Check } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Badge } from '@/components/ui/badge';
 
 interface MiscViewProps {
     appId: string;
@@ -54,6 +55,7 @@ const MiscView: React.FC<MiscViewProps> = ({ appId }) => {
         const data = { 
             purpose: formState.purpose, 
             amount: parseFloat(formState.amount), 
+            settled: false,
             timestamp: serverTimestamp()
         };
         try {
@@ -65,6 +67,14 @@ const MiscView: React.FC<MiscViewProps> = ({ appId }) => {
     const handleDelete = async (itemId: string) => {
         try { await deleteDoc(doc(db, `/artifacts/${appId}/public/data/miscExpenses`, itemId)); } catch (e) { setError("Failed to delete expense."); }
         setShowDeleteConfirm(null);
+    };
+    
+    const handleSettle = async (itemId: string) => {
+        try {
+            await updateDoc(doc(db, `/artifacts/${appId}/public/data/miscExpenses`, itemId), { settled: true });
+        } catch (e) {
+            setError("Failed to settle expense.");
+        }
     };
 
     return (
@@ -82,12 +92,19 @@ const MiscView: React.FC<MiscViewProps> = ({ appId }) => {
                         <CardContent className="space-y-3">
                             {expenses.length === 0 && <p className="text-muted-foreground italic text-center py-4">No expenses recorded yet.</p>}
                             {expenses.map(item => (
-                                <div key={item.id} className="bg-secondary p-3 rounded-lg flex justify-between items-center">
+                                <div key={item.id} className={`p-3 rounded-lg flex justify-between items-center ${item.settled ? 'bg-green-100 dark:bg-green-900/20' : 'bg-secondary'}`}>
                                     <div>
                                         <p className="font-semibold">{item.purpose}</p>
                                         <p className="text-sm text-muted-foreground">{formatCurrency(item.amount)} - {formatTimestamp(item.timestamp)}</p>
                                     </div>
-                                    <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                    <div className="flex items-center space-x-1">
+                                        {item.settled ? (
+                                            <Badge variant="default" className="bg-green-500 hover:bg-green-500">Settled</Badge>
+                                        ) : (
+                                            <Button variant="ghost" size="icon" onClick={() => handleSettle(item.id)}><Check className="h-4 w-4 text-green-500" /></Button>
+                                        )}
+                                        <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                    </div>
                                 </div>
                             ))}
                         </CardContent>

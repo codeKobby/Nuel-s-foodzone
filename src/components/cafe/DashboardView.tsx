@@ -77,7 +77,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
                 const ordersQuery = query(ordersRef, where("timestamp", ">=", startDate), orderBy("timestamp", "asc"));
                 
                 const miscExpensesRef = collection(db, `/artifacts/${appId}/public/data/miscExpenses`);
-                const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDate));
+                const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDate), where("settled", "==", true));
                 
                 const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
 
@@ -139,7 +139,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                     <StatCard icon={<DollarSign className="text-green-500"/>} title="Net Sales" value={formatCurrency(stats.netSales)} color="border-green-500" />
                     <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.orderCount} color="border-blue-500" />
-                    <StatCard icon={<Briefcase className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.totalMiscExpenses)} color="border-orange-500" />
+                    <StatCard icon={<Briefcase className="text-orange-500"/>} title="Settled Misc. Expenses" value={formatCurrency(stats.totalMiscExpenses)} color="border-orange-500" />
                 </div>
                 <Card className="mb-6">
                     <CardHeader>
