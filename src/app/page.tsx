@@ -51,10 +51,16 @@ export default function CafePage() {
                 setIsAuthReady(true);
             } catch (e) {
                 console.error("Authentication Error:", e);
-                if (e instanceof Error && (e.message.includes("auth/invalid-api-key") || e.message.includes("Firebase: Error"))) {
-                     setAuthError("Firebase configuration is invalid. Please check your API key and other settings.");
+                if (e instanceof Error) {
+                    if (e.message.includes("auth/invalid-api-key")) {
+                        setAuthError("Firebase configuration is invalid. Please check your API key and other settings in your .env.local file.");
+                    } else if (e.message.includes("auth/configuration-not-found")) {
+                        setAuthError("Anonymous sign-in is not enabled in your Firebase project. Please go to the Firebase console, navigate to Authentication > Sign-in method, and enable the Anonymous provider.");
+                    } else {
+                        setAuthError("Failed to authenticate. Please check your connection and refresh the page.");
+                    }
                 } else {
-                     setAuthError("Failed to authenticate. Please check your connection and refresh the page.");
+                     setAuthError("An unknown authentication error occurred.");
                 }
                 setIsAuthReady(true);
             }
