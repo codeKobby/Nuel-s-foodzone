@@ -24,7 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
         <TooltipProvider>
             <nav className="w-20 bg-card border-r border-border flex flex-col items-center justify-between py-6 shadow-md z-20">
                 <div>
-                    <Image src="https://i.imgur.com/gJ54w4r.png" alt="Nuel's Food Zone Logo" width={48} height={48} className="mb-10 mx-auto rounded-full shadow-md" />
+                    <Image src="https://i.imgur.com/2Y5hB9w.png" alt="Nuel's Food Zone Logo" width={48} height={48} className="mb-10 mx-auto rounded-full shadow-md" />
                     <ul className="space-y-4">
                         {navItems.map(item => (
                              <li key={item.id} className="relative">

@@ -16,7 +16,7 @@ interface OrderDetailsModalProps {
 const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, ref) => (
     <div ref={ref} className="receipt p-4 bg-white text-black font-mono">
         <div className="text-center">
-            <Image src="https://i.imgur.com/gJ54w4r.png" alt="Logo" width={60} height={60} className="mx-auto" />
+            <Image src="https://i.imgur.com/2Y5hB9w.png" alt="Logo" width={60} height={60} className="mx-auto" />
             <h3 className="font-bold">Nuel's Food Zone</h3>
         </div>
         <hr className="my-2 border-dashed border-black" />
