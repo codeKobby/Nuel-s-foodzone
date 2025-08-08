@@ -23,43 +23,32 @@ export default function CafePage() {
     const [appId, setAppId] = useState<string | null>(null);
 
     useEffect(() => {
+        if (!auth) {
+            setAuthError("Firebase is not configured. Please check your environment variables.");
+            setIsAuthReady(true);
+            return;
+        }
+
         if (typeof window !== 'undefined') {
             const storedTheme = localStorage.getItem('theme') || 'light';
             setTheme(storedTheme);
             document.documentElement.classList.add(storedTheme);
-            
-            // Set appId from environment variable on the client
-            const firebaseAppId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
-            if (firebaseAppId) {
-                setAppId(firebaseAppId);
-            } else {
-                console.error("Firebase App ID is not configured.");
-                setAuthError("Application is not configured correctly. Missing Firebase App ID.");
-            }
         }
-    }, []);
 
-    const toggleTheme = () => {
-        const newTheme = theme === 'light' ? 'dark' : 'light';
-        const root = window.document.documentElement;
-        root.classList.remove(theme);
-        root.classList.add(newTheme);
-        localStorage.setItem('theme', newTheme);
-        setTheme(newTheme);
-    };
-
-    useEffect(() => {
-        // Firebase auth operations should only run on the client
-        if (typeof window === 'undefined') return;
+        const firebaseAppId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
+        if (firebaseAppId) {
+            setAppId(firebaseAppId);
+        } else {
+            console.error("Firebase App ID is not configured.");
+            setAuthError("Application is not configured correctly. Missing Firebase App ID.");
+        }
 
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             try {
                 if (!user) {
                     await signInAnonymously(auth);
                 }
-                // Once user is available, auth is ready
-                 setIsAuthReady(true);
-
+                setIsAuthReady(true);
             } catch (e) {
                 console.error("Authentication Error:", e);
                 if (e instanceof Error && (e.message.includes("auth/invalid-api-key") || e.message.includes("Firebase: Error"))) {
@@ -73,8 +62,17 @@ export default function CafePage() {
         return () => unsubscribe();
     }, []);
     
+    const toggleTheme = () => {
+        const newTheme = theme === 'light' ? 'dark' : 'light';
+        const root = window.document.documentElement;
+        root.classList.remove(theme);
+        root.classList.add(newTheme);
+        localStorage.setItem('theme', newTheme);
+        setTheme(newTheme);
+    };
+    
     useEffect(() => {
-        if (!isAuthReady || !appId) return;
+        if (!isAuthReady || !appId || !db) return;
         const q = query(collection(db, `/artifacts/${appId}/public/data/orders`), where("status", "==", "Pending"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setPendingOrdersCount(snapshot.size);
