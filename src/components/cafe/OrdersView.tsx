@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, writeBatch, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -28,7 +28,7 @@ const OrderCard: React.FC<{ order: Order, onDetailsClick: (order: Order) => void
         'Partially Paid': 'secondary',
     } as const;
     
-    const isBalanceOwedByCustomer = order.paymentStatus === 'Partially Paid' && order.total > order.amountPaid;
+    const isBalanceOwedByCustomer = order.paymentStatus === 'Partially Paid' || order.paymentStatus === 'Unpaid';
     const isChangeOwedToCustomer = order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total;
 
     return (
@@ -97,13 +97,26 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
         }
     };
     
-    const settleChange = async (orderId: string) => {
+    const settleChange = async (orderId: string, settleAmount: number) => {
         const orderRef = doc(db, `/artifacts/${appId}/public/data/orders`, orderId);
         try {
-            await updateDoc(orderRef, {
-                balanceDue: 0
+             await runTransaction(db, async (transaction) => {
+                const orderDoc = await transaction.get(orderRef);
+                if (!orderDoc.exists()) {
+                    throw "Document does not exist!";
+                }
+                const currentBalance = orderDoc.data().balanceDue || 0;
+                const newBalance = Math.max(0, currentBalance - settleAmount);
+                const currentChangeGiven = orderDoc.data().changeGiven || 0;
+                const newChangeGiven = currentChangeGiven + settleAmount;
+
+                transaction.update(orderRef, { 
+                    balanceDue: newBalance,
+                    changeGiven: newChangeGiven
+                });
             });
         } catch (e) {
+            console.error(e);
             setError("Failed to settle change.");
         }
     };

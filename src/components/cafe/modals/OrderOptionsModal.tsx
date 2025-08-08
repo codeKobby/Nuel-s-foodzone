@@ -36,12 +36,14 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
     const calculatedChange = paymentMethod === 'cash' && amountPaidNum > total ? amountPaidNum - total : 0;
     
     useEffect(() => {
-        if (paymentMethod === 'cash' && amountPaidNum > total) {
-            setChangeGiven(calculatedChange.toFixed(2));
+        if (paymentMethod === 'cash' && amountPaidNum >= total) {
+             setCashPaid(amountPaidNum.toString()); // Ensure cashPaid reflects a number for auto-fill
+             setChangeGiven(calculatedChange.toFixed(2));
         } else {
             setChangeGiven('');
         }
-    }, [cashPaid, total, paymentMethod, calculatedChange]);
+    }, [cashPaid, total, paymentMethod, calculatedChange, amountPaidNum]);
+
 
     const changeGivenNum = parseFloat(changeGiven || '0');
     const finalBalanceDue = paymentMethod === 'cash' 
@@ -62,7 +64,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
             
             const finalAmountPaid = isPaid ? (paymentMethod === 'cash' ? amountPaidNum : total) : 0;
             const paymentStatus = isPaid 
-                ? (finalBalanceDue > 0 && total > amountPaidNum ? 'Partially Paid' : 'Paid')
+                ? (finalAmountPaid < total ? 'Partially Paid' : 'Paid')
                 : 'Unpaid';
 
             const newOrder = {
@@ -75,7 +77,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
                 paymentStatus,
                 amountPaid: finalAmountPaid,
                 changeGiven: isPaid && paymentMethod === 'cash' ? changeGivenNum : 0,
-                balanceDue: isPaid ? finalBalanceDue : total,
+                balanceDue: isPaid ? Math.max(0, finalBalanceDue) : total,
                 status: 'Pending',
                 timestamp: serverTimestamp(),
             };
@@ -132,12 +134,12 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
                                 <div className="space-y-4">
                                     <div>
                                         <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
-                                        <Input id="cashPaid" type="number" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="0.00" autoFocus className="text-lg h-12" />
+                                        <Input id="cashPaid" type="number" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
                                     </div>
                                     {cashPaid && calculatedChange > 0 && (
                                         <div>
                                             <Label htmlFor="changeGiven">Change Given to Customer</Label>
-                                            <Input id="changeGiven" type="number" value={changeGiven} onChange={(e) => setChangeGiven(e.target.value)} placeholder="0.00" className="text-lg h-12" />
+                                            <Input id="changeGiven" type="number" value={changeGiven} onChange={(e) => setChangeGiven(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} className="text-lg h-12" />
                                             <p className="text-sm text-muted-foreground mt-1">Calculated change: {formatCurrency(calculatedChange)}</p>
                                         </div>
                                     )}
