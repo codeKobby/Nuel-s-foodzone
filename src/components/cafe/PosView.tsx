@@ -68,7 +68,7 @@ const OrderCart: React.FC<{
                                         value={item.quantity}
                                         onChange={(e) => handleQuantityChange(e, item.id)}
                                         onBlur={(e) => { if (e.target.value === '') setQuantity(item.id, 1); }}
-                                        className="font-bold w-12 text-center h-8"
+                                        className="font-bold w-12 text-center h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                     <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.id, 1)}><Plus size={14} /></Button>
                                 </div>
@@ -364,5 +364,3 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
 };
 
 export default PosView;
-
-    
