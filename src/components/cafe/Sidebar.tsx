@@ -2,7 +2,7 @@
 "use client";
 
 import Image from 'next/image';
-import { Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase } from 'lucide-react';
+import { Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase, Scale } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import logo from '@/app/logo.png';
 
@@ -19,6 +19,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
         { id: 'pos', icon: Home, label: 'POS' },
         { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
         { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
+        { id: 'accounting', icon: Scale, label: 'Accounting' },
         { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
         { id: 'admin', icon: Settings, label: 'Admin' },
     ];

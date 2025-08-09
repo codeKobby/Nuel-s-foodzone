@@ -12,6 +12,7 @@ import OrdersView from '@/components/cafe/OrdersView';
 import DashboardView from '@/components/cafe/DashboardView';
 import AdminView from '@/components/cafe/AdminView';
 import MiscView from '@/components/cafe/MiscView';
+import AccountingView from '@/components/cafe/AccountingView';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
@@ -97,6 +98,7 @@ export default function CafePage() {
             case 'pos': return <PosView appId={appId} />;
             case 'orders': return <OrdersView appId={appId} />;
             case 'dashboard': return <DashboardView appId={appId} />;
+            case 'accounting': return <AccountingView appId={appId} />;
             case 'misc': return <MiscView appId={appId} />;
             case 'admin': return <AdminView appId={appId} />;
             default: return <PosView appId={appId}/>;

@@ -42,4 +42,17 @@ export interface MiscExpense {
   settled: boolean;
 }
 
-    
+export interface ReconciliationReport {
+    id: string;
+    timestamp: Timestamp;
+    period: string;
+    totalSales: number;
+    cashSales: number;
+    momoSales: number;
+    miscExpenses: number;
+    expectedCash: number;
+    countedCash: number;
+    countedMomo: number;
+    cashDifference: number;
+    notes: string;
+}
