@@ -23,10 +23,9 @@ export default function CafePage() {
     const [authError, setAuthError] = useState<string | null>(null);
     const [theme, setTheme] = useState('light');
     const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
-    const [appId, setAppId] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!auth) {
+        if (!auth || !db) {
             setAuthError("Firebase is not configured. Please check your environment variables.");
             setIsAuthReady(true);
             return;
@@ -36,14 +35,6 @@ export default function CafePage() {
             const storedTheme = localStorage.getItem('theme') || 'light';
             setTheme(storedTheme);
             document.documentElement.classList.add(storedTheme);
-        }
-
-        const firebaseAppId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
-        if (firebaseAppId) {
-            setAppId(firebaseAppId);
-        } else {
-            console.error("Firebase App ID is not configured.");
-            setAuthError("Application is not configured correctly. Missing Firebase App ID.");
         }
 
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -81,27 +72,26 @@ export default function CafePage() {
     };
     
     useEffect(() => {
-        if (!isAuthReady || !appId || !db) return;
-        const q = query(collection(db, `/artifacts/${appId}/public/data/orders`), where("status", "==", "Pending"));
+        if (!isAuthReady || !db) return;
+        const q = query(collection(db, "orders"), where("status", "==", "Pending"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setPendingOrdersCount(snapshot.size);
         }, (error) => {
             console.error("Error fetching pending orders count:", error);
         });
         return () => unsubscribe();
-    }, [isAuthReady, appId]);
+    }, [isAuthReady]);
 
 
     const renderActiveView = () => {
-        if (!appId) return <div className="flex-1 flex items-center justify-center"><LoadingSpinner /></div>;
         switch (activeView) {
-            case 'pos': return <PosView appId={appId} />;
-            case 'orders': return <OrdersView appId={appId} />;
-            case 'dashboard': return <DashboardView appId={appId} />;
-            case 'accounting': return <AccountingView appId={appId} />;
-            case 'misc': return <MiscView appId={appId} />;
-            case 'admin': return <AdminView appId={appId} />;
-            default: return <PosView appId={appId}/>;
+            case 'pos': return <PosView />;
+            case 'orders': return <OrdersView />;
+            case 'dashboard': return <DashboardView />;
+            case 'accounting': return <AccountingView />;
+            case 'misc': return <MiscView />;
+            case 'admin': return <AdminView />;
+            default: return <PosView />;
         }
     };
 

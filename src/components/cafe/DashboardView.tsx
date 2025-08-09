@@ -15,10 +15,6 @@ import { Button } from '@/components/ui/button';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart"
 import { BarChart, CartesianGrid, XAxis, YAxis, Bar, Legend, ResponsiveContainer, Tooltip } from 'recharts';
 
-interface DashboardViewProps {
-    appId: string;
-}
-
 interface Stats {
     totalSales: number;
     totalMiscExpenses: number;
@@ -48,7 +44,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
+const DashboardView: React.FC = () => {
     const [stats, setStats] = useState<Stats>({ totalSales: 0, totalMiscExpenses: 0, netSales: 0, orderCount: 0, salesData: [], topItems: [], bottomItems: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -75,10 +71,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
                 
                 const startDateTimestamp = Timestamp.fromDate(startDate);
 
-                const ordersRef = collection(db, `/artifacts/${appId}/public/data/orders`);
+                const ordersRef = collection(db, "orders");
                 const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp), orderBy("timestamp", "asc"));
                 
-                const miscExpensesRef = collection(db, `/artifacts/${appId}/public/data/miscExpenses`);
+                const miscExpensesRef = collection(db, "miscExpenses");
                 const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp));
                 
                 const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
@@ -126,7 +122,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
             }
         };
         fetchDashboardData();
-    }, [timeRange, appId]);
+    }, [timeRange]);
 
     return (
         <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
@@ -202,5 +198,3 @@ const DashboardView: React.FC<DashboardViewProps> = ({ appId }) => {
 };
 
 export default DashboardView;
-
-    

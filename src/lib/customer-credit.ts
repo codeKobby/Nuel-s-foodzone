@@ -5,14 +5,13 @@ import type { Order } from './types';
 
 /**
  * Finds and optionally applies customer credit from previous orders.
- * @param appId The application ID.
  * @param customerTag The customer tag to search for.
  * @param batch Optional Firestore write batch to add update operations to.
  * @param creditToApply The amount of credit to apply. If not provided, just finds credit.
  * @returns The total credit found and a list of orders that have the credit.
  */
-export async function findAndApplyCustomerCredit(appId: string, customerTag: string, batch?: WriteBatch, creditToApply?: number) {
-    const ordersRef = collection(db, `/artifacts/${appId}/public/data/orders`);
+export async function findAndApplyCustomerCredit(customerTag: string, batch?: WriteBatch, creditToApply?: number) {
+    const ordersRef = collection(db, "orders");
     // Find orders with the same tag that have change due (balanceDue > 0 and was paid by cash)
     const q = query(ordersRef, 
         where('tag', '==', customerTag),
@@ -42,7 +41,7 @@ export async function findAndApplyCustomerCredit(appId: string, customerTag: str
         for (const order of creditOrders) {
             if (remainingCreditToApply <= 0) break;
 
-            const orderRef = doc(db, `/artifacts/${appId}/public/data/orders`, order.id);
+            const orderRef = doc(db, "orders", order.id);
             const amountFromThisOrder = Math.min(order.balanceDue, remainingCreditToApply);
 
             const newBalanceDue = order.balanceDue - amountFromThisOrder;

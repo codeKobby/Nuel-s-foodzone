@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, doc, writeBatch, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency } from '@/lib/utils';
 import type { Order } from '@/lib/types';
@@ -11,19 +11,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Tag } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { findAndApplyCustomerCredit } from '@/lib/customer-credit';
 
 interface CombinedPaymentModalProps {
-    appId: string;
     orders: Order[];
     onClose: () => void;
     onOrderPlaced: () => void;
 }
 
-const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ appId, orders, onClose, onOrderPlaced }) => {
+const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onClose, onOrderPlaced }) => {
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'momo'>('cash');
     const [cashPaid, setCashPaid] = useState('');
     const [changeGiven, setChangeGiven] = useState('');
@@ -41,12 +40,12 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ appId, orde
             if (customerTags.length > 0) {
                 // For simplicity, we use the first tag to find credit. 
                 // A more complex system could handle multiple customers.
-                const { creditFound } = await findAndApplyCustomerCredit(appId, customerTags[0]);
+                const { creditFound } = await findAndApplyCustomerCredit(customerTags[0]);
                 setCreditApplied(creditFound);
             }
         };
         applyCredit();
-    }, [appId, orders]);
+    }, [orders]);
 
 
     const totalToPay = Math.max(0, totalToPayBeforeCredit - creditApplied);
@@ -77,13 +76,13 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ appId, orde
             // Apply credit if any was found
             if (creditApplied > 0) {
                  const customerTags = [...new Set(orders.map(o => o.tag).filter(Boolean))];
-                 await findAndApplyCustomerCredit(appId, customerTags[0], batch, creditApplied);
+                 await findAndApplyCustomerCredit(customerTags[0], batch, creditApplied);
             }
 
             // Update the orders being paid for
             let remainingPaid = paymentMethod === 'cash' ? amountPaidNum : totalToPay;
             for (const order of orders) {
-                const orderRef = doc(db, `/artifacts/${appId}/public/data/orders`, order.id);
+                const orderRef = doc(db, "orders", order.id);
                 const orderBalance = order.balanceDue || order.total;
                 const amountToPayForOrder = Math.min(remainingPaid, orderBalance);
                 
@@ -104,7 +103,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ appId, orde
             // Distribute change given if any, to the last order
              if (paymentMethod === 'cash' && changeGivenNum > 0) {
                 const lastOrder = orders[orders.length - 1];
-                const lastOrderRef = doc(db, `/artifacts/${appId}/public/data/orders`, lastOrder.id);
+                const lastOrderRef = doc(db, "orders", lastOrder.id);
                 batch.update(lastOrderRef, { balanceDue: changeGivenNum });
             }
 

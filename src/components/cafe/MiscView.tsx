@@ -26,11 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 
-interface MiscViewProps {
-    appId: string;
-}
-
-const MiscView: React.FC<MiscViewProps> = ({ appId }) => {
+const MiscView: React.FC = () => {
     const [expenses, setExpenses] = useState<MiscExpense[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -38,14 +34,14 @@ const MiscView: React.FC<MiscViewProps> = ({ appId }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<MiscExpense | null>(null);
 
     useEffect(() => {
-        const expensesRef = collection(db, `/artifacts/${appId}/public/data/miscExpenses`);
+        const expensesRef = collection(db, "miscExpenses");
         const q = query(expensesRef, orderBy('timestamp', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MiscExpense)));
             setLoading(false);
         }, (e) => { setError("Failed to load miscellaneous expenses."); setLoading(false); });
         return () => unsubscribe();
-    }, [appId]);
+    }, []);
     
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormState(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -59,19 +55,19 @@ const MiscView: React.FC<MiscViewProps> = ({ appId }) => {
             timestamp: serverTimestamp()
         };
         try {
-            await addDoc(collection(db, `/artifacts/${appId}/public/data/miscExpenses`), data);
+            await addDoc(collection(db, "miscExpenses"), data);
             setFormState({ purpose: '', amount: ''});
         } catch (e) { setError("Failed to save expense."); }
     };
 
     const handleDelete = async (itemId: string) => {
-        try { await deleteDoc(doc(db, `/artifacts/${appId}/public/data/miscExpenses`, itemId)); } catch (e) { setError("Failed to delete expense."); }
+        try { await deleteDoc(doc(db, "miscExpenses", itemId)); } catch (e) { setError("Failed to delete expense."); }
         setShowDeleteConfirm(null);
     };
     
     const handleSettle = async (itemId: string) => {
         try {
-            await updateDoc(doc(db, `/artifacts/${appId}/public/data/miscExpenses`, itemId), { settled: true });
+            await updateDoc(doc(db, "miscExpenses", itemId), { settled: true });
         } catch (e) {
             setError("Failed to settle expense.");
         }

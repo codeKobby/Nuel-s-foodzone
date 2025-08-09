@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { collection, doc, addDoc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, addDoc, getDoc, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
 import type { OrderItem } from '@/lib/types';
@@ -12,17 +12,15 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
 
 interface OrderOptionsModalProps {
-    appId: string;
     total: number;
     orderItems: Record<string, OrderItem>;
     onClose: () => void;
     onOrderPlaced: () => void;
 }
 
-const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, orderItems, onClose, onOrderPlaced }) => {
+const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems, onClose, onOrderPlaced }) => {
     const [step, setStep] = useState(1);
     const [orderType, setOrderType] = useState<'Dine-In' | 'Takeout' | 'Delivery'>('Dine-In');
     const [orderTag, setOrderTag] = useState('');
@@ -54,34 +52,39 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ appId, total, ord
         setIsProcessing(true);
         setError(null);
         try {
-            const ordersRef = collection(db, `/artifacts/${appId}/public/data/orders`);
-            const counterRef = doc(db, `artifacts/${appId}/public/data/counters/orderIdCounter`);
+            const counterRef = doc(db, "counters", "orderIdCounter");
             
-            let newCount;
-            const counterSnap = await getDoc(counterRef);
-            newCount = (counterSnap.exists() ? counterSnap.data().count : 0) + 1;
-            await setDoc(counterRef, { count: newCount });
-            
-            const finalAmountPaid = isPaid ? (paymentMethod === 'cash' ? amountPaidNum : total) : 0;
-            const paymentStatus = isPaid 
-                ? (finalAmountPaid < total ? 'Partially Paid' : 'Paid')
-                : 'Unpaid';
+            const newOrderRef = doc(collection(db, "orders"));
 
-            const newOrder = {
-                simplifiedId: generateSimpleOrderId(newCount),
-                tag: orderTag,
-                orderType,
-                items: Object.values(orderItems).map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
-                total,
-                paymentMethod: isPaid ? paymentMethod : 'Unpaid',
-                paymentStatus,
-                amountPaid: finalAmountPaid,
-                changeGiven: isPaid && paymentMethod === 'cash' ? changeGivenNum : 0,
-                balanceDue: isPaid ? Math.max(0, finalBalanceDue) : total,
-                status: 'Pending',
-                timestamp: serverTimestamp(),
-            };
-            await addDoc(ordersRef, newOrder);
+            await runTransaction(db, async (transaction) => {
+                const counterSnap = await transaction.get(counterRef);
+                const newCount = (counterSnap.exists() ? counterSnap.data().count : 0) + 1;
+
+                const finalAmountPaid = isPaid ? (paymentMethod === 'cash' ? amountPaidNum : total) : 0;
+                const paymentStatus = isPaid 
+                    ? (finalAmountPaid < total ? 'Partially Paid' : 'Paid')
+                    : 'Unpaid';
+    
+                const newOrder = {
+                    id: newOrderRef.id,
+                    simplifiedId: generateSimpleOrderId(newCount),
+                    tag: orderTag,
+                    orderType,
+                    items: Object.values(orderItems).map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
+                    total,
+                    paymentMethod: isPaid ? paymentMethod : 'Unpaid',
+                    paymentStatus,
+                    amountPaid: finalAmountPaid,
+                    changeGiven: isPaid && paymentMethod === 'cash' ? changeGivenNum : 0,
+                    balanceDue: isPaid ? Math.max(0, finalBalanceDue) : total,
+                    status: 'Pending',
+                    timestamp: serverTimestamp(),
+                };
+
+                transaction.set(newOrderRef, newOrder);
+                transaction.set(counterRef, { count: newCount });
+            });
+
             onOrderPlaced();
         } catch (e) {
             console.error("Error processing order:", e);

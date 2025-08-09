@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, onSnapshot, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { initialMenuData } from '@/data/initial-data';
 import { Search, ShoppingBag, Plus, Minus, PlusCircle, X, Trash2 } from 'lucide-react';
@@ -11,13 +11,13 @@ import type { MenuItem, OrderItem } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import OrderOptionsModal from './modals/OrderOptionsModal';
 import BreakfastModal from './modals/BreakfastModal';
 import CustomOrderModal from './modals/CustomOrderModal';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter, SheetClose } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,11 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-interface PosViewProps {
-    appId: string;
-}
-
-const OrderCart: React.FC<{
+interface OrderCartProps {
     currentOrder: Record<string, OrderItem>;
     total: number;
     updateQuantity: (itemId: string, amount: number) => void;
@@ -42,7 +38,9 @@ const OrderCart: React.FC<{
     onClearOrder: () => void;
     onPlaceOrder: () => void;
     isSheet?: boolean;
-}> = ({ currentOrder, total, updateQuantity, setQuantity, removeItem, onClearOrder, onPlaceOrder, isSheet = false }) => {
+}
+
+const OrderCart: React.FC<OrderCartProps> = ({ currentOrder, total, updateQuantity, setQuantity, removeItem, onClearOrder, onPlaceOrder, isSheet = false }) => {
     
     const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>, itemId: string) => {
         const value = e.target.value;
@@ -124,7 +122,7 @@ const OrderCart: React.FC<{
 };
 
 
-const PosView: React.FC<PosViewProps> = ({ appId }) => {
+const PosView: React.FC = () => {
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [currentOrder, setCurrentOrder] = useState<Record<string, OrderItem>>({});
     const [loading, setLoading] = useState(true);
@@ -139,18 +137,21 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
 
     useEffect(() => {
         setLoading(true);
-        const menuRef = collection(db, `/artifacts/${appId}/public/data/menuItems`);
+        const menuRef = collection(db, "menuItems");
         
         const initializeMenu = async () => {
             try {
                 const existingSnapshot = await getDocs(menuRef);
                 const existingNames = new Set(existingSnapshot.docs.map(doc => doc.data().name));
+                const batch = writeBatch(db);
 
                 for (const item of initialMenuData) {
                     if (!existingNames.has(item.name)) {
-                        await addDoc(menuRef, { ...item });
+                        const newItemRef = doc(menuRef);
+                        batch.set(newItemRef, item);
                     }
                 }
+                await batch.commit();
             } catch (e) {
                 console.error("Error ensuring initial menu data:", e);
                 setError("Failed to initialize menu data.");
@@ -172,7 +173,7 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
         });
 
         return () => unsubscribe();
-    }, [appId]);
+    }, []);
 
     const total = useMemo(() => {
         return Object.values(currentOrder).reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -380,14 +381,12 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
 
             {showOrderOptionsModal && (
                 <OrderOptionsModal
-                    appId={appId}
                     total={total}
                     orderItems={currentOrder}
                     onClose={() => setShowOrderOptionsModal(false)}
                     onOrderPlaced={() => {
                         setCurrentOrder({});
-                        setShowOrderOptionsİtems({});
-                        setShowOrderOptionsModal(false);
+                        setShowOrderOptionsMdal(false);
                     }}
                 />
             )}
@@ -422,3 +421,5 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
 };
 
 export default PosView;
+
+    

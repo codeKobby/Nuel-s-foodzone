@@ -29,10 +29,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
-interface AccountingViewProps {
-    appId: string;
-}
-
 interface DailyStats {
     totalSales: number;
     cashSales: number;
@@ -61,7 +57,7 @@ const denominations = [
     { name: '50 Pesewas', value: 0.5 },
 ];
 
-const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
+const AccountingView: React.FC = () => {
     const [stats, setStats] = useState<DailyStats>({ totalSales: 0, cashSales: 0, momoSales: 0, miscExpenses: 0, expectedCash: 0 });
     const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
     const [countedMomo, setCountedMomo] = useState('');
@@ -91,10 +87,10 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
                 startDate.setHours(0, 0, 0, 0);
                 const startDateTimestamp = Timestamp.fromDate(startDate);
 
-                const ordersRef = collection(db, `/artifacts/${appId}/public/data/orders`);
+                const ordersRef = collection(db, "orders");
                 const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp));
                 
-                const miscExpensesRef = collection(db, `/artifacts/${appId}/public/data/miscExpenses`);
+                const miscExpensesRef = collection(db, "miscExpenses");
                 const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp));
                 
                 const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
@@ -131,7 +127,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
             }
         };
 
-        const reportsRef = collection(db, `/artifacts/${appId}/public/data/reconciliationReports`);
+        const reportsRef = collection(db, "reconciliationReports");
         const q = query(reportsRef, orderBy('timestamp', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReconciliationReport)));
@@ -142,7 +138,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
 
         fetchDailyData();
         return () => unsubscribe();
-    }, [appId]);
+    }, []);
 
     const handleCountChange = (name: string, value: string) => {
         setCounts(prev => ({ ...prev, [name]: value.replace(/[^0-9]/g, '') }));
@@ -169,7 +165,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
                 cashDifference: cashDifference,
                 notes: notes,
             };
-            await addDoc(collection(db, `/artifacts/${appId}/public/data/reconciliationReports`), reportData);
+            await addDoc(collection(db, "reconciliationReports"), reportData);
             
             // Reset form
             setCounts(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
@@ -323,7 +319,3 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
 };
 
 export default AccountingView;
-
-    
-    
-    

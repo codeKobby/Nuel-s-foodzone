@@ -25,11 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-interface AdminViewProps {
-    appId: string;
-}
-
-const AdminView: React.FC<AdminViewProps> = ({ appId }) => {
+const AdminView: React.FC = () => {
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -38,13 +34,13 @@ const AdminView: React.FC<AdminViewProps> = ({ appId }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<MenuItem | null>(null);
 
     useEffect(() => {
-        const menuRef = collection(db, `/artifacts/${appId}/public/data/menuItems`);
+        const menuRef = collection(db, "menuItems");
         const unsubscribe = onSnapshot(menuRef, (snapshot) => {
             setMenuItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem)));
             setLoading(false);
         }, (e) => { setError("Failed to load menu for admin."); setLoading(false); });
         return () => unsubscribe();
-    }, [appId]);
+    }, []);
     
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormState(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -59,9 +55,9 @@ const AdminView: React.FC<AdminViewProps> = ({ appId }) => {
         };
         try {
             if (editingItem) {
-                await updateDoc(doc(db, `/artifacts/${appId}/public/data/menuItems`, editingItem.id), data);
+                await updateDoc(doc(db, "menuItems", editingItem.id), data);
             } else {
-                await addDoc(collection(db, `/artifacts/${appId}/public/data/menuItems`), data);
+                await addDoc(collection(db, "menuItems"), data);
             }
             setFormState({ name: '', price: '', category: '', stock: '' });
             setEditingItem(null);
@@ -74,7 +70,7 @@ const AdminView: React.FC<AdminViewProps> = ({ appId }) => {
     };
 
     const handleDelete = async (itemId: string) => {
-        try { await deleteDoc(doc(db, `/artifacts/${appId}/public/data/menuItems`, itemId)); } catch (e) { setError("Failed to delete menu item."); }
+        try { await deleteDoc(doc(db, "menuItems", itemId)); } catch (e) { setError("Failed to delete menu item."); }
         setShowDeleteConfirm(null);
     };
 
@@ -169,5 +165,3 @@ const AdminView: React.FC<AdminViewProps> = ({ appId }) => {
 };
 
 export default AdminView;
-
-    

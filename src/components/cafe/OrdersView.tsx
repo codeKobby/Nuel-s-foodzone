@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, writeBatch, runTransaction, where, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, runTransaction, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -18,10 +18,6 @@ import CombinedPaymentModal from './modals/CombinedPaymentModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
-
-interface OrdersViewProps {
-    appId: string;
-}
 
 interface OrderCardProps {
     order: Order;
@@ -93,7 +89,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
     );
 };
 
-const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
+const OrdersView: React.FC = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [allTimeOrders, setAllTimeOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
@@ -108,7 +104,7 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
         setLoading(true);
         setError(null);
         
-        const ordersRef = collection(db, `/artifacts/${appId}/public/data/orders`);
+        const ordersRef = collection(db, "orders");
         const q = query(ordersRef, orderBy('timestamp', 'desc'));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -121,7 +117,7 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
             setLoading(false); 
         });
         return () => unsubscribe();
-    }, [appId]);
+    }, []);
 
     useEffect(() => {
         if (timeRange === 'Today') {
@@ -151,14 +147,14 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
 
     const updateOrderStatus = async (orderId: string, newStatus: 'Pending' | 'Completed') => {
         try {
-            await updateDoc(doc(db, `/artifacts/${appId}/public/data/orders`, orderId), { status: newStatus });
+            await updateDoc(doc(db, "orders", orderId), { status: newStatus });
         } catch (e) {
             console.error("Error updating status:", e);
         }
     };
     
     const settleChange = async (orderId: string, settleAmount: number) => {
-        const orderRef = doc(db, `/artifacts/${appId}/public/data/orders`, orderId);
+        const orderRef = doc(db, "orders", orderId);
         try {
              await runTransaction(db, async (transaction) => {
                 const orderDoc = await transaction.get(orderRef);
@@ -270,7 +266,7 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
 
                 {selectedOrder && <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />}
                 {isChangeModalOpen && <ChangeDueModal orders={changeDueOrders} onSettle={settleChange} onClose={() => setIsChangeModalOpen(false)} />}
-                {isCombinedPaymentModalOpen && <CombinedPaymentModal appId={appId} orders={selectedOrders} onOrderPlaced={handleCombinedPaymentSuccess} onClose={() => setIsCombinedPaymentModalOpen(false)} />}
+                {isCombinedPaymentModalOpen && <CombinedPaymentModal orders={selectedOrders} onOrderPlaced={handleCombinedPaymentSuccess} onClose={() => setIsCombinedPaymentModalOpen(false)} />}
             </div>
         </TooltipProvider>
     );
