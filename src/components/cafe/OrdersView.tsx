@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, ShoppingCart } from 'lucide-react';
+import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, ShoppingCart, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -42,7 +42,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
     const isChangeOwedToCustomer = order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total;
 
     return (
-        <Card className={`flex flex-col justify-between transition hover:shadow-lg ${isSelected ? 'border-primary ring-2 ring-primary' : ''}`}>
+        <Card className={`flex flex-col justify-between transition hover:shadow-lg ${isSelected ? 'border-primary ring-2 ring-primary' : ''} ${order.status === 'Completed' ? 'bg-secondary/50' : ''}`}>
              <CardHeader>
                 <div className="flex justify-between items-start">
                      <div className="flex items-center space-x-3">
@@ -51,6 +51,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                             checked={isSelected}
                             onCheckedChange={(checked) => onSelectionChange(order.id, !!checked)}
                             aria-label={`Select order ${order.simplifiedId}`}
+                            disabled={order.status === 'Completed'}
                         />
                         <div>
                             <CardTitle className="cursor-pointer" onClick={() => onSelectionChange(order.id, !isSelected)}>{order.simplifiedId}</CardTitle>
@@ -79,10 +80,13 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
             </CardContent>
             <CardFooter className="flex space-x-2">
                 <Button onClick={() => onDetailsClick(order)} variant="outline" className="w-full">Details</Button>
-                {order.status === 'Pending' ? (
+                 {order.status === 'Pending' ? (
                     <Button onClick={() => onStatusUpdate(order.id, 'Completed')} className="w-full bg-green-500 hover:bg-green-600 text-white">Complete</Button>
                 ) : (
-                    <Button onClick={() => onStatusUpdate(order.id, 'Pending')} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white">Re-Open</Button>
+                    <Button disabled className="w-full" variant="outline">
+                        <CheckCircle2 size={16} className="mr-2 text-green-500" />
+                        Completed
+                    </Button>
                 )}
             </CardFooter>
         </Card>
@@ -133,6 +137,9 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
     const handleSelectionChange = (orderId: string, isSelected: boolean) => {
         setSelectedOrderIds(prev => {
             const newSet = new Set(prev);
+            const order = allTimeOrders.find(o => o.id === orderId);
+            if (order?.status === 'Completed') return prev; // Don't allow selection if completed
+
             if (isSelected) {
                 newSet.add(orderId);
             } else {
@@ -270,5 +277,3 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
 };
 
 export default OrdersView;
-
-    
