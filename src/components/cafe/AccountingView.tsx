@@ -92,7 +92,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
                 const startDateTimestamp = Timestamp.fromDate(startDate);
 
                 const ordersRef = collection(db, `/artifacts/${appId}/public/data/orders`);
-                const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp), where("paymentStatus", "!=", "Unpaid"));
+                const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp));
                 
                 const miscExpensesRef = collection(db, `/artifacts/${appId}/public/data/miscExpenses`);
                 const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp));
@@ -102,6 +102,8 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
                 let cashSales = 0, momoSales = 0;
                 ordersSnapshot.forEach(doc => {
                     const order = doc.data() as Order;
+                    if (order.paymentStatus === 'Unpaid') return;
+                    
                     if(order.paymentMethod === 'cash') {
                        cashSales += order.amountPaid - order.changeGiven;
                     } else if (order.paymentMethod === 'momo') {
@@ -322,4 +324,5 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
 
 export default AccountingView;
 
+    
     
