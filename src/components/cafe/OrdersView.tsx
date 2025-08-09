@@ -73,6 +73,7 @@ const OrderCard: React.FC<{ order: Order, onDetailsClick: (order: Order) => void
 
 const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
     const [orders, setOrders] = useState<Order[]>([]);
+    const [allTimeOrders, setAllTimeOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -84,20 +85,11 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
         setError(null);
         
         const ordersRef = collection(db, `/artifacts/${appId}/public/data/orders`);
-        let q;
-
-        if (timeRange === 'Today') {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayTimestamp = Timestamp.fromDate(today);
-            q = query(ordersRef, where("timestamp", ">=", todayTimestamp), orderBy('timestamp', 'desc'));
-        } else {
-            q = query(ordersRef, orderBy('timestamp', 'desc'));
-        }
+        const q = query(ordersRef, orderBy('timestamp', 'desc'));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-            setOrders(fetchedOrders);
+            setAllTimeOrders(fetchedOrders);
             setLoading(false);
         }, (e) => { 
             console.error(e);
@@ -105,7 +97,18 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
             setLoading(false); 
         });
         return () => unsubscribe();
-    }, [appId, timeRange]);
+    }, [appId]);
+
+    useEffect(() => {
+        if (timeRange === 'Today') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayTimestamp = Timestamp.fromDate(today).toMillis();
+            setOrders(allTimeOrders.filter(o => o.timestamp && o.timestamp.toMillis() >= todayTimestamp));
+        } else {
+            setOrders(allTimeOrders);
+        }
+    }, [timeRange, allTimeOrders]);
 
     const updateOrderStatus = async (orderId: string, newStatus: 'Pending' | 'Completed') => {
         try {
@@ -141,8 +144,10 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
     
     const pendingOrders = useMemo(() => orders.filter(o => o.status === 'Pending'), [orders]);
     const completedOrders = useMemo(() => orders.filter(o => o.status === 'Completed'), [orders]);
-    const unpaidOrders = useMemo(() => orders.filter(o => o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid'), [orders]);
-    const changeDueOrders = useMemo(() => orders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [orders]);
+    
+    // Unpaid and Change Due should reflect all-time data to not miss outstanding payments
+    const unpaidOrders = useMemo(() => allTimeOrders.filter(o => o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid'), [allTimeOrders]);
+    const changeDueOrders = useMemo(() => allTimeOrders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [allTimeOrders]);
 
     const renderOrderList = (orderList: Order[], emptyMessage: string) => {
         if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
@@ -190,7 +195,7 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
                     {renderOrderList(pendingOrders, "No pending orders for this period.")}
                   </TabsContent>
                    <TabsContent value="unpaid">
-                    {renderOrderList(unpaidOrders, "No unpaid orders for this period.")}
+                    {renderOrderList(unpaidOrders, "No unpaid orders. All caught up!")}
                   </TabsContent>
                   <TabsContent value="completed">
                     {renderOrderList(completedOrders, "No completed orders for this period.")}
@@ -205,3 +210,5 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
 };
 
 export default OrdersView;
+
+    
