@@ -153,5 +153,3 @@ const MiscView: React.FC<MiscViewProps> = ({ appId }) => {
 };
 
 export default MiscView;
-
-    

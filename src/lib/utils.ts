@@ -9,10 +9,24 @@ export const formatCurrency = (amount: number) => `GH₵${(amount || 0).toFixed(
 
 export const formatTimestamp = (timestamp: any): string => {
   if (!timestamp || !timestamp.toDate) return 'N/A';
-  return timestamp.toDate().toLocaleString('en-US', {
-    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  
+  const orderDate = timestamp.toDate();
+  const now = new Date();
+  
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+
+  if (orderDate >= startOfToday) {
+    return `Today, ${orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+  }
+  if (orderDate >= startOfYesterday) {
+    return `Yesterday, ${orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+  }
+  return orderDate.toLocaleString('en-US', {
+    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true
   });
 };
+
 
 export const generateSimpleOrderId = (count: number): string => {
   const date = new Date();

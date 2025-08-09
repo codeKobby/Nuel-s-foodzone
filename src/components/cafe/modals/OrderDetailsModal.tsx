@@ -26,7 +26,7 @@ const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, r
             </div>
             <hr className="my-2 border-dashed border-black" />
             <p><strong>Order:</strong> {order.simplifiedId}</p>
-            <p><strong>Date:</strong> {formatTimestamp(order.timestamp)}</p>
+            <p><strong>Date:</strong> {new Date(order.timestamp.seconds * 1000).toLocaleString()}</p>
             <p><strong>Type:</strong> {order.orderType}</p>
             {order.tag && <p><strong>Tag:</strong> {order.tag}</p>}
             <hr className="my-2 border-dashed border-black" />
