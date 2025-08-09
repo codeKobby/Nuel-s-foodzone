@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency } from '@/lib/utils';
 import type { Order } from '@/lib/types';
@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, Tag } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { findAndApplyCustomerCredit } from '@/lib/customer-credit';
 
 interface CombinedPaymentModalProps {
     appId: string;
@@ -22,54 +23,33 @@ interface CombinedPaymentModalProps {
     onOrderPlaced: () => void;
 }
 
-async function updateMultipleOrders(appId: string, ordersToUpdate: Order[], paymentDetails: { method: 'cash' | 'momo', amountPaid: number, changeGiven: number }) {
-    const batch = writeBatch(db);
-    let totalDue = ordersToUpdate.reduce((acc, order) => acc + (order.balanceDue || order.total), 0);
-    let remainingPaid = paymentDetails.amountPaid;
-    let remainingChange = paymentDetails.changeGiven;
-
-    for (const order of ordersToUpdate) {
-        const orderRef = doc(db, `/artifacts/${appId}/public/data/orders`, order.id);
-        const amountToPayForOrder = Math.min(remainingPaid, order.balanceDue || order.total);
-        
-        const newAmountPaid = order.amountPaid + amountToPayForOrder;
-        const newPaymentStatus = newAmountPaid >= order.total ? 'Paid' : 'Partially Paid';
-        const newBalanceDue = Math.max(0, order.total - newAmountPaid);
-
-        batch.update(orderRef, {
-            paymentMethod: paymentDetails.method,
-            paymentStatus: newPaymentStatus,
-            amountPaid: newAmountPaid,
-            balanceDue: newBalanceDue,
-        });
-
-        remainingPaid -= amountToPayForOrder;
-    }
-    
-    // Distribute change given if any, starting with the last order
-     if (paymentDetails.method === 'cash' && remainingChange > 0) {
-        const lastOrder = ordersToUpdate[ordersToUpdate.length - 1];
-        const lastOrderRef = doc(db, `/artifacts/${appId}/public/data/orders`, lastOrder.id);
-        batch.update(lastOrderRef, {
-            changeGiven: (lastOrder.changeGiven || 0) + remainingChange
-        });
-    }
-
-    await batch.commit();
-}
-
-
 const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ appId, orders, onClose, onOrderPlaced }) => {
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'momo'>('cash');
     const [cashPaid, setCashPaid] = useState('');
     const [changeGiven, setChangeGiven] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [creditApplied, setCreditApplied] = useState(0);
 
-    const totalToPay = useMemo(() => {
+    const totalToPayBeforeCredit = useMemo(() => {
         return orders.reduce((acc, order) => acc + (order.balanceDue || order.total), 0);
     }, [orders]);
+    
+    useEffect(() => {
+        const applyCredit = async () => {
+            const customerTags = [...new Set(orders.map(o => o.tag).filter(Boolean))];
+            if (customerTags.length > 0) {
+                // For simplicity, we use the first tag to find credit. 
+                // A more complex system could handle multiple customers.
+                const { creditFound } = await findAndApplyCustomerCredit(appId, customerTags[0]);
+                setCreditApplied(creditFound);
+            }
+        };
+        applyCredit();
+    }, [appId, orders]);
 
+
+    const totalToPay = Math.max(0, totalToPayBeforeCredit - creditApplied);
     const amountPaidNum = parseFloat(cashPaid || '0');
     const calculatedChange = paymentMethod === 'cash' && amountPaidNum > totalToPay ? amountPaidNum - totalToPay : 0;
     
@@ -92,11 +72,43 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ appId, orde
         setIsProcessing(true);
         setError(null);
         try {
-            await updateMultipleOrders(appId, orders, {
-                method: paymentMethod,
-                amountPaid: paymentMethod === 'cash' ? amountPaidNum : totalToPay,
-                changeGiven: paymentMethod === 'cash' ? changeGivenNum : 0,
-            });
+            const batch = writeBatch(db);
+
+            // Apply credit if any was found
+            if (creditApplied > 0) {
+                 const customerTags = [...new Set(orders.map(o => o.tag).filter(Boolean))];
+                 await findAndApplyCustomerCredit(appId, customerTags[0], batch, creditApplied);
+            }
+
+            // Update the orders being paid for
+            let remainingPaid = paymentMethod === 'cash' ? amountPaidNum : totalToPay;
+            for (const order of orders) {
+                const orderRef = doc(db, `/artifacts/${appId}/public/data/orders`, order.id);
+                const orderBalance = order.balanceDue || order.total;
+                const amountToPayForOrder = Math.min(remainingPaid, orderBalance);
+                
+                const newAmountPaid = order.amountPaid + amountToPayForOrder;
+                const newPaymentStatus = newAmountPaid >= order.total ? 'Paid' : 'Partially Paid';
+                const newBalanceDue = Math.max(0, order.total - newAmountPaid);
+
+                batch.update(orderRef, {
+                    paymentMethod: paymentMethod,
+                    paymentStatus: newPaymentStatus,
+                    amountPaid: newAmountPaid,
+                    balanceDue: newBalanceDue,
+                });
+
+                remainingPaid -= amountToPayForOrder;
+            }
+            
+            // Distribute change given if any, to the last order
+             if (paymentMethod === 'cash' && changeGivenNum > 0) {
+                const lastOrder = orders[orders.length - 1];
+                const lastOrderRef = doc(db, `/artifacts/${appId}/public/data/orders`, lastOrder.id);
+                batch.update(lastOrderRef, { balanceDue: changeGivenNum });
+            }
+
+            await batch.commit();
             onOrderPlaced();
         } catch (e) {
             console.error("Error processing combined payment:", e);
@@ -129,6 +141,14 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ appId, orde
                     ))}
                     </div>
                 </ScrollArea>
+                
+                 {creditApplied > 0 && (
+                    <Alert variant="default" className="bg-green-100 dark:bg-green-900/20 border-green-500">
+                        <AlertDescription>
+                            Applied <span className="font-bold">{formatCurrency(creditApplied)}</span> from customer's previous change.
+                        </AlertDescription>
+                    </Alert>
+                )}
                 
                 <div className="text-center text-4xl font-bold text-primary py-4">{formatCurrency(totalToPay)}</div>
                 
@@ -168,5 +188,3 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ appId, orde
 };
 
 export default CombinedPaymentModal;
-
-    
