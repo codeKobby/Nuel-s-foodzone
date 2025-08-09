@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check } from 'lucide-react';
+import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -57,7 +57,7 @@ const OrderCard: React.FC<{ order: Order, onDetailsClick: (order: Order) => void
                         <Coins size={14} className="inline mr-2"/>Change Due: {formatCurrency(order.balanceDue)}
                     </p>
                 }
-                <p className="text-xs text-muted-foreground mt-2">{formatTimestamp(order.timestamp)}</p>
+                <p className="text-xs text-muted-foreground mt-2 flex items-center"><CalendarDays size={12} className="inline mr-1.5" />{formatTimestamp(order.timestamp)}</p>
             </CardContent>
             <CardFooter className="flex space-x-2">
                 <Button onClick={() => onDetailsClick(order)} variant="outline" className="w-full">Details</Button>
