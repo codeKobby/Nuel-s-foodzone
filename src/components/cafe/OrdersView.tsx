@@ -7,39 +7,57 @@ import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays } from 'lucide-react';
+import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import OrderDetailsModal from './modals/OrderDetailsModal';
 import ChangeDueModal from './modals/ChangeDueModal';
+import CombinedPaymentModal from './modals/CombinedPaymentModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface OrdersViewProps {
     appId: string;
 }
 
-const OrderCard: React.FC<{ order: Order, onDetailsClick: (order: Order) => void, onStatusUpdate: (id: string, status: 'Pending' | 'Completed') => void }> = ({ order, onDetailsClick, onStatusUpdate }) => {
+interface OrderCardProps {
+    order: Order;
+    isSelected: boolean;
+    onSelectionChange: (orderId: string, isSelected: boolean) => void;
+    onDetailsClick: (order: Order) => void;
+    onStatusUpdate: (id: string, status: 'Pending' | 'Completed') => void;
+}
+
+const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionChange, onDetailsClick, onStatusUpdate }) => {
     const paymentStatusVariant = {
         'Paid': 'default',
         'Unpaid': 'destructive',
         'Partially Paid': 'secondary',
     } as const;
     
-    const isBalanceOwedByCustomer = order.paymentStatus === 'Partially Paid' || order.paymentStatus === 'Unpaid';
+    const isBalanceOwedByCustomer = (order.paymentStatus === 'Partially Paid' || order.paymentStatus === 'Unpaid') && order.balanceDue > 0;
     const isChangeOwedToCustomer = order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total;
 
     return (
-        <Card className="flex flex-col justify-between transition hover:shadow-lg">
-            <CardHeader>
+        <Card className={`flex flex-col justify-between transition hover:shadow-lg ${isSelected ? 'border-primary ring-2 ring-primary' : ''}`}>
+             <CardHeader>
                 <div className="flex justify-between items-start">
-                    <div>
-                        <CardTitle>{order.simplifiedId}</CardTitle>
-                        <CardDescription>
-                            <Badge variant="outline" className="mt-1">{order.orderType}</Badge>
-                        </CardDescription>
+                     <div className="flex items-center space-x-3">
+                        <Checkbox
+                            id={`select-${order.id}`}
+                            checked={isSelected}
+                            onCheckedChange={(checked) => onSelectionChange(order.id, !!checked)}
+                            aria-label={`Select order ${order.simplifiedId}`}
+                        />
+                        <div>
+                            <CardTitle className="cursor-pointer" onClick={() => onSelectionChange(order.id, !isSelected)}>{order.simplifiedId}</CardTitle>
+                            <CardDescription>
+                                <Badge variant="outline" className="mt-1">{order.orderType}</Badge>
+                            </CardDescription>
+                        </div>
                     </div>
                     <Badge variant={paymentStatusVariant[order.paymentStatus]}>{order.paymentStatus}</Badge>
                 </div>
@@ -78,6 +96,8 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
     const [error, setError] = useState<string | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
+    const [isCombinedPaymentModalOpen, setIsCombinedPaymentModalOpen] = useState(false);
+    const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
     const [timeRange, setTimeRange] = useState('Today');
 
     useEffect(() => {
@@ -109,6 +129,18 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
             setOrders(allTimeOrders);
         }
     }, [timeRange, allTimeOrders]);
+
+    const handleSelectionChange = (orderId: string, isSelected: boolean) => {
+        setSelectedOrderIds(prev => {
+            const newSet = new Set(prev);
+            if (isSelected) {
+                newSet.add(orderId);
+            } else {
+                newSet.delete(orderId);
+            }
+            return newSet;
+        });
+    };
 
     const updateOrderStatus = async (orderId: string, newStatus: 'Pending' | 'Completed') => {
         try {
@@ -142,19 +174,33 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
         }
     };
     
+    const handleCombinedPaymentSuccess = () => {
+        setSelectedOrderIds(new Set());
+        setIsCombinedPaymentModalOpen(false);
+    };
+    
     const pendingOrders = useMemo(() => orders.filter(o => o.status === 'Pending'), [orders]);
     const completedOrders = useMemo(() => orders.filter(o => o.status === 'Completed'), [orders]);
-    
-    // Unpaid and Change Due should reflect all-time data to not miss outstanding payments
     const unpaidOrders = useMemo(() => allTimeOrders.filter(o => o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid'), [allTimeOrders]);
     const changeDueOrders = useMemo(() => allTimeOrders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [allTimeOrders]);
+    const selectedOrders = useMemo(() => allTimeOrders.filter(o => selectedOrderIds.has(o.id)), [allTimeOrders, selectedOrderIds]);
+
 
     const renderOrderList = (orderList: Order[], emptyMessage: string) => {
         if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
         if (error) return <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
         return (
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
-                {orderList.length > 0 ? orderList.map(order => <OrderCard key={order.id} order={order} onDetailsClick={setSelectedOrder} onStatusUpdate={updateOrderStatus} />) : <p className="text-muted-foreground italic col-span-full text-center mt-8">{emptyMessage}</p>}
+                {orderList.length > 0 ? orderList.map(order => 
+                    <OrderCard 
+                        key={order.id} 
+                        order={order} 
+                        onDetailsClick={setSelectedOrder} 
+                        onStatusUpdate={updateOrderStatus}
+                        isSelected={selectedOrderIds.has(order.id)}
+                        onSelectionChange={handleSelectionChange}
+                    />) 
+                    : <p className="text-muted-foreground italic col-span-full text-center mt-8">{emptyMessage}</p>}
             </div>
         )
     }
@@ -165,7 +211,7 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center space-x-4">
                         <h2 className="text-3xl font-bold">Order Management</h2>
-                        {changeDueOrders.length > 0 && (
+                         {changeDueOrders.length > 0 && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button variant="outline" size="icon" className="relative" onClick={() => setIsChangeModalOpen(true)}>
@@ -175,6 +221,19 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p>View Orders with Change Due</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
+                        {selectedOrderIds.size > 0 && (
+                             <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="default" size="sm" className="relative" onClick={() => setIsCombinedPaymentModalOpen(true)}>
+                                        <ShoppingCart className="mr-2" /> Pay for Selected
+                                        <Badge variant="secondary" className="ml-2">{selectedOrderIds.size}</Badge>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Settle payment for all selected orders</p>
                                 </TooltipContent>
                             </Tooltip>
                         )}
@@ -204,6 +263,7 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
 
                 {selectedOrder && <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />}
                 {isChangeModalOpen && <ChangeDueModal orders={changeDueOrders} onSettle={settleChange} onClose={() => setIsChangeModalOpen(false)} />}
+                {isCombinedPaymentModalOpen && <CombinedPaymentModal appId={appId} orders={selectedOrders} onOrderPlaced={handleCombinedPaymentSuccess} onClose={() => setIsCombinedPaymentModalOpen(false)} />}
             </div>
         </TooltipProvider>
     );
