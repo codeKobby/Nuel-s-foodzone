@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, onSnapshot, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { initialMenuData } from '@/data/initial-data';
 import { Search, ShoppingBag, Plus, Minus, PlusCircle, X, Trash2 } from 'lucide-react';
@@ -140,13 +140,26 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
     useEffect(() => {
         setLoading(true);
         const menuRef = collection(db, `/artifacts/${appId}/public/data/menuItems`);
-        const unsubscribe = onSnapshot(menuRef, async (snapshot) => {
-            if (snapshot.empty) {
-                try {
-                    for (const item of initialMenuData) {
+        
+        const initializeMenu = async () => {
+            try {
+                const existingSnapshot = await getDocs(menuRef);
+                const existingNames = new Set(existingSnapshot.docs.map(doc => doc.data().name));
+
+                for (const item of initialMenuData) {
+                    if (!existingNames.has(item.name)) {
                         await addDoc(menuRef, { ...item });
                     }
-                } catch (e) { console.error("Error populating initial menu data:", e); }
+                }
+            } catch (e) {
+                console.error("Error ensuring initial menu data:", e);
+                setError("Failed to initialize menu data.");
+            }
+        };
+
+        const unsubscribe = onSnapshot(menuRef, async (snapshot) => {
+            if (snapshot.empty) {
+                await initializeMenu();
             } else {
                 const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem));
                 setMenuItems(items);
@@ -157,6 +170,7 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
             setError("Failed to load menu items.");
             setLoading(false);
         });
+
         return () => unsubscribe();
     }, [appId]);
 
@@ -372,6 +386,7 @@ const PosView: React.FC<PosViewProps> = ({ appId }) => {
                     onClose={() => setShowOrderOptionsModal(false)}
                     onOrderPlaced={() => {
                         setCurrentOrder({});
+                        setShowOrderOptionsİtems({});
                         setShowOrderOptionsModal(false);
                     }}
                 />
