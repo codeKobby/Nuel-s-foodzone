@@ -95,7 +95,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
                 const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp), where("paymentStatus", "!=", "Unpaid"));
                 
                 const miscExpensesRef = collection(db, `/artifacts/${appId}/public/data/miscExpenses`);
-                const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("settled", "==", true));
+                const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp));
                 
                 const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
 
@@ -110,7 +110,12 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
                 });
 
                 let miscExpenses = 0;
-                miscSnapshot.forEach(doc => miscExpenses += (doc.data() as MiscExpense).amount);
+                miscSnapshot.forEach(doc => {
+                    const expense = doc.data() as MiscExpense;
+                    if (expense.settled) {
+                        miscExpenses += expense.amount;
+                    }
+                });
                 
                 const totalSales = cashSales + momoSales;
                 const expectedCash = cashSales - miscExpenses;
@@ -316,3 +321,5 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
 };
 
 export default AccountingView;
+
+    
