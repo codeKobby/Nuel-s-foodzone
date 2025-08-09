@@ -188,7 +188,7 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
     
     const pendingOrders = useMemo(() => orders.filter(o => o.status === 'Pending'), [orders]);
     const completedOrders = useMemo(() => orders.filter(o => o.status === 'Completed'), [orders]);
-    const unpaidOrders = useMemo(() => allTimeOrders.filter(o => o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid'), [allTimeOrders]);
+    const unpaidOrders = useMemo(() => allTimeOrders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0), [allTimeOrders]);
     const changeDueOrders = useMemo(() => allTimeOrders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [allTimeOrders]);
     const selectedOrders = useMemo(() => allTimeOrders.filter(o => selectedOrderIds.has(o.id)), [allTimeOrders, selectedOrderIds]);
 
