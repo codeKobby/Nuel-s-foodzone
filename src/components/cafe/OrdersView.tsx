@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, writeBatch, runTransaction } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, writeBatch, runTransaction, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -77,17 +77,35 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
     const [error, setError] = useState<string | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
+    const [timeRange, setTimeRange] = useState('Today');
 
     useEffect(() => {
         setLoading(true);
-        const q = query(collection(db, `/artifacts/${appId}/public/data/orders`), orderBy('timestamp', 'desc'));
+        setError(null);
+        
+        const ordersRef = collection(db, `/artifacts/${appId}/public/data/orders`);
+        let q;
+
+        if (timeRange === 'Today') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayTimestamp = Timestamp.fromDate(today);
+            q = query(ordersRef, where("timestamp", ">=", todayTimestamp), orderBy('timestamp', 'desc'));
+        } else {
+            q = query(ordersRef, orderBy('timestamp', 'desc'));
+        }
+
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
             setOrders(fetchedOrders);
             setLoading(false);
-        }, (e) => { setError("Failed to load orders."); setLoading(false); });
+        }, (e) => { 
+            console.error(e);
+            setError("Failed to load orders. You may need to create a Firestore index if filtering. Check console for details."); 
+            setLoading(false); 
+        });
         return () => unsubscribe();
-    }, [appId]);
+    }, [appId, timeRange]);
 
     const updateOrderStatus = async (orderId: string, newStatus: 'Pending' | 'Completed') => {
         try {
@@ -139,21 +157,28 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
     return (
         <TooltipProvider>
             <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
-                <div className="flex items-center space-x-4 mb-6">
-                    <h2 className="text-3xl font-bold">Order Management</h2>
-                    {changeDueOrders.length > 0 && (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="outline" size="icon" className="relative" onClick={() => setIsChangeModalOpen(true)}>
-                                    <HandCoins className="text-red-500" />
-                                    <Badge className="absolute -top-2 -right-2 h-5 w-5 justify-center p-0">{changeDueOrders.length}</Badge>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>View Orders with Change Due</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    )}
+                <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center space-x-4">
+                        <h2 className="text-3xl font-bold">Order Management</h2>
+                        {changeDueOrders.length > 0 && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="outline" size="icon" className="relative" onClick={() => setIsChangeModalOpen(true)}>
+                                        <HandCoins className="text-red-500" />
+                                        <Badge className="absolute -top-2 -right-2 h-5 w-5 justify-center p-0">{changeDueOrders.length}</Badge>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>View Orders with Change Due</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
+                    </div>
+                     <div className="flex space-x-1 bg-card p-1 rounded-lg shadow-sm">
+                        {['Today', 'All Time'].map(range => (
+                            <Button key={range} onClick={() => setTimeRange(range)} variant={timeRange === range ? 'default' : 'ghost'} size="sm">{range}</Button>
+                        ))}
+                    </div>
                 </div>
                 <Tabs defaultValue="pending" className="w-full">
                   <TabsList className="grid w-full max-w-md grid-cols-3">
@@ -162,13 +187,13 @@ const OrdersView: React.FC<OrdersViewProps> = ({ appId }) => {
                     <TabsTrigger value="completed">Completed ({completedOrders.length})</TabsTrigger>
                   </TabsList>
                   <TabsContent value="pending">
-                    {renderOrderList(pendingOrders, "No pending orders.")}
+                    {renderOrderList(pendingOrders, "No pending orders for this period.")}
                   </TabsContent>
                    <TabsContent value="unpaid">
-                    {renderOrderList(unpaidOrders, "No unpaid orders.")}
+                    {renderOrderList(unpaidOrders, "No unpaid orders for this period.")}
                   </TabsContent>
                   <TabsContent value="completed">
-                    {renderOrderList(completedOrders, "No completed orders.")}
+                    {renderOrderList(completedOrders, "No completed orders for this period.")}
                   </TabsContent>
                 </Tabs>
 
