@@ -9,7 +9,7 @@ import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { DollarSign, CreditCard, MinusCircle, CheckCircle, AlertCircle, History, Landmark } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -324,5 +324,6 @@ const AccountingView: React.FC<AccountingViewProps> = ({ appId }) => {
 
 export default AccountingView;
 
+    
     
     
