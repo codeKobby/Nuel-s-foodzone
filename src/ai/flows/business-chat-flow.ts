@@ -7,8 +7,19 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { BusinessChatInputSchema, BusinessChatOutputSchema, GetBusinessDataInputSchema, GetBusinessDataOutputSchema } from '@/ai/schemas';
+import { 
+    BusinessChatInputSchema, 
+    BusinessChatOutputSchema, 
+    GetBusinessDataInputSchema, 
+    GetBusinessDataOutputSchema,
+    GetMenuItemsInputSchema,
+    GetMenuItemsOutputSchema,
+    AddMenuItemInputSchema,
+    UpdateMenuItemInputSchema,
+    DeleteMenuItemInputSchema
+} from '@/ai/schemas';
 import { getBusinessDataForRange } from '@/lib/tools';
+import { getMenuItems, addMenuItem, updateMenuItem, deleteMenuItem } from '@/lib/menu-tools';
 
 
 const getBusinessDataTool = ai.defineTool(
@@ -21,6 +32,46 @@ const getBusinessDataTool = ai.defineTool(
     async (input) => getBusinessDataForRange(input.startDate, input.endDate)
 );
 
+const getMenuItemsTool = ai.defineTool(
+    {
+        name: 'getMenuItems',
+        description: 'Retrieves a list of items from the menu. Can be used to count items or list items in a category.',
+        inputSchema: GetMenuItemsInputSchema,
+        outputSchema: GetMenuItemsOutputSchema,
+    },
+    async (input) => getMenuItems(input)
+);
+
+const addMenuItemTool = ai.defineTool(
+    {
+        name: 'addMenuItem',
+        description: 'Adds a new item to the menu.',
+        inputSchema: AddMenuItemInputSchema,
+        outputSchema: z.string(),
+    },
+    async (input) => addMenuItem(input)
+);
+
+const updateMenuItemTool = ai.defineTool(
+    {
+        name: 'updateMenuItem',
+        description: 'Updates an existing item on the menu, such as changing its price or name.',
+        inputSchema: UpdateMenuItemInputSchema,
+        outputSchema: z.string(),
+    },
+    async (input) => updateMenuItem(input)
+);
+
+const deleteMenuItemTool = ai.defineTool(
+    {
+        name: 'deleteMenuItem',
+        description: 'Removes an item from the menu.',
+        inputSchema: DeleteMenuItemInputSchema,
+        outputSchema: z.string(),
+    },
+    async (input) => deleteMenuItem(input)
+);
+
 
 const businessChatPrompt = ai.definePrompt({
     name: 'businessChatPrompt',
@@ -29,14 +80,16 @@ const businessChatPrompt = ai.definePrompt({
         historyContext: z.string().optional()
     }) },
     output: { format: 'text' },
-    tools: [getBusinessDataTool],
-    system: `You are an expert business analyst for a cafe called "Nuel's Food Zone".
-Your role is to answer questions from the business owner or manager based on sales data.
-You have access to a tool called 'getBusinessData' that can retrieve sales, orders, and item performance for specific date ranges.
+    tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
+    system: `You are an expert business analyst and friendly assistant for a cafe called "Nuel's Food Zone".
+Your role is to answer questions from the business owner or manager based on sales data, and to help them manage the menu.
+You have access to several tools to help you.
 
-- When the user asks a question about performance, sales, or items (e.g., "What were our sales yesterday?", "How many spring rolls did we sell last week?"), you MUST use the 'getBusinessData' tool to find the answer.
+- For questions about sales, orders, or financial performance (e.g., "What were our sales yesterday?", "How much MoMo did we receive last week?"), you MUST use the 'getBusinessData' tool.
+- For questions about the menu itself (e.g., "How many items are on the menu?", "List all the snacks"), you MUST use the 'getMenuItems' tool.
+- For requests to modify the menu (e.g., "Add a new drink", "Change a price", "Remove an item"), you MUST use the 'addMenuItem', 'updateMenuItem', or 'deleteMenuItem' tools respectively.
 - Today's date is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}. Use this to determine the correct date range for terms like "yesterday", "last week", or "last month".
-- When you receive data from the tool, analyze it and present the key information to the user in a clear, friendly, and concise way.
+- When you receive data or a confirmation message from a tool, analyze it and present the key information to the user in a clear, friendly, and concise way.
 - If the tool returns no data (e.g., zero sales), state that clearly to the user. Do not invent data.
 - If the user's question is unclear, ask for clarification.
 {{#if historyContext}}
