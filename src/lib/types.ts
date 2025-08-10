@@ -19,7 +19,7 @@ export interface OrderItem {
 }
 
 export interface Order {
-  id: string;
+  id:string;
   simplifiedId: string;
   tag: string;
   orderType: 'Dine-In' | 'Takeout' | 'Delivery';
@@ -59,3 +59,17 @@ export interface ReconciliationReport {
     cashForDeposit: number;
     notes: string;
 }
+
+export interface ChatMessage {
+    role: 'user' | 'model';
+    content: string;
+}
+
+export interface ChatSession {
+    id: string;
+    title: string;
+    timestamp: Timestamp;
+    messages: ChatMessage[];
+}
+
+    

@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, addDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck } from 'lucide-react';
+import type { Order, MiscExpense, ReconciliationReport, ChatSession } from '@/lib/types';
+import { formatCurrency, formatTimestamp } from '@/lib/utils';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2 } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -23,7 +23,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { businessChat } from '@/ai/flows/business-chat-flow';
 import { type BusinessChatInput } from '@/ai/schemas';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Sheet,
   SheetContent,
@@ -48,7 +48,7 @@ interface DashboardStats {
 
 interface ChatMessage {
     role: 'user' | 'model';
-    content: { text: string }[];
+    content: string;
 }
 
 
@@ -79,11 +79,14 @@ const DashboardView: React.FC = () => {
     const [date, setDate] = useState<DateRange | undefined>({ from: addDays(new Date(), -6), to: new Date() });
     
     // AI Chat State
+    const [activeChatSessionId, setActiveChatSessionId] = useState<string | null>(null);
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+    const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
     const [chatInput, setChatInput] = useState('');
     const [isAiReplying, setIsAiReplying] = useState(false);
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const [isChatSheetOpen, setIsChatSheetOpen] = useState(false);
+    const [isHistoryView, setIsHistoryView] = useState(false);
     const isMobile = useIsMobile();
 
 
@@ -96,6 +99,23 @@ const DashboardView: React.FC = () => {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
     }, [chatHistory]);
+
+    useEffect(() => {
+        const q = query(collection(db, "chatSessions"), orderBy("timestamp", "desc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setChatSessions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ChatSession)));
+        });
+        return () => unsubscribe();
+    }, []);
+    
+    useEffect(() => {
+        if (activeChatSessionId) {
+            const session = chatSessions.find(s => s.id === activeChatSessionId);
+            setChatHistory(session?.messages || []);
+        } else {
+            setChatHistory([]);
+        }
+    }, [activeChatSessionId, chatSessions]);
 
 
     const fetchDashboardData = async () => {
@@ -189,28 +209,57 @@ const DashboardView: React.FC = () => {
     const handleSendMessage = async () => {
         if (!chatInput.trim() || isAiReplying) return;
 
-        const newUserMessage: ChatMessage = { role: 'user', content: [{ text: chatInput }] };
+        const newUserMessage: ChatMessage = { role: 'user', content: chatInput };
         const newHistory = [...chatHistory, newUserMessage];
         setChatHistory(newHistory);
+        const currentInput = chatInput;
         setChatInput('');
         setIsAiReplying(true);
 
+        let sessionId = activeChatSessionId;
+
+        // Create a new session if one doesn't exist
+        if (!sessionId) {
+            const newSessionRef = await addDoc(collection(db, "chatSessions"), {
+                title: currentInput.substring(0, 40),
+                timestamp: Timestamp.now(),
+                messages: [newUserMessage]
+            });
+            sessionId = newSessionRef.id;
+            setActiveChatSessionId(sessionId);
+        }
+
         try {
             const input: BusinessChatInput = {
-                history: newHistory.slice(0, -1), // Send history without the latest user message
-                prompt: chatInput,
+                history: newHistory.slice(0, -1),
+                prompt: currentInput,
             };
             const response = await businessChat(input);
-            const newModelMessage: ChatMessage = { role: 'model', content: [{ text: response }] };
-            setChatHistory(prev => [...prev, newModelMessage]);
+            const newModelMessage: ChatMessage = { role: 'model', content: response };
+            
+            // Save the full exchange to Firestore
+            const sessionRef = doc(db, "chatSessions", sessionId!);
+            await setDoc(sessionRef, { messages: [...newHistory, newModelMessage] }, { merge: true });
+
         } catch (e) {
             console.error("Error with AI chat:", e);
-            const errorMessage: ChatMessage = { role: 'model', content: [{ text: "Sorry, I encountered an error. Please try again." }] };
+            const errorMessage: ChatMessage = { role: 'model', content: "Sorry, I encountered an error. Please try again." };
             setChatHistory(prev => [...prev, errorMessage]);
         } finally {
             setIsAiReplying(false);
         }
     };
+    
+    const startNewChat = () => {
+        setActiveChatSessionId(null);
+        setChatHistory([]);
+        setIsHistoryView(false);
+    }
+    
+    const selectChat = (sessionId: string) => {
+        setActiveChatSessionId(sessionId);
+        setIsHistoryView(false);
+    }
 
     const topItems = useMemo(() => stats?.itemPerformance.slice(0, 5) || [], [stats]);
     const bottomItems = useMemo(() => stats && stats.itemPerformance.length > 5 ? stats.itemPerformance.slice(-5).reverse() : [], [stats]);
@@ -227,7 +276,7 @@ const DashboardView: React.FC = () => {
                                 </Avatar>
                             )}
                             <div className={`rounded-lg px-4 py-2 max-w-sm whitespace-pre-wrap ${message.role === 'model' ? 'bg-secondary' : 'bg-primary text-primary-foreground'}`}>
-                                {message.content[0].text}
+                                {message.content}
                             </div>
                             {message.role === 'user' && (
                                 <Avatar className="h-8 w-8">
@@ -245,7 +294,7 @@ const DashboardView: React.FC = () => {
                     {chatHistory.length === 0 && !isAiReplying && (
                         <div className="text-center text-muted-foreground pt-16">
                             <p>Ask a question to get started, like:</p>
-                            <p className="italic font-medium">"What were the top 3 selling items yesterday?"</p>
+                            <p className="italic font-medium">"What were our sales yesterday?"</p>
                         </div>
                     )}
                 </div>
@@ -263,6 +312,25 @@ const DashboardView: React.FC = () => {
                     <Send />
                 </Button>
             </div>
+        </div>
+    );
+    
+     const renderHistoryContent = () => (
+        <div className="h-full flex flex-col">
+            <ScrollArea className="flex-grow p-2">
+                <div className="space-y-2">
+                    {chatSessions.map(session => (
+                        <div key={session.id} onClick={() => selectChat(session.id)}
+                            className={cn(
+                                "p-3 rounded-lg cursor-pointer hover:bg-secondary",
+                                activeChatSessionId === session.id && "bg-secondary"
+                            )}>
+                            <p className="font-semibold truncate">{session.title}</p>
+                            <p className="text-xs text-muted-foreground">{formatTimestamp(session.timestamp)}</p>
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
         </div>
     );
 
@@ -374,11 +442,21 @@ const DashboardView: React.FC = () => {
                         'flex flex-col p-0'
                     )}
                 >
-                    <SheetHeader className="p-4 border-b">
-                        <SheetTitle>AI Business Assistant</SheetTitle>
-                        <SheetDescription>Ask me anything about your business performance.</SheetDescription>
+                    <SheetHeader className="p-4 border-b flex flex-row items-center justify-between">
+                       <div>
+                            <SheetTitle>{isHistoryView ? 'Chat History' : 'AI Business Assistant'}</SheetTitle>
+                            <SheetDescription>{isHistoryView ? 'Select a chat or start a new one.' : 'Ask me anything about your business.'}</SheetDescription>
+                        </div>
+                        <div className="flex gap-2">
+                             <Button variant="outline" size="icon" onClick={() => setIsHistoryView(!isHistoryView)}>
+                                <MessageSquare />
+                             </Button>
+                             <Button variant="outline" size="icon" onClick={startNewChat}>
+                                <Plus />
+                            </Button>
+                        </div>
                     </SheetHeader>
-                   {renderChatContent()}
+                   {isHistoryView ? renderHistoryContent() : renderChatContent()}
                 </SheetContent>
             </Sheet>
 
