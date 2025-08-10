@@ -193,7 +193,7 @@ const OrdersView: React.FC = () => {
         if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
         if (error) return <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
         return (
-             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
+             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
                 {orderList.length > 0 ? orderList.map(order => 
                     <OrderCard 
                         key={order.id} 

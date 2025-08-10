@@ -136,7 +136,7 @@ const DashboardView: React.FC = () => {
 
             const [ordersSnapshot, miscSnapshot, reportsSnapshot] = await Promise.all([
                 getDocs(ordersQuery),
-                getDocs(miscSnapshot),
+                getDocs(miscQuery),
                 getDocs(reportsQuery),
             ]);
 
@@ -481,7 +481,7 @@ const DashboardView: React.FC = () => {
                     </Dialog>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
                     <StatCard icon={<DollarSign className="text-green-500"/>} title="Net Sales" value={formatCurrency(stats.netSales)} description={`${formatCurrency(stats.totalSales)} Total - ${formatCurrency(stats.totalMiscExpenses)} Expenses`}/>
                     <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} />
                     <StatCard icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Cash Discrepancy" value={formatCurrency(stats.cashDiscrepancy)} description="Sum of cash surplus/deficit" />
