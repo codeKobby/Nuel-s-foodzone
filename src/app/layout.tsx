@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster"
 export const metadata: Metadata = {
   title: "Nuel's Cafe",
   description: "Point of Sale system for Nuel's Food Zone",
+  icons: null,
 };
 
 export default function RootLayout({

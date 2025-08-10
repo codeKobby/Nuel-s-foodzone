@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, getDocs, orderBy, Timestamp, addDoc, onSnapshot, serverTimestamp, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, CheckCircle, AlertCircle, History, Landmark } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -35,9 +35,11 @@ interface DailyStats {
     momoSales: number;
     miscExpenses: number;
     expectedCash: number;
+    changeGiven: number;
+    changeOwed: number;
 }
 
-const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, color?: string }> = ({ icon, title, value, color }) => (
+const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, color?: string, description?: string }> = ({ icon, title, value, color, description }) => (
     <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -45,20 +47,21 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
         </CardHeader>
         <CardContent>
             <div className={`text-2xl font-bold ${color}`}>{value}</div>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </CardContent>
     </Card>
 );
 
 const denominations = [
     { name: '200 GHS', value: 200 }, { name: '100 GHS', value: 100 },
-    { name: '50 GHS', value: 50 }, { name: '20 GHS', value: 20 },
+    { name: '50 GHS', value = 50 }, { name: '20 GHS', value: 20 },
     { name: '10 GHS', value: 10 }, { name: '5 GHS', value: 5 },
     { name: '2 GHS', value: 2 }, { name: '1 GHS', value: 1 },
     { name: '50 Pesewas', value: 0.5 },
 ];
 
 const AccountingView: React.FC = () => {
-    const [stats, setStats] = useState<DailyStats>({ totalSales: 0, cashSales: 0, momoSales: 0, miscExpenses: 0, expectedCash: 0 });
+    const [stats, setStats] = useState<DailyStats>({ totalSales: 0, cashSales: 0, momoSales: 0, miscExpenses: 0, expectedCash: 0, changeGiven: 0, changeOwed: 0 });
     const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
     const [countedMomo, setCountedMomo] = useState('');
     const [notes, setNotes] = useState('');
@@ -95,13 +98,19 @@ const AccountingView: React.FC = () => {
                 
                 const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
 
-                let cashSales = 0, momoSales = 0;
+                let cashSales = 0, momoSales = 0, totalSales = 0, totalChangeGiven = 0, totalChangeOwed = 0;
                 ordersSnapshot.docs.forEach(doc => {
                     const order = doc.data() as Order;
                     if (order.paymentStatus === 'Unpaid') return;
                     
+                    totalSales += order.total;
+
                     if(order.paymentMethod === 'cash') {
-                       cashSales += order.amountPaid - order.changeGiven;
+                       cashSales += order.amountPaid;
+                       totalChangeGiven += order.changeGiven;
+                       if(order.amountPaid >= order.total) {
+                           totalChangeOwed += order.balanceDue;
+                       }
                     } else if (order.paymentMethod === 'momo') {
                         momoSales += order.amountPaid;
                     }
@@ -115,10 +124,9 @@ const AccountingView: React.FC = () => {
                     }
                 });
                 
-                const totalSales = cashSales + momoSales;
-                const expectedCash = cashSales - miscExpenses;
+                const expectedCash = cashSales - totalChangeGiven - miscExpenses;
                 
-                setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash });
+                setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, changeGiven: totalChangeGiven, changeOwed: totalChangeOwed });
             } catch (e) {
                 console.error(e);
                 setError("Failed to load daily financial data. Check Firestore indexes.");
@@ -167,7 +175,6 @@ const AccountingView: React.FC = () => {
             };
             await addDoc(collection(db, "reconciliationReports"), reportData);
             
-            // Reset form
             setCounts(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
             setCountedMomo('');
             setNotes('');
@@ -200,29 +207,39 @@ const AccountingView: React.FC = () => {
                 <h2 className="text-3xl font-bold mb-6">Accounting & Reconciliation</h2>
                 {error && <Alert variant="destructive" className="mb-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
 
-                 <Tabs defaultValue="reconciliation" className="w-full">
+                 <Tabs defaultValue="summary" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
+                    <TabsTrigger value="summary">Today's Summary</TabsTrigger>
                     <TabsTrigger value="history">History ({reports.length})</TabsTrigger>
                   </TabsList>
-                  <TabsContent value="reconciliation">
+                  <TabsContent value="summary">
                         <Card className="mt-4">
                             <CardHeader>
                                 <CardTitle>Today's Financial Summary</CardTitle>
-                                <CardDescription>All financial data since midnight.</CardDescription>
+                                <CardDescription>All financial data since midnight. This is a real-time view.</CardDescription>
                             </CardHeader>
-                            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales (Paid)" value={formatCurrency(stats.totalSales)} />
-                                <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} />
+                                <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
                                 <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
-                                <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.miscExpenses)} />
+                                <StatCard icon={<Coins className="text-red-500"/>} title="Change Given" value={formatCurrency(stats.changeGiven)} description="Cash returned to customers" />
+                                <StatCard icon={<Coins className="text-yellow-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change to be given" />
+                                <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Settled Misc. Expenses" value={formatCurrency(stats.miscExpenses)} />
                             </CardContent>
+                            <CardFooter>
+                                <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
+                                    <Label className="text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash in Drawer</Label>
+                                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
+                                    <p className="text-xs text-muted-foreground">(Cash Sales - Change Given - Misc. Expenses)</p>
+                                </div>
+                            </CardFooter>
                         </Card>
                   </TabsContent>
                   <TabsContent value="history">
                       <Card className="mt-4">
                           <CardHeader>
                               <CardTitle>Reconciliation History</CardTitle>
+                              <CardDescription>Review past end-of-day reports.</CardDescription>
                           </CardHeader>
                           <CardContent className="space-y-3 max-h-[500px] overflow-y-auto">
                             {reports.length === 0 && <p className="text-muted-foreground italic text-center py-4">No reports saved yet.</p>}
@@ -250,41 +267,33 @@ const AccountingView: React.FC = () => {
                 </Tabs>
             </div>
             
-            <Card className="w-full md:w-[450px] rounded-none border-t md:border-t-0 md:border-r-0 flex flex-col">
+            <Card className="w-full md:w-[450px] rounded-none border-t md:border-t-0 md:border-l flex flex-col">
                 <CardHeader>
                     <CardTitle className="text-2xl">Close Out for Today</CardTitle>
                     <CardDescription>Count physical cash and reconcile accounts.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex-grow overflow-y-auto">
-                    <div className="space-y-4">
-                        <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
-                            <Label className="text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash in Drawer</Label>
-                            <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
-                            <p className="text-xs text-muted-foreground">(Total Cash Sales - Settled Misc. Expenses)</p>
+                <CardContent className="flex-grow overflow-y-auto space-y-4">
+                    <div>
+                        <Label className="text-lg font-semibold">Cash Count</Label>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 p-3 border rounded-md bg-secondary">
+                            {denominations.map(d => (
+                                <div key={d.name} className="flex items-center space-x-2">
+                                    <Label htmlFor={`count-${d.name}`} className="w-24 text-sm">{d.name}</Label>
+                                    <Input id={`count-${d.name}`} type="text" pattern="[0-9]*" value={counts[d.name]} onChange={e => handleCountChange(d.name, e.target.value)} placeholder="Qty" className="h-8"/>
+                                </div>
+                            ))}
                         </div>
-                        <div>
-                            <Label className="text-lg font-semibold">Cash Count</Label>
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 p-3 border rounded-md">
-                                {denominations.map(d => (
-                                    <div key={d.name} className="flex items-center space-x-2">
-                                        <Label htmlFor={`count-${d.name}`} className="w-24 text-sm">{d.name}</Label>
-                                        <Input id={`count-${d.name}`} type="text" pattern="[0-9]*" value={counts[d.name]} onChange={e => handleCountChange(d.name, e.target.value)} placeholder="Qty" className="h-8"/>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                         <div>
-                            <Label className="text-lg font-semibold">Momo/Card Count</Label>
-                             <Input id="counted-momo" type="number" value={countedMomo} onChange={e => setCountedMomo(e.target.value)} placeholder="Total from device" className="h-10 mt-2"/>
-                        </div>
-                        <div>
-                            <Label className="text-lg font-semibold" htmlFor="notes">Notes</Label>
-                             <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any notes about today's sales (e.g., reason for deficit)" className="mt-2"/>
-                        </div>
-
+                    </div>
+                     <div>
+                        <Label className="text-lg font-semibold">Momo/Card Count</Label>
+                         <Input id="counted-momo" type="number" value={countedMomo} onChange={e => setCountedMomo(e.target.value)} placeholder="Total from device" className="h-10 mt-2"/>
+                    </div>
+                    <div>
+                        <Label className="text-lg font-semibold" htmlFor="notes">Notes</Label>
+                         <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any notes about today's sales (e.g., reason for deficit)" className="mt-2"/>
                     </div>
                 </CardContent>
-                 <CardFooter className="mt-auto bg-card border-t pt-4 flex-col items-stretch space-y-4">
+                 <CardFooter className="bg-card border-t pt-4 flex-col items-stretch space-y-4">
                     <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-900/20 text-center">
                         <Label className="text-lg font-semibold text-blue-700 dark:text-blue-300">Counted Cash Total</Label>
                         <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(totalCountedCash)}</p>
@@ -319,3 +328,5 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
+
+    
