@@ -16,8 +16,7 @@ export default function RoleSelectionPage() {
 
   const handleNavigation = (role: 'manager' | 'cashier') => {
     setLoadingRole(role);
-    // The link will handle the navigation, but the loading state is set.
-    // We can also use router.push if we want more control.
+    router.push(`/main?role=${role}`);
   };
 
   return (
@@ -36,24 +35,22 @@ export default function RoleSelectionPage() {
             <CardDescription>Full access to dashboard and admin controls.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/main?role=manager" passHref legacyBehavior>
-              <Button 
-                className="w-full text-lg h-12"
-                onClick={() => handleNavigation('manager')}
-                disabled={loadingRole === 'manager' || loadingRole === 'cashier'}
-              >
-                {loadingRole === 'manager' ? (
-                  <>
-                    <Loader className="mr-2 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    Login as Manager <ArrowRight className="ml-2" />
-                  </>
-                )}
-              </Button>
-            </Link>
+            <Button 
+              className="w-full text-lg h-12"
+              onClick={() => handleNavigation('manager')}
+              disabled={loadingRole === 'manager' || loadingRole === 'cashier'}
+            >
+              {loadingRole === 'manager' ? (
+                <>
+                  <Loader className="mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  Login as Manager <ArrowRight className="ml-2" />
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
 
@@ -64,24 +61,22 @@ export default function RoleSelectionPage() {
             <CardDescription>Access to POS, Orders, Accounting, and Misc for daily operations.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/main?role=cashier" passHref legacyBehavior>
-              <Button 
-                className="w-full text-lg h-12"
-                onClick={() => handleNavigation('cashier')}
-                disabled={loadingRole === 'manager' || loadingRole === 'cashier'}
-              >
-                 {loadingRole === 'cashier' ? (
-                  <>
-                    <Loader className="mr-2 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    Login as Cashier <ArrowRight className="ml-2" />
-                  </>
-                )}
-              </Button>
-            </Link>
+            <Button 
+              className="w-full text-lg h-12"
+              onClick={() => handleNavigation('cashier')}
+              disabled={loadingRole === 'manager' || loadingRole === 'cashier'}
+            >
+               {loadingRole === 'cashier' ? (
+                <>
+                  <Loader className="mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  Login as Cashier <ArrowRight className="ml-2" />
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
       </div>
