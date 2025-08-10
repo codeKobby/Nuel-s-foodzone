@@ -1,0 +1,26 @@
+/**
+ * @fileOverview This file contains the Zod schemas and TypeScript types for the AI flows.
+ * It is separated from the flow definitions to avoid exporting non-async objects
+ * from a 'use server' file.
+ */
+
+import { z } from 'zod';
+
+export const AnalyzeBusinessInputSchema = z.object({
+  period: z.string().describe('The date range for the analysis period.'),
+  totalSales: z.number().describe('The total sales revenue for the period.'),
+  netSales: z.number().describe('The net sales after deducting expenses.'),
+  totalOrders: z.number().describe('The total number of orders.'),
+  itemPerformance: z.array(z.object({
+    name: z.string().describe('The name of the menu item.'),
+    count: z.number().describe('The quantity of this item sold.'),
+  })).describe('A list of menu items and their sales counts.'),
+  cashDiscrepancy: z.number().describe('The total cash discrepancy (surplus or deficit) from reconciliations.'),
+});
+export type AnalyzeBusinessInput = z.infer<typeof AnalyzeBusinessInputSchema>;
+
+export const AnalyzeBusinessOutputSchema = z.object({
+  analysis: z.string().describe("A concise analysis of the business's performance for the period. Analyze the key metrics. Keep it to 2-3 short paragraphs."),
+  suggestions: z.string().describe("Actionable suggestions to boost sales or improve operations. Provide 3-5 bullet points. Each suggestion should be specific and based on the data provided."),
+});
+export type AnalyzeBusinessOutput = z.infer<typeof AnalyzeBusinessOutputSchema>;

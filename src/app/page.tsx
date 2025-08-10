@@ -16,6 +16,7 @@ import AccountingView from '@/components/cafe/AccountingView';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
+import AiFlow from '@/ai/flows/analyze-business-flow';
 
 export default function CafePage() {
     const [activeView, setActiveView] = useState('pos');
@@ -127,6 +128,7 @@ export default function CafePage() {
             />
             <main className="flex-1 flex flex-col overflow-hidden">
                 {renderActiveView()}
+                <AiFlow />
             </main>
         </div>
     );
