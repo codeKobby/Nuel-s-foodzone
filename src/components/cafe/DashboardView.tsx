@@ -330,7 +330,7 @@ const DashboardView: React.FC = () => {
     const bottomItems = useMemo(() => stats && stats.itemPerformance.length > 5 ? stats.itemPerformance.slice(-5).reverse() : [], [stats]);
     
     const renderChatContent = () => (
-         <div className="flex-grow flex flex-col overflow-hidden">
+         <div className="flex-grow flex flex-col overflow-hidden h-full">
             <ScrollArea className="flex-grow p-4" ref={chatContainerRef}>
                 <div className="space-y-4">
                     {chatHistory.map((message, index) => (
