@@ -1,12 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileAnalytics } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -40,9 +40,14 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { DateRange } from "react-day-picker"
+import { addDays, format } from "date-fns"
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 
-interface DailyStats {
+interface PeriodStats {
     totalSales: number;
     cashSales: number;
     momoSales: number;
@@ -50,7 +55,7 @@ interface DailyStats {
     expectedCash: number;
     changeGiven: number;
     changeOwed: number;
-    todaysOrders: Order[];
+    orders: Order[];
     itemCounts: Record<string, number>;
 }
 
@@ -76,7 +81,7 @@ const denominations = [
 ];
 
 const AccountingView: React.FC = () => {
-    const [stats, setStats] = useState<DailyStats>({ totalSales: 0, cashSales: 0, momoSales: 0, miscExpenses: 0, expectedCash: 0, changeGiven: 0, changeOwed: 0, todaysOrders: [], itemCounts: {} });
+    const [stats, setStats] = useState<PeriodStats | null>(null);
     const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
     const [countedMomo, setCountedMomo] = useState('');
     const [notes, setNotes] = useState('');
@@ -88,6 +93,7 @@ const AccountingView: React.FC = () => {
     const [showConfirm, setShowConfirm] = useState(false);
     const [isCloseOutOpen, setIsCloseOutOpen] = useState(false);
     const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
+    const [date, setDate] = useState<DateRange | undefined>({ from: new Date(), to: new Date() });
 
     const totalCountedCash = useMemo(() => {
         return denominations.reduce((acc, d) => {
@@ -96,73 +102,81 @@ const AccountingView: React.FC = () => {
         }, 0);
     }, [counts]);
     
-    const cashDifference = useMemo(() => totalCountedCash - stats.expectedCash, [totalCountedCash, stats.expectedCash]);
-    const cashForDeposit = useMemo(() => changeSetAside ? totalCountedCash - stats.changeOwed : totalCountedCash, [changeSetAside, totalCountedCash, stats.changeOwed]);
+    const cashDifference = useMemo(() => totalCountedCash - (stats?.expectedCash || 0), [totalCountedCash, stats?.expectedCash]);
+    const cashForDeposit = useMemo(() => changeSetAside ? totalCountedCash - (stats?.changeOwed || 0) : totalCountedCash, [changeSetAside, totalCountedCash, stats?.changeOwed]);
 
+    const fetchPeriodData = useCallback(async () => {
+        if (!date?.from) return;
+        setLoading(true);
+        setError(null);
+        setStats(null);
+        
+        try {
+            const startDate = new Date(date.from);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = date.to ? new Date(date.to) : new Date(date.from);
+            endDate.setHours(23, 59, 59, 999);
+
+            const startDateTimestamp = Timestamp.fromDate(startDate);
+            const endDateTimestamp = Timestamp.fromDate(endDate);
+
+            const ordersRef = collection(db, "orders");
+            const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
+            
+            const miscExpensesRef = collection(db, "miscExpenses");
+            const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
+            
+            const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
+
+            let cashSales = 0, momoSales = 0, totalSales = 0, totalChangeGiven = 0, totalChangeOwed = 0;
+            const periodOrders: Order[] = [];
+            const itemCounts: Record<string, number> = {};
+
+            ordersSnapshot.docs.forEach(doc => {
+                const order = { id: doc.id, ...doc.data() } as Order;
+                periodOrders.push(order);
+                if (order.paymentStatus === 'Unpaid') return;
+                
+                totalSales += order.amountPaid;
+                order.items.forEach(item => {
+                    itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
+                });
+
+                if (order.paymentMethod === 'cash') {
+                   cashSales += order.amountPaid;
+                   totalChangeGiven += order.changeGiven;
+                   if (order.balanceDue > 0 && order.amountPaid >= order.total) {
+                       totalChangeOwed += order.balanceDue;
+                   }
+                } else if (order.paymentMethod === 'momo') {
+                    momoSales += order.amountPaid;
+                }
+            });
+
+            let miscExpenses = 0;
+            miscSnapshot.forEach(doc => {
+                const expense = doc.data() as MiscExpense;
+                if (expense.settled) {
+                    miscExpenses += expense.amount;
+                }
+            });
+            
+            const expectedCash = cashSales - totalChangeGiven - miscExpenses;
+            
+            setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, changeGiven: totalChangeGiven, changeOwed: totalChangeOwed, orders: periodOrders, itemCounts });
+        } catch (e) {
+            console.error(e);
+            setError("Failed to load financial data for the selected period.");
+        } finally {
+            setLoading(false);
+        }
+    }, [date]);
+    
     useEffect(() => {
-        const fetchDailyData = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const now = new Date();
-                const startDate = new Date(now);
-                startDate.setHours(0, 0, 0, 0);
-                const startDateTimestamp = Timestamp.fromDate(startDate);
-
-                const ordersRef = collection(db, "orders");
-                const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp));
-                
-                const miscExpensesRef = collection(db, "miscExpenses");
-                const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp));
-                
-                const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
-
-                let cashSales = 0, momoSales = 0, totalSales = 0, totalChangeGiven = 0, totalChangeOwed = 0;
-                const todaysOrders: Order[] = [];
-                const itemCounts: Record<string, number> = {};
-
-                ordersSnapshot.docs.forEach(doc => {
-                    const order = { id: doc.id, ...doc.data() } as Order;
-                    todaysOrders.push(order);
-
-                    order.items.forEach(item => {
-                        itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
-                    });
-                    
-                    if (order.paymentStatus === 'Unpaid') return;
-                    
-                    totalSales += order.total;
-
-                    if(order.paymentMethod === 'cash') {
-                       cashSales += order.amountPaid;
-                       totalChangeGiven += order.changeGiven;
-                       if(order.amountPaid >= order.total && order.balanceDue > 0) {
-                           totalChangeOwed += order.balanceDue;
-                       }
-                    } else if (order.paymentMethod === 'momo') {
-                        momoSales += order.amountPaid;
-                    }
-                });
-
-                let miscExpenses = 0;
-                miscSnapshot.forEach(doc => {
-                    const expense = doc.data() as MiscExpense;
-                    if (expense.settled) {
-                        miscExpenses += expense.amount;
-                    }
-                });
-                
-                const expectedCash = cashSales - totalChangeGiven - miscExpenses;
-                
-                setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, changeGiven: totalChangeGiven, changeOwed: totalChangeOwed, todaysOrders, itemCounts });
-            } catch (e) {
-                console.error(e);
-                setError("Failed to load daily financial data. Check Firestore indexes.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
+        fetchPeriodData();
+    }, [fetchPeriodData]);
+    
+    useEffect(() => {
         const reportsRef = collection(db, "reconciliationReports");
         const q = query(reportsRef, orderBy('timestamp', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -172,7 +186,6 @@ const AccountingView: React.FC = () => {
             setError("Failed to load past reports.");
         });
 
-        fetchDailyData();
         return () => unsubscribe();
     }, []);
 
@@ -188,6 +201,10 @@ const AccountingView: React.FC = () => {
     }
 
     const handleSaveReport = async () => {
+        if (!stats) {
+            setError("No financial data loaded to create a report.");
+            return;
+        }
         if (totalCountedCash <= 0 && !countedMomo) {
             setError("Please count either cash or Momo/Card before submitting.");
             return;
@@ -236,110 +253,147 @@ const AccountingView: React.FC = () => {
     }
     
     const sortedItemCounts = useMemo(() => {
+        if (!stats) return [];
         return Object.entries(stats.itemCounts).sort(([, a], [, b]) => b - a);
-    }, [stats.itemCounts]);
+    }, [stats]);
     
-    if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
+    const CloseOutDialog = (
+        <Dialog open={isCloseOutOpen} onOpenChange={setIsCloseOutOpen}>
+            <DialogTrigger asChild>
+                 <Button><FileAnalytics className="mr-2" /> Start End-of-Day Close Out</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle>End-of-Day Reconciliation</DialogTitle>
+                    <DialogDescription>Count physical cash and reconcile accounts for today's sales. This action will save a permanent report.</DialogDescription>
+                </DialogHeader>
+                
+                {!stats ? <LoadingSpinner /> : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                     <div className="space-y-4">
+                        <Label className="text-lg font-semibold">Cash Count</Label>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 p-3 border rounded-md bg-secondary">
+                            {denominations.map(d => (
+                                <div key={d.name} className="flex items-center space-x-2">
+                                    <Label htmlFor={`count-${d.name}`} className="w-24 text-sm">{d.name}</Label>
+                                    <Input id={`count-${d.name}`} type="text" pattern="[0-9]*" value={counts[d.name]} onChange={e => handleCountChange(d.name, e.target.value)} placeholder="Qty" className="h-8"/>
+                                </div>
+                            ))}
+                        </div>
+                        <div>
+                            <Label className="text-lg font-semibold">Momo/Card Sales Count</Label>
+                            <Input id="counted-momo" type="number" value={countedMomo} onChange={e => setCountedMomo(e.target.value)} placeholder="Total from payment device" className="h-10 mt-2"/>
+                        </div>
+                        <div>
+                            <Label className="text-lg font-semibold" htmlFor="notes">Notes</Label>
+                            <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g., reason for cash deficit/surplus" className="mt-2"/>
+                        </div>
+                     </div>
+
+                     <div className="space-y-4 p-4 border rounded-lg">
+                        <h3 className="text-lg font-semibold text-center mb-2">Reconciliation Summary</h3>
+                        <div className="flex justify-between items-center">
+                            <Label>Expected Cash in Drawer</Label>
+                            <p className="font-bold text-lg">{formatCurrency(stats.expectedCash)}</p>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <Label>Counted Cash Total</Label>
+                            <p className="font-bold text-lg">{formatCurrency(totalCountedCash)}</p>
+                        </div>
+                        <Separator />
+                        <div className="flex justify-between items-center">
+                             <Label>Cash Status</Label>
+                             {renderDifferenceBadge(cashDifference)}
+                        </div>
+                        {cashDifference !== 0 && (
+                             <Button variant="outline" size="sm" className="w-full mt-1" onClick={() => setIsAdvancedModalOpen(true)}>
+                                 <Search className="mr-2 h-4 w-4" />
+                                 Advanced Reconciliation (Audit)
+                             </Button>
+                        )}
+                        <Separator />
+                        <div className="space-y-3 pt-2">
+                            <h4 className="font-semibold">Handle Outstanding Change</h4>
+                            <div className="flex justify-between items-center">
+                                <Label className="text-red-500">Change Owed to Customers</Label>
+                                <p className="font-bold text-red-500 text-lg">{formatCurrency(stats.changeOwed)}</p>
+                            </div>
+                            <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="change-set-aside" className="font-semibold">Set aside cash for owed change?</Label>
+                                    <p className="text-xs text-muted-foreground">Toggle this on if you are physically separating this cash.</p>
+                                </div>
+                                <Switch
+                                    id="change-set-aside"
+                                    checked={changeSetAside}
+                                    onCheckedChange={setChangeSetAside}
+                                    disabled={stats.changeOwed === 0}
+                                />
+                            </div>
+                        </div>
+                        <Separator />
+                        <div className="pt-2 text-center bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                             <Label className="text-xl font-bold text-green-700 dark:text-green-300">Final Cash for Deposit</Label>
+                             <p className="text-4xl font-extrabold text-green-600 dark:text-green-400 mt-2">{formatCurrency(cashForDeposit)}</p>
+                              {changeSetAside && <p className="text-xs text-muted-foreground mt-1">({formatCurrency(totalCountedCash)} Counted - {formatCurrency(stats.changeOwed)} Set Aside)</p>}
+                        </div>
+                     </div>
+                </div>
+                )}
+                
+                {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+
+                <DialogFooter>
+                    <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting || !stats} className="w-full h-12 text-lg font-bold">
+                        {isSubmitting ? 'Saving...' : 'Save Reconciliation Report'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 
     return (
         <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
-                 <h2 className="text-3xl font-bold">Accounting</h2>
-                 <Dialog open={isCloseOutOpen} onOpenChange={setIsCloseOutOpen}>
-                    <DialogTrigger asChild>
-                         <Button>Start End-of-Day Close Out</Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl">
-                        <DialogHeader>
-                            <DialogTitle>End-of-Day Reconciliation</DialogTitle>
-                            <DialogDescription>Count physical cash and reconcile accounts. This action will save a permanent report for the day.</DialogDescription>
-                        </DialogHeader>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                             <div className="space-y-4">
-                                <Label className="text-lg font-semibold">Cash Count</Label>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 p-3 border rounded-md bg-secondary">
-                                    {denominations.map(d => (
-                                        <div key={d.name} className="flex items-center space-x-2">
-                                            <Label htmlFor={`count-${d.name}`} className="w-24 text-sm">{d.name}</Label>
-                                            <Input id={`count-${d.name}`} type="text" pattern="[0-9]*" value={counts[d.name]} onChange={e => handleCountChange(d.name, e.target.value)} placeholder="Qty" className="h-8"/>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div>
-                                    <Label className="text-lg font-semibold">Momo/Card Sales Count</Label>
-                                    <Input id="counted-momo" type="number" value={countedMomo} onChange={e => setCountedMomo(e.target.value)} placeholder="Total from payment device" className="h-10 mt-2"/>
-                                </div>
-                                <div>
-                                    <Label className="text-lg font-semibold" htmlFor="notes">Notes</Label>
-                                    <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g., reason for cash deficit/surplus" className="mt-2"/>
-                                </div>
-                             </div>
-
-                             <div className="space-y-4 p-4 border rounded-lg">
-                                <h3 className="text-lg font-semibold text-center mb-2">Reconciliation Summary</h3>
-                                <div className="flex justify-between items-center">
-                                    <Label>Expected Cash in Drawer</Label>
-                                    <p className="font-bold text-lg">{formatCurrency(stats.expectedCash)}</p>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Label>Counted Cash Total</Label>
-                                    <p className="font-bold text-lg">{formatCurrency(totalCountedCash)}</p>
-                                </div>
-                                <Separator />
-                                <div className="flex justify-between items-center">
-                                     <Label>Cash Status</Label>
-                                     {renderDifferenceBadge(cashDifference)}
-                                </div>
-                                {cashDifference !== 0 && (
-                                     <Button variant="outline" size="sm" className="w-full mt-1" onClick={() => setIsAdvancedModalOpen(true)}>
-                                         <Search className="mr-2 h-4 w-4" />
-                                         Advanced Reconciliation (Audit)
-                                     </Button>
-                                )}
-                                <Separator />
-                                <div className="space-y-3 pt-2">
-                                    <h4 className="font-semibold">Handle Outstanding Change</h4>
-                                    <div className="flex justify-between items-center">
-                                        <Label className="text-red-500">Change Owed to Customers</Label>
-                                        <p className="font-bold text-red-500 text-lg">{formatCurrency(stats.changeOwed)}</p>
-                                    </div>
-                                    <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                                        <div className="space-y-0.5">
-                                            <Label htmlFor="change-set-aside" className="font-semibold">Set aside cash for owed change?</Label>
-                                            <p className="text-xs text-muted-foreground">Toggle this on if you are physically separating this cash.</p>
-                                        </div>
-                                        <Switch
-                                            id="change-set-aside"
-                                            checked={changeSetAside}
-                                            onCheckedChange={setChangeSetAside}
-                                            disabled={stats.changeOwed === 0}
-                                        />
-                                    </div>
-                                </div>
-                                <Separator />
-                                <div className="pt-2 text-center bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                                     <Label className="text-xl font-bold text-green-700 dark:text-green-300">Final Cash for Deposit</Label>
-                                     <p className="text-4xl font-extrabold text-green-600 dark:text-green-400 mt-2">{formatCurrency(cashForDeposit)}</p>
-                                      {changeSetAside && <p className="text-xs text-muted-foreground mt-1">({formatCurrency(totalCountedCash)} Counted - {formatCurrency(stats.changeOwed)} Set Aside)</p>}
-                                </div>
-                             </div>
-                        </div>
-                        
-                        {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-
-                        <DialogFooter>
-                            <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting} className="w-full h-12 text-lg font-bold">
-                                {isSubmitting ? 'Saving...' : 'Save Reconciliation Report'}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                 </Dialog>
+                <h2 className="text-3xl font-bold">Accounting</h2>
+                <div className="flex items-center gap-4">
+                     <Popover>
+                        <PopoverTrigger asChild>
+                        <Button
+                            id="date"
+                            variant={"outline"}
+                            className={cn("w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+                        >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {date?.from ? (
+                            date.to ? (
+                                <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>
+                            ) : (
+                                format(date.from, "LLL dd, y")
+                            )
+                            ) : (
+                            <span>Pick a date</span>
+                            )}
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                        <Calendar
+                            initialFocus
+                            mode="range"
+                            defaultMonth={date?.from}
+                            selected={date}
+                            onSelect={setDate}
+                            numberOfMonths={2}
+                        />
+                        </PopoverContent>
+                    </Popover>
+                    {CloseOutDialog}
+                </div>
             </div>
             
-            {isAdvancedModalOpen && (
+            {stats && isAdvancedModalOpen && (
                 <AdvancedReconciliationModal
-                    orders={stats.todaysOrders}
+                    orders={stats.orders}
                     onClose={() => setIsAdvancedModalOpen(false)}
                 />
             )}
@@ -348,16 +402,22 @@ const AccountingView: React.FC = () => {
 
             <Tabs defaultValue="summary" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="summary">Today's Summary</TabsTrigger>
+                <TabsTrigger value="summary">Financial Summary</TabsTrigger>
                 <TabsTrigger value="history">History ({reports.length})</TabsTrigger>
               </TabsList>
               <TabsContent value="summary">
+                    {loading ? <div className="mt-8"><LoadingSpinner /></div> : !stats ? <p className="text-muted-foreground text-center italic py-10">No financial data for this period.</p> : (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
                         <div className="lg:col-span-2">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Today's Financial Summary</CardTitle>
-                                    <CardDescription>All financial data since midnight. This is a real-time view.</CardDescription>
+                                    <CardTitle>Financial Summary</CardTitle>
+                                    <CardDescription>
+                                        {date?.from && date.to && format(date.from, "LLL dd, y") !== format(date.to, "LLL dd, y") 
+                                            ? `Financial data from ${format(date.from, "LLL dd, y")} to ${format(date.to, "LLL dd, y")}`
+                                            : `Financial data for ${date?.from ? format(date.from, "LLL dd, y") : 'the selected date'}`
+                                        }
+                                    </CardDescription>
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales (Paid)" value={formatCurrency(stats.totalSales)} />
@@ -369,7 +429,7 @@ const AccountingView: React.FC = () => {
                                 </CardContent>
                                 <CardFooter>
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
-                                        <Label className="text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash in Drawer</Label>
+                                        <Label className="text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash from Sales</Label>
                                         <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
                                         <p className="text-xs text-muted-foreground">(Cash Sales - Change Given - Settled Misc. Expenses)</p>
                                     </div>
@@ -378,8 +438,8 @@ const AccountingView: React.FC = () => {
                         </div>
                          <Card>
                             <CardHeader>
-                                <CardTitle>Today's Item Sales</CardTitle>
-                                <CardDescription>Total count of each item sold today.</CardDescription>
+                                <CardTitle>Item Sales</CardTitle>
+                                <CardDescription>Total count of each item sold in this period.</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <ScrollArea className="h-[400px]">
@@ -390,13 +450,14 @@ const AccountingView: React.FC = () => {
                                                 <Badge variant="default" className="bg-primary/80">{count} sold</Badge>
                                             </div>
                                         )) : (
-                                            <p className="text-muted-foreground text-center italic py-4">No items sold yet today.</p>
+                                            <p className="text-muted-foreground text-center italic py-4">No items sold in this period.</p>
                                         )}
                                     </div>
                                 </ScrollArea>
                             </CardContent>
                         </Card>
                     </div>
+                    )}
               </TabsContent>
               <TabsContent value="history">
                   <Card className="mt-4">
@@ -460,5 +521,3 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
-
-    

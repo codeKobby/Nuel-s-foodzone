@@ -1,12 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, addDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, MiscExpense, ReconciliationReport, ChatSession } from '@/lib/types';
+import type { Order, MiscExpense, ReconciliationReport, ChatSession, AnalyzeBusinessOutput } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileAnalytics } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -21,11 +21,19 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { businessChat } from '@/ai/flows/business-chat-flow';
-import { type BusinessChatInput } from '@/ai/schemas';
+import { analyzeBusiness } from '@/ai/flows/analyze-business-flow';
+import { type BusinessChatInput, type AnalyzeBusinessInput } from '@/ai/schemas';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Sheet,
   SheetContent,
@@ -90,12 +98,14 @@ const DashboardView: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [date, setDate] = useState<DateRange | undefined>({ from: addDays(new Date(), -6), to: new Date() });
     
-    // AI Chat State
+    // AI Features State
     const [activeChatSessionId, setActiveChatSessionId] = useState<string | null>(null);
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
     const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
     const [chatInput, setChatInput] = useState('');
     const [isAiReplying, setIsAiReplying] = useState(false);
+    const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState<AnalyzeBusinessOutput | null>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const [isChatSheetOpen, setIsChatSheetOpen] = useState(false);
     const [isHistoryView, setIsHistoryView] = useState(false);
@@ -103,39 +113,12 @@ const DashboardView: React.FC = () => {
     const isMobile = useIsMobile();
 
 
-    useEffect(() => {
-        fetchDashboardData();
-    }, [date]);
-    
-     useEffect(() => {
-        if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-        }
-    }, [chatHistory]);
-
-    useEffect(() => {
-        const q = query(collection(db, "chatSessions"), orderBy("timestamp", "desc"));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            setChatSessions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ChatSession)));
-        });
-        return () => unsubscribe();
-    }, []);
-    
-    useEffect(() => {
-        if (activeChatSessionId) {
-            const session = chatSessions.find(s => s.id === activeChatSessionId);
-            setChatHistory(session?.messages || []);
-        } else {
-            setChatHistory([]);
-        }
-    }, [activeChatSessionId, chatSessions]);
-
-
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = useCallback(async () => {
         if (!date?.from || !date?.to) return;
         setLoading(true);
         setError(null);
         setStats(null);
+        setAnalysisResult(null);
         
         try {
             const startDate = Timestamp.fromDate(date.from);
@@ -152,7 +135,7 @@ const DashboardView: React.FC = () => {
 
             const [ordersSnapshot, miscSnapshot, reportsSnapshot] = await Promise.all([
                 getDocs(ordersQuery),
-                getDocs(miscQuery),
+                getDocs(miscSnapshot),
                 getDocs(reportsQuery),
             ]);
 
@@ -178,7 +161,7 @@ const DashboardView: React.FC = () => {
                 if (order.timestamp) {
                     const orderDate = order.timestamp.toDate();
                     const dayKey = format(orderDate, 'MMM d');
-                    salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.total;
+                    salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.amountPaid;
                 }
             });
 
@@ -198,7 +181,7 @@ const DashboardView: React.FC = () => {
 
             const netSales = totalSales - totalMiscExpenses;
             const salesData = Object.entries(salesByDay).map(([date, sales]) => ({ date, sales }));
-            const itemPerformance = Object.entries(itemCounts).sort(([, a], [, b]) => b - a);
+            const itemPerformance = Object.entries(itemCounts).sort(([, a], [, b]) => b - a).map(([name, count]) => ({name, count}));
 
             setStats({
                 totalSales,
@@ -217,7 +200,58 @@ const DashboardView: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [date]);
+    
+     useEffect(() => {
+        fetchDashboardData();
+    }, [fetchDashboardData]);
+    
+     useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [chatHistory]);
+
+    useEffect(() => {
+        const q = query(collection(db, "chatSessions"), orderBy("timestamp", "desc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setChatSessions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ChatSession)));
+        });
+        return () => unsubscribe();
+    }, []);
+    
+    useEffect(() => {
+        if (activeChatSessionId) {
+            const session = chatSessions.find(s => s.id === activeChatSessionId);
+            setChatHistory(session?.messages || []);
+        } else {
+            setChatHistory([]);
+        }
+    }, [activeChatSessionId, chatSessions]);
+
+    const handleRunAnalysis = async () => {
+        if (!stats || !date?.from) return;
+        setIsAnalysisLoading(true);
+        setAnalysisResult(null);
+        try {
+            const period = `From ${format(date.from, "PPP")} to ${format(date.to || date.from, "PPP")}`;
+            const input: AnalyzeBusinessInput = {
+                period,
+                totalSales: stats.totalSales,
+                netSales: stats.netSales,
+                totalOrders: stats.totalOrders,
+                itemPerformance: stats.itemPerformance.slice(0, 10), // Send top 10 items
+                cashDiscrepancy: stats.cashDiscrepancy,
+            };
+            const result = await analyzeBusiness(input);
+            setAnalysisResult(result);
+        } catch(e) {
+            console.error(e);
+            setError("Failed to run the AI analysis.");
+        } finally {
+            setIsAnalysisLoading(false);
+        }
+    }
     
     const handleSendMessage = async () => {
         if (!chatInput.trim() || isAiReplying) return;
@@ -301,14 +335,10 @@ const DashboardView: React.FC = () => {
                                     <AvatarFallback><Bot /></AvatarFallback>
                                 </Avatar>
                             )}
-                            <div className={`rounded-lg px-4 py-2 max-w-sm ${message.role === 'model' ? 'bg-secondary markdown-content' : 'bg-primary text-primary-foreground'}`}>
-                                {message.role === 'model' ? (
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">
-                                        {message.content}
-                                    </ReactMarkdown>
-                                ) : (
-                                    message.content
-                                )}
+                            <div className={`rounded-lg px-4 py-2 max-w-sm ${message.role === 'model' ? 'bg-secondary' : 'bg-primary text-primary-foreground'}`}>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">
+                                    {message.content}
+                                </ReactMarkdown>
                             </div>
                             {message.role === 'user' && (
                                 <Avatar className="h-8 w-8">
@@ -383,40 +413,69 @@ const DashboardView: React.FC = () => {
     return (
         <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-bold">Dashboard</h2>
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        id="date"
-                        variant={"outline"}
-                        className={cn("w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}
-                    >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date?.from ? (
-                        date.to ? (
-                            <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>
-                        ) : (
-                            format(date.from, "LLL dd, y")
-                        )
-                        ) : (
-                        <span>Pick a date</span>
-                        )}
+                 <div className="flex flex-col">
+                    <h2 className="text-3xl font-bold">Dashboard</h2>
+                    <p className="text-muted-foreground">High-level overview of business performance.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                        <Button
+                            id="date"
+                            variant={"outline"}
+                            className={cn("w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+                        >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {date?.from ? (
+                            date.to ? (
+                                <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>
+                            ) : (
+                                format(date.from, "LLL dd, y")
+                            )
+                            ) : (
+                            <span>Pick a date</span>
+                            )}
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                        <Calendar
+                            initialFocus
+                            mode="range"
+                            defaultMonth={date?.from}
+                            selected={date}
+                            onSelect={setDate}
+                            numberOfMonths={2}
+                        />
+                        </PopoverContent>
+                    </Popover>
+                     <Button onClick={handleRunAnalysis} disabled={!stats || isAnalysisLoading}>
+                        <FileAnalytics className="mr-2 h-4 w-4"/>
+                        {isAnalysisLoading ? "Analyzing..." : "Analyze Performance"}
                     </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar
-                        initialFocus
-                        mode="range"
-                        defaultMonth={date?.from}
-                        selected={date}
-                        onSelect={setDate}
-                        numberOfMonths={2}
-                    />
-                    </PopoverContent>
-                </Popover>
+                </div>
             </div>
             {loading ? <div className="mt-8"><LoadingSpinner/></div> : error ? <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : !stats ?  <div className="text-center py-10 text-muted-foreground">Select a date range to view data.</div> : (
             <>
+                 {isAnalysisLoading && <div className="flex items-center justify-center my-4 p-4 rounded-lg bg-card border"><LoadingSpinner /><p className="ml-2">AI is analyzing your data...</p></div>}
+                
+                {analysisResult && (
+                    <Dialog open onOpenChange={() => setAnalysisResult(null)}>
+                        <DialogContent className="max-w-2xl">
+                             <DialogHeader>
+                                <DialogTitle className="flex items-center text-2xl"><Sparkles className="mr-3 text-primary" /> AI Performance Analysis</DialogTitle>
+                                <DialogDescription>
+                                    Analysis for the period: {date?.from && format(date.from, "PPP")} - {date?.to && format(date.to, "PPP")}
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="max-h-[60vh] overflow-y-auto p-1">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content space-y-4">
+                                   {`### Analysis\n${analysisResult.analysis}\n\n### Suggestions\n${analysisResult.suggestions}`}
+                                </ReactMarkdown>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                     <StatCard icon={<DollarSign className="text-green-500"/>} title="Net Sales" value={formatCurrency(stats.netSales)} description={`${formatCurrency(stats.totalSales)} Total Sales - ${formatCurrency(stats.totalMiscExpenses)} Expenses`}/>
                     <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} />

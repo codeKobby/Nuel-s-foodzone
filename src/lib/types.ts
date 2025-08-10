@@ -1,5 +1,6 @@
-
 import type { Timestamp } from 'firebase/firestore';
+import type { AnalyzeBusinessOutputSchema } from '@/ai/schemas';
+import { z } from 'zod';
 
 export interface MenuItem {
   id: string;
@@ -72,4 +73,4 @@ export interface ChatSession {
     messages: ChatMessage[];
 }
 
-    
+export type AnalyzeBusinessOutput = z.infer<typeof AnalyzeBusinessOutputSchema>;
