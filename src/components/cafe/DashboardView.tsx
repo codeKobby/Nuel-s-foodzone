@@ -125,7 +125,8 @@ const DashboardView: React.FC = () => {
             const endDate = Timestamp.fromDate(new Date(date.to.getTime() + 86400000)); // Include the whole end day
 
             const ordersRef = collection(db, "orders");
-            const ordersQuery = query(ordersRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate), orderBy("timestamp", "asc"));
+            // Removed orderBy from here to prevent needing a composite index. We will sort client-side.
+            const ordersQuery = query(ordersRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate));
             
             const miscExpensesRef = collection(db, "miscExpenses");
             const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate));
@@ -143,8 +144,12 @@ const DashboardView: React.FC = () => {
             let totalSales = 0, totalOrders = 0, unpaidOrdersValue = 0;
             const itemCounts: Record<string, number> = {};
             const salesByDay: Record<string, number> = {};
+            
+            // Sort documents by timestamp client-side
+            const sortedDocs = ordersSnapshot.docs.sort((a, b) => a.data().timestamp.toMillis() - b.data().timestamp.toMillis());
 
-            ordersSnapshot.forEach(doc => {
+
+            sortedDocs.forEach(doc => {
                 const order = doc.data() as Order;
                 totalOrders++;
                 if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
@@ -411,19 +416,19 @@ const DashboardView: React.FC = () => {
     );
 
     return (
-        <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
+        <div className="p-4 md:p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                  <div className="flex flex-col">
-                    <h2 className="text-3xl font-bold">Dashboard</h2>
-                    <p className="text-muted-foreground">High-level overview of business performance.</p>
+                    <h2 className="text-2xl md:text-3xl font-bold">Dashboard</h2>
+                    <p className="text-sm text-muted-foreground">High-level overview of business performance.</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
                     <Popover>
                         <PopoverTrigger asChild>
                         <Button
                             id="date"
                             variant={"outline"}
-                            className={cn("w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+                            className={cn("w-full sm:w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
                         >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {date?.from ? (
@@ -444,13 +449,13 @@ const DashboardView: React.FC = () => {
                             defaultMonth={date?.from}
                             selected={date}
                             onSelect={setDate}
-                            numberOfMonths={2}
+                            numberOfMonths={isMobile ? 1 : 2}
                         />
                         </PopoverContent>
                     </Popover>
-                     <Button onClick={handleRunAnalysis} disabled={!stats || isAnalysisLoading}>
+                     <Button onClick={handleRunAnalysis} disabled={!stats || isAnalysisLoading} className="w-full sm:w-auto">
                         <FileCheck className="mr-2 h-4 w-4"/>
-                        {isAnalysisLoading ? "Analyzing..." : "Analyze Performance"}
+                        {isAnalysisLoading ? "Analyzing..." : "Analyze"}
                     </Button>
                 </div>
             </div>
@@ -476,8 +481,8 @@ const DashboardView: React.FC = () => {
                     </Dialog>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Net Sales" value={formatCurrency(stats.netSales)} description={`${formatCurrency(stats.totalSales)} Total Sales - ${formatCurrency(stats.totalMiscExpenses)} Expenses`}/>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Net Sales" value={formatCurrency(stats.netSales)} description={`${formatCurrency(stats.totalSales)} Total - ${formatCurrency(stats.totalMiscExpenses)} Expenses`}/>
                     <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} />
                     <StatCard icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Cash Discrepancy" value={formatCurrency(stats.cashDiscrepancy)} description="Sum of cash surplus/deficit" />
                     <StatCard icon={<AlertCircle className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-red-500"}/>} title="Unpaid Orders" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
@@ -489,7 +494,7 @@ const DashboardView: React.FC = () => {
                             <CardTitle>Sales Trend</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                            <ChartContainer config={chartConfig} className="h-[250px] md:h-[300px] w-full">
                                 <ResponsiveContainer>
                                     <BarChart data={stats.salesData} margin={{ top: 20, right: 20, bottom: 5, left: 0 }}>
                                         <CartesianGrid vertical={false} />
@@ -516,7 +521,7 @@ const DashboardView: React.FC = () => {
                             <CardDescription>Top and bottom selling items for the period.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                           <ScrollArea className="h-[300px]">
+                           <ScrollArea className="h-[250px] md:h-[300px]">
                                 <div className="space-y-4">
                                 <div>
                                     <h4 className="font-semibold text-green-600 mb-2 flex items-center"><TrendingUp className="mr-2" /> Top 5 Items</h4>
@@ -589,3 +594,5 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    

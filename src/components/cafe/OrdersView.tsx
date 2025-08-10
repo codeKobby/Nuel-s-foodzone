@@ -39,7 +39,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
 
     return (
         <Card className={`flex flex-col justify-between transition hover:shadow-lg ${isSelected ? 'border-primary ring-2 ring-primary' : ''} ${order.status === 'Completed' ? 'bg-secondary/50' : ''}`}>
-             <CardHeader>
+             <CardHeader className="p-4">
                 <div className="flex justify-between items-start">
                      <div className="flex items-center space-x-3">
                         <Checkbox
@@ -50,7 +50,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                             disabled={order.status === 'Completed'}
                         />
                         <div>
-                            <CardTitle className="cursor-pointer" onClick={() => onSelectionChange(order.id, !isSelected)}>{order.simplifiedId}</CardTitle>
+                            <CardTitle className="cursor-pointer text-base" onClick={() => onSelectionChange(order.id, !isSelected)}>{order.simplifiedId}</CardTitle>
                             <CardDescription>
                                 <Badge variant="outline" className="mt-1">{order.orderType}</Badge>
                             </CardDescription>
@@ -60,8 +60,8 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                 </div>
                  {order.tag && <p className="text-muted-foreground text-sm pt-2 flex items-center"><Tag size={14} className="inline mr-2"/>{order.tag}</p>}
             </CardHeader>
-            <CardContent>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(order.total)}</p>
+            <CardContent className="p-4">
+                <p className="text-xl md:text-2xl font-bold text-primary">{formatCurrency(order.total)}</p>
                 {isBalanceOwedByCustomer && 
                     <p className="text-sm text-amber-500 flex items-center">
                         <Hourglass size={14} className="inline mr-2"/>Balance: {formatCurrency(order.balanceDue)}
@@ -74,7 +74,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                 }
                 <p className="text-xs text-muted-foreground mt-2 flex items-center"><CalendarDays size={12} className="inline mr-1.5" />{formatTimestamp(order.timestamp)}</p>
             </CardContent>
-            <CardFooter className="flex space-x-2">
+            <CardFooter className="flex space-x-2 p-4">
                 <Button onClick={() => onDetailsClick(order)} variant="outline" className="w-full">Details</Button>
                  {order.status === 'Pending' ? (
                     <Button onClick={() => onStatusUpdate(order.id, 'Completed')} className="w-full bg-green-500 hover:bg-green-600 text-white">Complete</Button>
@@ -193,7 +193,7 @@ const OrdersView: React.FC = () => {
         if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
         if (error) return <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
         return (
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
                 {orderList.length > 0 ? orderList.map(order => 
                     <OrderCard 
                         key={order.id} 
@@ -210,11 +210,13 @@ const OrdersView: React.FC = () => {
 
     return (
         <TooltipProvider>
-            <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
-                <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center space-x-4">
-                        <h2 className="text-3xl font-bold">Order Management</h2>
-                         {changeDueOrders.length > 0 && (
+            <div className="p-4 md:p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
+                <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
+                    <div className="flex-grow">
+                        <h2 className="text-2xl md:text-3xl font-bold">Order Management</h2>
+                    </div>
+                    <div className="flex items-center space-x-2 w-full md:w-auto">
+                        {changeDueOrders.length > 0 && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button variant="outline" size="icon" className="relative" onClick={() => setIsChangeModalOpen(true)}>
@@ -230,7 +232,7 @@ const OrdersView: React.FC = () => {
                         {selectedOrderIds.size > 0 && (
                              <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="default" size="sm" className="relative" onClick={() => setIsCombinedPaymentModalOpen(true)}>
+                                    <Button variant="default" size="sm" className="relative flex-grow" onClick={() => setIsCombinedPaymentModalOpen(true)}>
                                         <ShoppingCart className="mr-2" /> Pay for Selected
                                         <Badge variant="secondary" className="ml-2">{selectedOrderIds.size}</Badge>
                                     </Button>
@@ -240,11 +242,11 @@ const OrdersView: React.FC = () => {
                                 </TooltipContent>
                             </Tooltip>
                         )}
-                    </div>
-                     <div className="flex space-x-1 bg-card p-1 rounded-lg shadow-sm">
-                        {['Today', 'All Time'].map(range => (
-                            <Button key={range} onClick={() => setTimeRange(range)} variant={timeRange === range ? 'default' : 'ghost'} size="sm">{range}</Button>
-                        ))}
+                         <div className="flex flex-grow space-x-1 bg-card p-1 rounded-lg shadow-sm">
+                            {['Today', 'All Time'].map(range => (
+                                <Button key={range} onClick={() => setTimeRange(range)} variant={timeRange === range ? 'default' : 'ghost'} size="sm" className="flex-1">{range}</Button>
+                            ))}
+                        </div>
                     </div>
                 </div>
                 <Tabs defaultValue="pending" className="w-full">
@@ -273,3 +275,5 @@ const OrdersView: React.FC = () => {
 };
 
 export default OrdersView;
+
+    

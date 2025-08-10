@@ -137,9 +137,9 @@ const AdminView: React.FC = () => {
 
     return (
         <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
-            <div className="flex-1 p-6 overflow-y-auto">
+            <div className="flex-1 p-4 md:p-6 overflow-y-auto">
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-3xl font-bold">Menu Management</h2>
+                    <h2 className="text-2xl md:text-3xl font-bold">Menu Management</h2>
                     {isMobile && (
                         <Sheet open={isSheetOpen} onOpenChange={(open) => { setIsSheetOpen(open); if (!open) clearForm(); }}>
                             <SheetTrigger asChild>
@@ -169,17 +169,17 @@ const AdminView: React.FC = () => {
                     <div className="space-y-6">
                         {groupedMenu.map(({ category, items }) => (
                             <Card key={category}>
-                                <CardHeader>
+                                <CardHeader className="p-4 md:p-6">
                                     <CardTitle>{category}</CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-2">
+                                <CardContent className="space-y-2 p-4 md:p-6 pt-0">
                                     {items.map(item => (
                                         <div key={item.id} className="bg-secondary p-3 rounded-lg flex justify-between items-center">
                                             <div>
-                                                <p className="font-semibold">{item.name}</p>
+                                                <p className="font-semibold text-sm">{item.name}</p>
                                                 <p className="text-sm text-muted-foreground">{formatCurrency(item.price)} - Stock: {item.stock ?? 'N/A'}</p>
                                             </div>
-                                            <div className="flex space-x-2">
+                                            <div className="flex space-x-1">
                                                 <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}><Edit className="h-4 w-4 text-blue-500" /></Button>
                                                 <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                                             </div>
@@ -193,9 +193,9 @@ const AdminView: React.FC = () => {
             </div>
             
             {!isMobile && (
-                <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-l">
+                <Card className="w-full md:w-80 lg:w-96 rounded-none border-t md:border-t-0 md:border-l">
                     <CardHeader>
-                        <CardTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</CardTitle>
+                        <CardTitle className="text-xl md:text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</CardTitle>
                     </CardHeader>
                     <CardContent>
                          <AdminForm 
@@ -230,3 +230,5 @@ const AdminView: React.FC = () => {
 };
 
 export default AdminView;
+
+    

@@ -45,6 +45,7 @@ import { addDays, format } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 interface PeriodStats {
@@ -66,7 +67,7 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
             {icon}
         </CardHeader>
         <CardContent>
-            <div className={`text-2xl font-bold ${color}`}>{value}</div>
+            <div className={`text-xl md:text-2xl font-bold ${color}`}>{value}</div>
             {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </CardContent>
     </Card>
@@ -94,6 +95,7 @@ const AccountingView: React.FC = () => {
     const [isCloseOutOpen, setIsCloseOutOpen] = useState(false);
     const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
     const [date, setDate] = useState<DateRange | undefined>({ from: new Date(), to: new Date() });
+    const isMobile = useIsMobile();
 
     const totalCountedCash = useMemo(() => {
         return denominations.reduce((acc, d) => {
@@ -243,13 +245,13 @@ const AccountingView: React.FC = () => {
     };
     
     const renderDifferenceBadge = (diff: number, className: string = "") => {
-        if (diff === 0) return <Badge variant="default" className={`bg-green-500 hover:bg-green-500 text-lg ${className}`}>Balanced</Badge>;
+        if (diff === 0) return <Badge variant="default" className={`bg-green-500 hover:bg-green-500 text-base ${className}`}>Balanced</Badge>;
         
         const isSurplus = diff > 0;
         const colorClass = isSurplus ? 'bg-blue-500 hover:bg-blue-500' : 'bg-red-500 hover:bg-red-500';
         const text = isSurplus ? `Surplus: +${formatCurrency(diff)}` : `Deficit: ${formatCurrency(diff)}`;
 
-        return <Badge variant="default" className={`${colorClass} text-lg ${className}`}>{text}</Badge>;
+        return <Badge variant="default" className={`${colorClass} text-base ${className}`}>{text}</Badge>;
     }
     
     const sortedItemCounts = useMemo(() => {
@@ -260,7 +262,7 @@ const AccountingView: React.FC = () => {
     const CloseOutDialog = (
         <Dialog open={isCloseOutOpen} onOpenChange={setIsCloseOutOpen}>
             <DialogTrigger asChild>
-                 <Button><FileCheck className="mr-2" /> Start End-of-Day Close Out</Button>
+                 <Button className="w-full md:w-auto"><FileCheck className="mr-2" /> Start End-of-Day</Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl">
                 <DialogHeader>
@@ -320,8 +322,8 @@ const AccountingView: React.FC = () => {
                             </div>
                             <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                                 <div className="space-y-0.5">
-                                    <Label htmlFor="change-set-aside" className="font-semibold">Set aside cash for owed change?</Label>
-                                    <p className="text-xs text-muted-foreground">Toggle this on if you are physically separating this cash.</p>
+                                    <Label htmlFor="change-set-aside" className="font-semibold">Set aside cash?</Label>
+                                    <p className="text-xs text-muted-foreground">Separate cash for owed change.</p>
                                 </div>
                                 <Switch
                                     id="change-set-aside"
@@ -333,9 +335,9 @@ const AccountingView: React.FC = () => {
                         </div>
                         <Separator />
                         <div className="pt-2 text-center bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                             <Label className="text-xl font-bold text-green-700 dark:text-green-300">Final Cash for Deposit</Label>
-                             <p className="text-4xl font-extrabold text-green-600 dark:text-green-400 mt-2">{formatCurrency(cashForDeposit)}</p>
-                              {changeSetAside && <p className="text-xs text-muted-foreground mt-1">({formatCurrency(totalCountedCash)} Counted - {formatCurrency(stats.changeOwed)} Set Aside)</p>}
+                             <Label className="text-xl font-bold text-green-700 dark:text-green-300">Cash for Deposit</Label>
+                             <p className="text-3xl md:text-4xl font-extrabold text-green-600 dark:text-green-400 mt-2">{formatCurrency(cashForDeposit)}</p>
+                              {changeSetAside && <p className="text-xs text-muted-foreground mt-1">({formatCurrency(totalCountedCash)} - {formatCurrency(stats.changeOwed)} set aside)</p>}
                         </div>
                      </div>
                 </div>
@@ -345,7 +347,7 @@ const AccountingView: React.FC = () => {
 
                 <DialogFooter>
                     <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting || !stats} className="w-full h-12 text-lg font-bold">
-                        {isSubmitting ? 'Saving...' : 'Save Reconciliation Report'}
+                        {isSubmitting ? 'Saving...' : 'Save Report'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -353,16 +355,16 @@ const AccountingView: React.FC = () => {
     );
 
     return (
-        <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-bold">Accounting</h2>
-                <div className="flex items-center gap-4">
+        <div className="p-4 md:p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
+            <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
+                <h2 className="text-2xl md:text-3xl font-bold">Accounting</h2>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
                      <Popover>
                         <PopoverTrigger asChild>
                         <Button
                             id="date"
                             variant={"outline"}
-                            className={cn("w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+                            className={cn("w-full sm:w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
                         >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {date?.from ? (
@@ -383,7 +385,7 @@ const AccountingView: React.FC = () => {
                             defaultMonth={date?.from}
                             selected={date}
                             onSelect={setDate}
-                            numberOfMonths={2}
+                            numberOfMonths={isMobile ? 1 : 2}
                         />
                         </PopoverContent>
                     </Popover>
@@ -407,31 +409,31 @@ const AccountingView: React.FC = () => {
               </TabsList>
               <TabsContent value="summary">
                     {loading ? <div className="mt-8"><LoadingSpinner /></div> : !stats ? <p className="text-muted-foreground text-center italic py-10">No financial data for this period.</p> : (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mt-4">
                         <div className="lg:col-span-2">
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Financial Summary</CardTitle>
                                     <CardDescription>
                                         {date?.from && date.to && format(date.from, "LLL dd, y") !== format(date.to, "LLL dd, y") 
-                                            ? `Financial data from ${format(date.from, "LLL dd, y")} to ${format(date.to, "LLL dd, y")}`
-                                            : `Financial data for ${date?.from ? format(date.from, "LLL dd, y") : 'the selected date'}`
+                                            ? `Data from ${format(date.from, "LLL dd, y")} to ${format(date.to, "LLL dd, y")}`
+                                            : `Data for ${date?.from ? format(date.from, "LLL dd, y") : 'the selected date'}`
                                         }
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                     <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales (Paid)" value={formatCurrency(stats.totalSales)} />
                                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
                                     <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
-                                    <StatCard icon={<Coins className="text-green-500"/>} title="Change Given" value={formatCurrency(stats.changeGiven)} description="Cash returned to customers" />
-                                    <StatCard icon={<Coins className="text-red-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change to be given" />
-                                    <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Settled Misc. Expenses" value={formatCurrency(stats.miscExpenses)} />
+                                    <StatCard icon={<Coins className="text-green-500"/>} title="Change Given" value={formatCurrency(stats.changeGiven)} description="Cash returned" />
+                                    <StatCard icon={<Coins className="text-red-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change" />
+                                    <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.miscExpenses)} />
                                 </CardContent>
                                 <CardFooter>
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
-                                        <Label className="text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash from Sales</Label>
-                                        <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
-                                        <p className="text-xs text-muted-foreground">(Cash Sales - Change Given - Settled Misc. Expenses)</p>
+                                        <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash from Sales</Label>
+                                        <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
+                                        <p className="text-xs text-muted-foreground">(Cash - Change Given - Expenses)</p>
                                     </div>
                                 </CardFooter>
                             </Card>
@@ -439,10 +441,10 @@ const AccountingView: React.FC = () => {
                          <Card>
                             <CardHeader>
                                 <CardTitle>Item Sales</CardTitle>
-                                <CardDescription>Total count of each item sold in this period.</CardDescription>
+                                <CardDescription>Total count of each item sold.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <ScrollArea className="h-[400px]">
+                                <ScrollArea className="h-[350px] md:h-[400px]">
                                     <div className="space-y-3">
                                         {sortedItemCounts.length > 0 ? sortedItemCounts.map(([name, count]) => (
                                             <div key={name} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
@@ -521,3 +523,5 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
+
+    

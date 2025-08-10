@@ -68,38 +68,38 @@ const OrderCart: React.FC<OrderCartProps> = ({ currentOrder, total, updateQuanti
                         <p className="text-sm">Add items from the menu.</p>
                     </div>
                 ) : (
-                    <div className="flex-grow overflow-y-auto px-6 space-y-3">
+                    <div className="flex-grow overflow-y-auto px-4 md:px-6 space-y-3">
                         {Object.values(currentOrder).map(item => (
-                            <div key={item.id} className="flex items-center p-3 bg-secondary rounded-lg">
+                            <div key={item.id} className="flex items-center p-2 bg-secondary rounded-lg">
                                 <div className="flex-grow">
-                                    <p className="font-semibold">{item.name}</p>
-                                    <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
+                                    <p className="font-semibold text-sm">{item.name}</p>
+                                    <p className="text-xs text-muted-foreground">{formatCurrency(item.price)}</p>
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.id, -1)}><Minus size={14} /></Button>
+                                <div className="flex items-center space-x-1">
+                                    <Button size="icon" variant="ghost" className="h-6 w-6 rounded-full" onClick={() => updateQuantity(item.id, -1)}><Minus size={14} /></Button>
                                     <Input 
                                         type="number"
                                         value={item.quantity}
                                         onChange={(e) => handleQuantityChange(e, item.id)}
                                         onBlur={(e) => handleQuantityBlur(e, item.id)}
-                                        className="font-bold w-12 text-center h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        className="font-bold w-10 text-center h-7 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
-                                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.id, 1)}><Plus size={14} /></Button>
+                                    <Button size="icon" variant="ghost" className="h-6 w-6 rounded-full" onClick={() => updateQuantity(item.id, 1)}><Plus size={14} /></Button>
                                 </div>
-                                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full ml-2 text-red-500" onClick={() => removeItem(item.id)}><Trash2 size={16} /></Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full ml-1 text-red-500" onClick={() => removeItem(item.id)}><Trash2 size={16} /></Button>
                             </div>
                         ))}
                     </div>
                 )}
             </div>
-            <div className={`mt-auto p-6 ${isSheet ? '' : 'border-t'}`}>
-                <div className="flex justify-between items-center text-2xl font-bold mb-4">
+            <div className={`mt-auto p-4 md:p-6 ${isSheet ? '' : 'border-t'}`}>
+                <div className="flex justify-between items-center text-xl md:text-2xl font-bold mb-4">
                     <span>Total:</span>
                     <span className="text-primary">{formatCurrency(total)}</span>
                 </div>
-                <div className="space-y-3">
-                    <Button onClick={onPlaceOrder} disabled={Object.keys(currentOrder).length === 0} className="w-full font-bold text-lg h-12">Place Order</Button>
-                    <Button onClick={onClearOrder} disabled={Object.keys(currentOrder).length === 0} variant="secondary" className="w-full font-bold text-lg h-12">Clear Order</Button>
+                <div className="space-y-2">
+                    <Button onClick={onPlaceOrder} disabled={Object.keys(currentOrder).length === 0} className="w-full font-bold text-base h-11">Place Order</Button>
+                    <Button onClick={onClearOrder} disabled={Object.keys(currentOrder).length === 0} variant="secondary" className="w-full font-bold text-base h-11">Clear Order</Button>
                 </div>
             </div>
         </>
@@ -110,9 +110,9 @@ const OrderCart: React.FC<OrderCartProps> = ({ currentOrder, total, updateQuanti
     }
 
     return (
-        <Card className="w-full md:w-96 rounded-none md:rounded-l-2xl border-l-0 md:border-l shadow-lg flex-col hidden md:flex">
-            <CardHeader>
-                <CardTitle className="text-2xl">Current Order</CardTitle>
+        <Card className="w-full md:w-80 lg:w-96 rounded-none md:rounded-l-2xl border-l-0 md:border-l shadow-lg flex-col hidden md:flex">
+            <CardHeader className="p-4 md:p-6">
+                <CardTitle className="text-xl md:text-2xl">Current Order</CardTitle>
             </CardHeader>
             <CardContent className="flex-grow flex flex-col p-0">
                  <CartContent />
@@ -278,28 +278,28 @@ const PosView: React.FC = () => {
 
     return (
         <div className="flex h-screen md:flex-row flex-col bg-background">
-            <div className="flex-1 p-4 sm:p-6 bg-secondary/50 dark:bg-background overflow-y-auto">
+            <div className="flex-1 p-4 bg-secondary/50 dark:bg-background overflow-y-auto">
                 <header className="mb-4">
-                    <h1 className="text-3xl font-bold">Menu</h1>
-                    <p className="text-muted-foreground">Select items to add to the order.</p>
+                    <h1 className="text-2xl md:text-3xl font-bold">Menu</h1>
+                    <p className="text-sm text-muted-foreground">Select items to add to the order.</p>
                 </header>
-                <div className="sticky top-0 bg-secondary/50 dark:bg-background py-2 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6">
-                    <div className="flex gap-2 mb-4">
+                <div className="sticky top-0 bg-secondary/50 dark:bg-background py-2 z-10 -mx-4 px-4 shadow-sm">
+                    <div className="flex gap-2 mb-2">
                         <div className="relative flex-grow">
-                            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
                             <Input
                                 type="text"
                                 placeholder="Search menu..."
                                 value={searchQuery}
                                 onClick={(e) => e.currentTarget.select()}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full h-10 text-base bg-card border-border rounded-lg focus:ring-2 focus:ring-primary pr-10 pl-10"
+                                className="w-full h-10 bg-card border-border rounded-lg focus:ring-2 focus:ring-primary pr-8 pl-9"
                             />
                             {searchQuery && (
                                 <Button 
                                     variant="ghost" 
                                     size="icon" 
-                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full" 
+                                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full" 
                                     onClick={() => setSearchQuery('')}
                                 >
                                     <X size={16} />
@@ -331,15 +331,15 @@ const PosView: React.FC = () => {
                 {loading && <div className="mt-8"><LoadingSpinner /></div>}
                 {error && <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                 {!loading && !error && (
-                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pt-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pt-4">
                         {filteredItems.map(item => (
                             <Card key={item.id} onClick={() => addToOrder(item)} className="cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1 hover:border-primary/50">
-                                <CardHeader className="p-3">
-                                    <CardTitle className="text-sm">{item.name}</CardTitle>
+                                <CardHeader className="p-2 md:p-3">
+                                    <CardTitle className="text-sm md:text-base leading-tight">{item.name}</CardTitle>
                                     <CardDescription className="text-xs">{item.category}</CardDescription>
                                 </CardHeader>
-                                <CardContent className="p-3 pt-0">
-                                    <p className="text-base font-semibold text-primary mt-1">{formatCurrency(item.price)}</p>
+                                <CardContent className="p-2 md:p-3 pt-0">
+                                    <p className="text-sm md:text-base font-semibold text-primary mt-1">{formatCurrency(item.price)}</p>
                                 </CardContent>
                             </Card>
                         ))}
@@ -422,3 +422,5 @@ const PosView: React.FC = () => {
 };
 
 export default PosView;
+
+    
