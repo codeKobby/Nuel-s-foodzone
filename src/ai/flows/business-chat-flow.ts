@@ -44,8 +44,10 @@ const businessChatFlow = ai.defineFlow(
         outputSchema: BusinessChatOutputSchema,
     },
     async (input) => {
-        const history: Message[] = input.history.map((msg: { role: 'user' | 'model'; content: Part[] }) => {
-            return new Message(msg.role, msg.content);
+        const history: Message[] = input.history.map((msg: { role: 'user' | 'model'; content: { text: string }[] }) => {
+            // Ensure content is an array of Parts, which is iterable
+            const contentAsParts: Part[] = msg.content.map(c => ({ text: c.text }));
+            return new Message(msg.role, contentAsParts);
         });
 
         const promptInput = {
