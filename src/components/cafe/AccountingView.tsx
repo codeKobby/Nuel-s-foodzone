@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serve
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import AdvancedReconciliationModal from './modals/AdvancedReconciliationModal';
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,7 @@ interface DailyStats {
     expectedCash: number;
     changeGiven: number;
     changeOwed: number;
+    todaysOrders: Order[];
 }
 
 const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, color?: string, description?: string }> = ({ icon, title, value, color, description }) => (
@@ -72,7 +74,7 @@ const denominations = [
 ];
 
 const AccountingView: React.FC = () => {
-    const [stats, setStats] = useState<DailyStats>({ totalSales: 0, cashSales: 0, momoSales: 0, miscExpenses: 0, expectedCash: 0, changeGiven: 0, changeOwed: 0 });
+    const [stats, setStats] = useState<DailyStats>({ totalSales: 0, cashSales: 0, momoSales: 0, miscExpenses: 0, expectedCash: 0, changeGiven: 0, changeOwed: 0, todaysOrders: [] });
     const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
     const [countedMomo, setCountedMomo] = useState('');
     const [notes, setNotes] = useState('');
@@ -83,6 +85,7 @@ const AccountingView: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const [isCloseOutOpen, setIsCloseOutOpen] = useState(false);
+    const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
 
     const totalCountedCash = useMemo(() => {
         return denominations.reduce((acc, d) => {
@@ -113,8 +116,10 @@ const AccountingView: React.FC = () => {
                 const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
 
                 let cashSales = 0, momoSales = 0, totalSales = 0, totalChangeGiven = 0, totalChangeOwed = 0;
+                const todaysOrders: Order[] = [];
                 ordersSnapshot.docs.forEach(doc => {
-                    const order = doc.data() as Order;
+                    const order = { id: doc.id, ...doc.data() } as Order;
+                    todaysOrders.push(order);
                     if (order.paymentStatus === 'Unpaid') return;
                     
                     totalSales += order.total;
@@ -140,7 +145,7 @@ const AccountingView: React.FC = () => {
                 
                 const expectedCash = cashSales - totalChangeGiven - miscExpenses;
                 
-                setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, changeGiven: totalChangeGiven, changeOwed: totalChangeOwed });
+                setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, changeGiven: totalChangeGiven, changeOwed: totalChangeOwed, todaysOrders });
             } catch (e) {
                 console.error(e);
                 setError("Failed to load daily financial data. Check Firestore indexes.");
@@ -211,15 +216,14 @@ const AccountingView: React.FC = () => {
         }
     };
     
-    const renderDifference = (diff: number, className: string = "") => {
-        if (diff === 0) return <Badge variant="default" className={`bg-green-500 text-lg ${className}`}>Balanced</Badge>;
-        const color = diff > 0 ? "text-green-500" : "text-red-500";
-        const sign = diff > 0 ? "+" : "";
-        return (
-            <div className={`text-2xl font-bold ${color} ${className}`}>
-                {diff > 0 ? 'Surplus' : 'Deficit'}: {sign}{formatCurrency(diff)}
-            </div>
-        );
+    const renderDifferenceBadge = (diff: number, className: string = "") => {
+        if (diff === 0) return <Badge variant="default" className={`bg-green-500 hover:bg-green-500 text-lg ${className}`}>Balanced</Badge>;
+        
+        const isSurplus = diff > 0;
+        const colorClass = isSurplus ? 'bg-blue-500 hover:bg-blue-500' : 'bg-red-500 hover:bg-red-500';
+        const text = isSurplus ? `Surplus: +${formatCurrency(diff)}` : `Deficit: ${formatCurrency(diff)}`;
+
+        return <Badge variant="default" className={`${colorClass} text-lg ${className}`}>{text}</Badge>;
     }
     
     if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
@@ -271,9 +275,15 @@ const AccountingView: React.FC = () => {
                                 </div>
                                 <Separator />
                                 <div className="flex justify-between items-center">
-                                     <Label>Initial Cash Difference</Label>
-                                     {renderDifference(cashDifference)}
+                                     <Label>Cash Status</Label>
+                                     {renderDifferenceBadge(cashDifference)}
                                 </div>
+                                {cashDifference !== 0 && (
+                                     <Button variant="outline" size="sm" className="w-full mt-1" onClick={() => setIsAdvancedModalOpen(true)}>
+                                         <Search className="mr-2 h-4 w-4" />
+                                         Advanced Reconciliation (Audit)
+                                     </Button>
+                                )}
                                 <Separator />
                                 <div className="space-y-3 pt-2">
                                     <h4 className="font-semibold">Handle Outstanding Change</h4>
@@ -313,6 +323,13 @@ const AccountingView: React.FC = () => {
                     </DialogContent>
                  </Dialog>
             </div>
+            
+            {isAdvancedModalOpen && (
+                <AdvancedReconciliationModal
+                    orders={stats.todaysOrders}
+                    onClose={() => setIsAdvancedModalOpen(false)}
+                />
+            )}
             
             {error && !isCloseOutOpen && <Alert variant="destructive" className="mb-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
 
@@ -359,7 +376,7 @@ const AccountingView: React.FC = () => {
                                         <p className="font-semibold">{report.period}</p>
                                         <p className="text-sm text-muted-foreground">{formatTimestamp(report.timestamp)}</p>
                                     </div>
-                                    {renderDifference(report.cashDifference)}
+                                    {renderDifferenceBadge(report.cashDifference)}
                                 </div>
                                 <div className="text-xs grid grid-cols-2 gap-x-4 gap-y-1 mt-2 border-t pt-2">
                                     <span>Expected Cash: <span className="font-medium">{formatCurrency(report.expectedCash)}</span></span>
@@ -406,3 +423,5 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
+
+    
