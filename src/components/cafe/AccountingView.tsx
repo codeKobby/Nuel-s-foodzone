@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serve
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileAnalytics } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -260,7 +260,7 @@ const AccountingView: React.FC = () => {
     const CloseOutDialog = (
         <Dialog open={isCloseOutOpen} onOpenChange={setIsCloseOutOpen}>
             <DialogTrigger asChild>
-                 <Button><FileAnalytics className="mr-2" /> Start End-of-Day Close Out</Button>
+                 <Button><FileCheck className="mr-2" /> Start End-of-Day Close Out</Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl">
                 <DialogHeader>

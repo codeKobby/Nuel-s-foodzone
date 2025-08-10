@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, add
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport, ChatSession, AnalyzeBusinessOutput } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileAnalytics } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -449,7 +449,7 @@ const DashboardView: React.FC = () => {
                         </PopoverContent>
                     </Popover>
                      <Button onClick={handleRunAnalysis} disabled={!stats || isAnalysisLoading}>
-                        <FileAnalytics className="mr-2 h-4 w-4"/>
+                        <FileCheck className="mr-2 h-4 w-4"/>
                         {isAnalysisLoading ? "Analyzing..." : "Analyze Performance"}
                     </Button>
                 </div>
@@ -589,3 +589,5 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    
