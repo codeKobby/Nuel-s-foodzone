@@ -45,7 +45,9 @@ const businessChatFlow = ai.defineFlow(
     },
     async (input) => {
         const history: Message[] = input.history.map((msg: any) => {
-            const contentAsParts: Part[] = msg.content.map((c: any) => ({ text: c.text }));
+            const contentAsParts: Part[] = Array.isArray(msg.content) 
+                ? msg.content.map((c: any) => ({ text: c.text })) 
+                : [{ text: msg.content.text }];
             return new Message(msg.role, contentAsParts);
         });
 
@@ -53,9 +55,9 @@ const businessChatFlow = ai.defineFlow(
             ...input,
             currentDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
         };
-
+        
         const { output } = await businessChatPrompt(promptInput, { history });
-        return output!;
+        return output as string;
     }
 );
 
