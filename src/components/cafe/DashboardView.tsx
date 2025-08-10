@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, addDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, addDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport, ChatSession } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
@@ -34,6 +34,16 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useIsMobile } from '@/hooks/use-mobile';
 
 
@@ -89,6 +99,7 @@ const DashboardView: React.FC = () => {
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const [isChatSheetOpen, setIsChatSheetOpen] = useState(false);
     const [isHistoryView, setIsHistoryView] = useState(false);
+    const [sessionToDelete, setSessionToDelete] = useState<ChatSession | null>(null);
     const isMobile = useIsMobile();
 
 
@@ -263,11 +274,24 @@ const DashboardView: React.FC = () => {
         setIsHistoryView(false);
     }
 
+    const handleDeleteSession = async (sessionId: string) => {
+        if (!sessionId) return;
+        try {
+            await deleteDoc(doc(db, "chatSessions", sessionId));
+            if (activeChatSessionId === sessionId) {
+                startNewChat();
+            }
+            setSessionToDelete(null); // Close the dialog
+        } catch (e) {
+            console.error("Error deleting chat session:", e);
+        }
+    };
+
     const topItems = useMemo(() => stats?.itemPerformance.slice(0, 5) || [], [stats]);
     const bottomItems = useMemo(() => stats && stats.itemPerformance.length > 5 ? stats.itemPerformance.slice(-5).reverse() : [], [stats]);
     
     const renderChatContent = () => (
-         <div className="h-full flex flex-col">
+         <div className="flex-grow flex flex-col overflow-hidden">
             <ScrollArea className="flex-grow p-4" ref={chatContainerRef}>
                 <div className="space-y-4">
                     {chatHistory.map((message, index) => (
@@ -328,13 +352,27 @@ const DashboardView: React.FC = () => {
             <ScrollArea className="flex-grow p-2">
                 <div className="space-y-2">
                     {chatSessions.map(session => (
-                        <div key={session.id} onClick={() => selectChat(session.id)}
+                        <div 
+                            key={session.id} 
+                            onClick={() => selectChat(session.id)}
                             className={cn(
-                                "p-3 rounded-lg cursor-pointer hover:bg-secondary",
+                                "p-3 rounded-lg cursor-pointer hover:bg-secondary group flex justify-between items-center",
                                 activeChatSessionId === session.id && "bg-secondary"
                             )}>
-                            <p className="font-semibold truncate">{session.title}</p>
-                            <p className="text-xs text-muted-foreground">{formatTimestamp(session.timestamp)}</p>
+                            <div>
+                                <p className="font-semibold truncate">{session.title}</p>
+                                <p className="text-xs text-muted-foreground">{formatTimestamp(session.timestamp)}</p>
+                            </div>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSessionToDelete(session);
+                                }}>
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
                         </div>
                     ))}
                 </div>
@@ -469,6 +507,23 @@ const DashboardView: React.FC = () => {
                    </div>
                 </SheetContent>
             </Sheet>
+
+            {sessionToDelete && (
+                <AlertDialog open onOpenChange={() => setSessionToDelete(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Chat Session?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Are you sure you want to delete the chat titled "{sessionToDelete.title}"? This action cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteSession(sessionToDelete.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
 
         </div>
     );
