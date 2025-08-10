@@ -279,7 +279,7 @@ const DashboardView: React.FC = () => {
                             )}
                             <div className={`rounded-lg px-4 py-2 max-w-sm ${message.role === 'model' ? 'bg-secondary markdown-content' : 'bg-primary text-primary-foreground'}`}>
                                 {message.role === 'model' ? (
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">
                                         {message.content}
                                     </ReactMarkdown>
                                 ) : (
@@ -307,7 +307,7 @@ const DashboardView: React.FC = () => {
                     )}
                 </div>
             </ScrollArea>
-            <div className="mt-auto p-4 border-t flex gap-2">
+            <div className="flex-shrink-0 p-4 border-t flex gap-2">
                 <Input
                     placeholder="Type your question..."
                     value={chatInput}
@@ -450,7 +450,7 @@ const DashboardView: React.FC = () => {
                         'flex flex-col p-0'
                     )}
                 >
-                    <SheetHeader className="p-4 border-b flex flex-row items-center justify-between">
+                    <SheetHeader className="p-4 border-b flex flex-row items-center justify-between flex-shrink-0">
                        <div>
                             <SheetTitle>{isHistoryView ? 'Chat History' : 'AI Business Assistant'}</SheetTitle>
                             <SheetDescription>{isHistoryView ? 'Select a chat or start a new one.' : 'Ask me anything about your business.'}</SheetDescription>
@@ -464,7 +464,9 @@ const DashboardView: React.FC = () => {
                             </Button>
                         </div>
                     </SheetHeader>
-                   {isHistoryView ? renderHistoryContent() : renderChatContent()}
+                   <div className="flex-grow overflow-y-auto">
+                    {isHistoryView ? renderHistoryContent() : renderChatContent()}
+                   </div>
                 </SheetContent>
             </Sheet>
 
