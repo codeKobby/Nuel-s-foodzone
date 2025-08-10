@@ -43,16 +43,21 @@ const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: s
 );
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, setTheme, pendingOrdersCount, role }) => {
-    const allNavItems = [
-        { id: 'pos', icon: Home, label: 'POS' },
-        { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
-        { id: 'dashboard', icon: BarChart2, label: 'Dashboard', role: 'manager' },
-        { id: 'accounting', icon: Scale, label: 'Accounting' },
-        { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
-        { id: 'admin', icon: Settings, label: 'Admin', role: 'manager' },
-    ];
+    
+    const navItemsConfig = {
+        manager: [
+            { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
+            { id: 'admin', icon: Settings, label: 'Admin' },
+        ],
+        cashier: [
+            { id: 'pos', icon: Home, label: 'POS' },
+            { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
+            { id: 'accounting', icon: Scale, label: 'Accounting' },
+            { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
+        ],
+    };
 
-    const navItems = allNavItems.filter(item => !item.role || item.role === role);
+    const navItems = navItemsConfig[role] || [];
 
     return (
         <TooltipProvider>

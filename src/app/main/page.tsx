@@ -41,16 +41,20 @@ const MobileNav = ({
 }) => {
     const [isOpen, setIsOpen] = useState(false);
 
-    const allNavItems = [
-        { id: 'pos', icon: Home, label: 'POS' },
-        { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
-        { id: 'dashboard', icon: BarChart2, label: 'Dashboard', role: 'manager' },
-        { id: 'accounting', icon: Scale, label: 'Accounting' },
-        { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
-        { id: 'admin', icon: Settings, label: 'Admin', role: 'manager' },
-    ];
-    
-    const navItems = allNavItems.filter(item => !item.role || item.role === role);
+    const navItemsConfig = {
+        manager: [
+            { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
+            { id: 'admin', icon: Settings, label: 'Admin' },
+        ],
+        cashier: [
+            { id: 'pos', icon: Home, label: 'POS' },
+            { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
+            { id: 'accounting', icon: Scale, label: 'Accounting' },
+            { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
+        ],
+    };
+
+    const navItems = navItemsConfig[role] || [];
 
     const handleItemClick = (view: string) => {
         setActiveView(view);
@@ -116,7 +120,12 @@ function CafePage() {
     const router = useRouter();
     const role = searchParams.get('role') as 'manager' | 'cashier';
 
-    const [activeView, setActiveView] = useState('pos');
+    const defaultViews = {
+        manager: 'dashboard',
+        cashier: 'pos',
+    };
+
+    const [activeView, setActiveView] = useState(defaultViews[role] || 'pos');
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [authError, setAuthError] = useState<string | null>(null);
     const [theme, setTheme] = useState('light');
@@ -124,10 +133,12 @@ function CafePage() {
     const isMobile = useIsMobile();
 
     useEffect(() => {
-        if (!role) {
+        if (!role || !['manager', 'cashier'].includes(role)) {
             router.push('/');
             return;
         }
+
+        setActiveView(defaultViews[role]);
 
         if (!auth || !db) {
             setAuthError("Firebase is not configured. Please check your environment variables.");
@@ -189,13 +200,13 @@ function CafePage() {
 
     const renderActiveView = () => {
         switch (activeView) {
-            case 'pos': return <PosView />;
-            case 'orders': return <OrdersView />;
-            case 'dashboard': return role === 'manager' ? <DashboardView /> : <PosView />;
-            case 'accounting': return <AccountingView />;
-            case 'misc': return <MiscView />;
-            case 'admin': return role === 'manager' ? <AdminView /> : <PosView />;
-            default: return <PosView />;
+            case 'pos': return role === 'cashier' ? <PosView /> : null;
+            case 'orders': return role === 'cashier' ? <OrdersView /> : null;
+            case 'dashboard': return role === 'manager' ? <DashboardView /> : null;
+            case 'accounting': return role === 'cashier' ? <AccountingView /> : null;
+            case 'misc': return role === 'cashier' ? <MiscView /> : null;
+            case 'admin': return role === 'manager' ? <AdminView /> : null;
+            default: return null;
         }
     };
 

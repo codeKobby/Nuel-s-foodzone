@@ -286,32 +286,32 @@ const PosView: React.FC = () => {
                 <div className="sticky top-0 bg-secondary/50 dark:bg-background py-2 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6">
                     <div className="flex gap-2 mb-4">
                         <div className="relative flex-grow">
-                            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
+                            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
                             <Input
                                 type="text"
                                 placeholder="Search menu..."
                                 value={searchQuery}
                                 onClick={(e) => e.currentTarget.select()}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full p-3 pl-12 h-12 text-lg bg-card border-border rounded-xl focus:ring-2 focus:ring-primary pr-10"
+                                className="w-full h-10 text-base bg-card border-border rounded-lg focus:ring-2 focus:ring-primary pr-10 pl-10"
                             />
                             {searchQuery && (
                                 <Button 
                                     variant="ghost" 
                                     size="icon" 
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full" 
+                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full" 
                                     onClick={() => setSearchQuery('')}
                                 >
-                                    <X size={18} />
+                                    <X size={16} />
                                 </Button>
                             )}
                         </div>
                         <Button
                             onClick={() => setShowCustomOrderModal(true)}
-                            className="h-12 px-4 rounded-xl"
+                            className="h-10 px-3 rounded-lg"
                             variant="outline"
                         >
-                            <PlusCircle size={20} className="mr-0 sm:mr-2"/> <span className="hidden sm:inline">Custom</span>
+                            <PlusCircle size={18} className="mr-0 sm:mr-2"/> <span className="hidden sm:inline">Custom</span>
                         </Button>
                     </div>
                     <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2">
@@ -320,7 +320,8 @@ const PosView: React.FC = () => {
                                 key={category}
                                 onClick={() => setActiveCategory(category)}
                                 variant={activeCategory === category ? 'default' : 'secondary'}
-                                className="flex-shrink-0 rounded-lg"
+                                size="sm"
+                                className="flex-shrink-0 rounded-md"
                             >
                                 {category}
                             </Button>
@@ -330,15 +331,15 @@ const PosView: React.FC = () => {
                 {loading && <div className="mt-8"><LoadingSpinner /></div>}
                 {error && <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                 {!loading && !error && (
-                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pt-4">
                         {filteredItems.map(item => (
                             <Card key={item.id} onClick={() => addToOrder(item)} className="cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1 hover:border-primary/50">
-                                <CardHeader className="p-4">
-                                    <CardTitle className="text-base">{item.name}</CardTitle>
+                                <CardHeader className="p-3">
+                                    <CardTitle className="text-sm">{item.name}</CardTitle>
                                     <CardDescription className="text-xs">{item.category}</CardDescription>
                                 </CardHeader>
-                                <CardContent className="p-4 pt-0">
-                                    <p className="text-lg font-semibold text-primary mt-2">{formatCurrency(item.price)}</p>
+                                <CardContent className="p-3 pt-0">
+                                    <p className="text-base font-semibold text-primary mt-1">{formatCurrency(item.price)}</p>
                                 </CardContent>
                             </Card>
                         ))}
