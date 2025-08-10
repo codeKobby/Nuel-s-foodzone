@@ -45,8 +45,8 @@ const MobileNav = ({
         { id: 'pos', icon: Home, label: 'POS' },
         { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
         { id: 'dashboard', icon: BarChart2, label: 'Dashboard', role: 'manager' },
-        { id: 'accounting', icon: Scale, label: 'Accounting', role: 'manager' },
-        { id: 'misc', icon: Briefcase, label: 'Miscellaneous', role: 'manager' },
+        { id: 'accounting', icon: Scale, label: 'Accounting' },
+        { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
         { id: 'admin', icon: Settings, label: 'Admin', role: 'manager' },
     ];
     
@@ -192,8 +192,8 @@ function CafePage() {
             case 'pos': return <PosView />;
             case 'orders': return <OrdersView />;
             case 'dashboard': return role === 'manager' ? <DashboardView /> : <PosView />;
-            case 'accounting': return role === 'manager' ? <AccountingView /> : <PosView />;
-            case 'misc': return role === 'manager' ? <MiscView /> : <PosView />;
+            case 'accounting': return <AccountingView />;
+            case 'misc': return <MiscView />;
             case 'admin': return role === 'manager' ? <AdminView /> : <PosView />;
             default: return <PosView />;
         }
