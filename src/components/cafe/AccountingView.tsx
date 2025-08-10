@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serve
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from '@/components/ui/separator';
 
 
 interface DailyStats {
@@ -74,6 +76,7 @@ const AccountingView: React.FC = () => {
     const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
     const [countedMomo, setCountedMomo] = useState('');
     const [notes, setNotes] = useState('');
+    const [changeSetAside, setChangeSetAside] = useState(false);
     const [reports, setReports] = useState<ReconciliationReport[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -89,6 +92,7 @@ const AccountingView: React.FC = () => {
     }, [counts]);
     
     const cashDifference = useMemo(() => totalCountedCash - stats.expectedCash, [totalCountedCash, stats.expectedCash]);
+    const cashForDeposit = useMemo(() => changeSetAside ? totalCountedCash - stats.changeOwed : totalCountedCash, [changeSetAside, totalCountedCash, stats.changeOwed]);
 
     useEffect(() => {
         const fetchDailyData = async () => {
@@ -166,6 +170,7 @@ const AccountingView: React.FC = () => {
         setCounts(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
         setCountedMomo('');
         setNotes('');
+        setChangeSetAside(false);
     }
 
     const handleSaveReport = async () => {
@@ -176,7 +181,7 @@ const AccountingView: React.FC = () => {
         setError(null);
         setIsSubmitting(true);
         try {
-            const reportData = {
+            const reportData: Omit<ReconciliationReport, 'id'> = {
                 timestamp: serverTimestamp(),
                 period: new Date().toDateString(),
                 totalSales: stats.totalSales,
@@ -187,6 +192,9 @@ const AccountingView: React.FC = () => {
                 countedCash: totalCountedCash,
                 countedMomo: parseFloat(countedMomo) || 0,
                 cashDifference: cashDifference,
+                changeOwed: stats.changeOwed,
+                changeSetAside: changeSetAside,
+                cashForDeposit: cashForDeposit,
                 notes: notes,
             };
             await addDoc(collection(db, "reconciliationReports"), reportData);
@@ -203,12 +211,12 @@ const AccountingView: React.FC = () => {
         }
     };
     
-    const renderDifference = (diff: number) => {
-        if (diff === 0) return <Badge variant="default" className="bg-green-500 text-lg">Balanced</Badge>;
+    const renderDifference = (diff: number, className: string = "") => {
+        if (diff === 0) return <Badge variant="default" className={`bg-green-500 text-lg ${className}`}>Balanced</Badge>;
         const color = diff > 0 ? "text-green-500" : "text-red-500";
         const sign = diff > 0 ? "+" : "";
         return (
-            <div className={`text-2xl font-bold ${color}`}>
+            <div className={`text-2xl font-bold ${color} ${className}`}>
                 {diff > 0 ? 'Surplus' : 'Deficit'}: {sign}{formatCurrency(diff)}
             </div>
         );
@@ -226,7 +234,7 @@ const AccountingView: React.FC = () => {
                     </DialogTrigger>
                     <DialogContent className="max-w-4xl">
                         <DialogHeader>
-                            <DialogTitle>Close Out for Today</DialogTitle>
+                            <DialogTitle>End-of-Day Reconciliation</DialogTitle>
                             <DialogDescription>Count physical cash and reconcile accounts. This action will save a permanent report for the day.</DialogDescription>
                         </DialogHeader>
                         
@@ -242,28 +250,55 @@ const AccountingView: React.FC = () => {
                                     ))}
                                 </div>
                                 <div>
-                                    <Label className="text-lg font-semibold">Momo/Card Count</Label>
-                                    <Input id="counted-momo" type="number" value={countedMomo} onChange={e => setCountedMomo(e.target.value)} placeholder="Total from device" className="h-10 mt-2"/>
+                                    <Label className="text-lg font-semibold">Momo/Card Sales Count</Label>
+                                    <Input id="counted-momo" type="number" value={countedMomo} onChange={e => setCountedMomo(e.target.value)} placeholder="Total from payment device" className="h-10 mt-2"/>
                                 </div>
                                 <div>
                                     <Label className="text-lg font-semibold" htmlFor="notes">Notes</Label>
-                                    <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any notes about today's sales (e.g., reason for deficit)" className="mt-2"/>
+                                    <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g., reason for cash deficit/surplus" className="mt-2"/>
                                 </div>
                              </div>
 
-                             <div className="space-y-4">
-                                <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-900/20 text-center">
-                                    <Label className="text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash in Drawer</Label>
-                                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
-                                    <p className="text-xs text-muted-foreground">(Cash Sales - Change Given - Misc. Expenses)</p>
+                             <div className="space-y-4 p-4 border rounded-lg">
+                                <h3 className="text-lg font-semibold text-center mb-2">Reconciliation Summary</h3>
+                                <div className="flex justify-between items-center">
+                                    <Label>Expected Cash in Drawer</Label>
+                                    <p className="font-bold text-lg">{formatCurrency(stats.expectedCash)}</p>
                                 </div>
-                                <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-900/20 text-center">
-                                    <Label className="text-lg font-semibold text-blue-700 dark:text-blue-300">Counted Cash Total</Label>
-                                    <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(totalCountedCash)}</p>
+                                <div className="flex justify-between items-center">
+                                    <Label>Counted Cash Total</Label>
+                                    <p className="font-bold text-lg">{formatCurrency(totalCountedCash)}</p>
                                 </div>
-                                <div className="p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20 text-center">
-                                    <Label className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">Cash Difference</Label>
-                                    {renderDifference(cashDifference)}
+                                <Separator />
+                                <div className="flex justify-between items-center">
+                                     <Label>Initial Cash Difference</Label>
+                                     {renderDifference(cashDifference)}
+                                </div>
+                                <Separator />
+                                <div className="space-y-3 pt-2">
+                                    <h4 className="font-semibold">Handle Outstanding Change</h4>
+                                    <div className="flex justify-between items-center">
+                                        <Label className="text-red-500">Change Owed to Customers</Label>
+                                        <p className="font-bold text-red-500 text-lg">{formatCurrency(stats.changeOwed)}</p>
+                                    </div>
+                                    <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                                        <div className="space-y-0.5">
+                                            <Label htmlFor="change-set-aside" className="font-semibold">Set aside cash for owed change?</Label>
+                                            <p className="text-xs text-muted-foreground">Toggle this on if you are physically separating this cash.</p>
+                                        </div>
+                                        <Switch
+                                            id="change-set-aside"
+                                            checked={changeSetAside}
+                                            onCheckedChange={setChangeSetAside}
+                                            disabled={stats.changeOwed === 0}
+                                        />
+                                    </div>
+                                </div>
+                                <Separator />
+                                <div className="pt-2 text-center bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                                     <Label className="text-xl font-bold text-green-700 dark:text-green-300">Final Cash for Deposit</Label>
+                                     <p className="text-4xl font-extrabold text-green-600 dark:text-green-400 mt-2">{formatCurrency(cashForDeposit)}</p>
+                                      {changeSetAside && <p className="text-xs text-muted-foreground mt-1">({formatCurrency(totalCountedCash)} Counted - {formatCurrency(stats.changeOwed)} Set Aside)</p>}
                                 </div>
                              </div>
                         </div>
@@ -296,8 +331,8 @@ const AccountingView: React.FC = () => {
                             <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales (Paid)" value={formatCurrency(stats.totalSales)} />
                             <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
                             <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
-                            <StatCard icon={<Coins className="text-red-500"/>} title="Change Given" value={formatCurrency(stats.changeGiven)} description="Cash returned to customers" />
-                            <StatCard icon={<Coins className="text-yellow-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change to be given" />
+                            <StatCard icon={<Coins className="text-green-500"/>} title="Change Given" value={formatCurrency(stats.changeGiven)} description="Cash returned to customers" />
+                            <StatCard icon={<Coins className="text-red-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change to be given" />
                             <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Settled Misc. Expenses" value={formatCurrency(stats.miscExpenses)} />
                         </CardContent>
                         <CardFooter>
@@ -327,12 +362,22 @@ const AccountingView: React.FC = () => {
                                     {renderDifference(report.cashDifference)}
                                 </div>
                                 <div className="text-xs grid grid-cols-2 gap-x-4 gap-y-1 mt-2 border-t pt-2">
-                                    <p>Expected Cash: {formatCurrency(report.expectedCash)}</p>
-                                    <p>Counted Cash: {formatCurrency(report.countedCash)}</p>
-                                    <p>Expected Momo: {formatCurrency(report.momoSales)}</p>
-                                    <p>Counted Momo: {formatCurrency(report.countedMomo)}</p>
+                                    <span>Expected Cash: <span className="font-medium">{formatCurrency(report.expectedCash)}</span></span>
+                                    <span>Counted Cash: <span className="font-medium">{formatCurrency(report.countedCash)}</span></span>
+                                    <span>Expected Momo: <span className="font-medium">{formatCurrency(report.momoSales)}</span></span>
+                                    <span>Counted Momo: <span className="font-medium">{formatCurrency(report.countedMomo)}</span></span>
+                                    <span className="col-span-2">Cash for Deposit: <span className="font-bold">{formatCurrency(report.cashForDeposit)}</span></span>
                                 </div>
-                                {report.notes && <p className="text-xs italic mt-2">Notes: {report.notes}</p>}
+                                 {report.changeOwed > 0 && (
+                                    <div className={`mt-2 text-xs flex items-center gap-2 p-2 rounded-md ${report.changeSetAside ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
+                                        <AlertCircle className="h-4 w-4"/>
+                                        <div>
+                                            {formatCurrency(report.changeOwed)} in change was owed. Cashier reported it was
+                                            <span className="font-bold"> {report.changeSetAside ? 'SET ASIDE' : 'NOT SET ASIDE'}</span>.
+                                        </div>
+                                    </div>
+                                )}
+                                {report.notes && <p className="text-xs italic mt-2 border-t pt-2">Notes: {report.notes}</p>}
                             </div>
                         ))}
                       </CardContent>

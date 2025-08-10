@@ -54,5 +54,8 @@ export interface ReconciliationReport {
     countedCash: number;
     countedMomo: number;
     cashDifference: number;
+    changeOwed: number;
+    changeSetAside: boolean;
+    cashForDeposit: number;
     notes: string;
 }
