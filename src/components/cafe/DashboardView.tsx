@@ -24,6 +24,8 @@ import { businessChat } from '@/ai/flows/business-chat-flow';
 import { type BusinessChatInput } from '@/ai/schemas';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Sheet,
   SheetContent,
@@ -275,8 +277,14 @@ const DashboardView: React.FC = () => {
                                     <AvatarFallback><Bot /></AvatarFallback>
                                 </Avatar>
                             )}
-                            <div className={`rounded-lg px-4 py-2 max-w-sm whitespace-pre-wrap ${message.role === 'model' ? 'bg-secondary' : 'bg-primary text-primary-foreground'}`}>
-                                {message.content}
+                            <div className={`rounded-lg px-4 py-2 max-w-sm ${message.role === 'model' ? 'bg-secondary markdown-content' : 'bg-primary text-primary-foreground'}`}>
+                                {message.role === 'model' ? (
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {message.content}
+                                    </ReactMarkdown>
+                                ) : (
+                                    message.content
+                                )}
                             </div>
                             {message.role === 'user' && (
                                 <Avatar className="h-8 w-8">
