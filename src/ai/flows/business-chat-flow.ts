@@ -44,9 +44,8 @@ const businessChatFlow = ai.defineFlow(
         outputSchema: BusinessChatOutputSchema,
     },
     async (input) => {
-        const history: Message[] = input.history.map((msg: { role: 'user' | 'model'; content: { text: string }[] }) => {
-            // Ensure content is an array of Parts, which is iterable
-            const contentAsParts: Part[] = msg.content.map(c => ({ text: c.text }));
+        const history: Message[] = input.history.map((msg: any) => {
+            const contentAsParts: Part[] = msg.content.map((c: any) => ({ text: c.text }));
             return new Message(msg.role, contentAsParts);
         });
 
