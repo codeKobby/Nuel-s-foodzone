@@ -26,14 +26,14 @@ const getBusinessDataTool = ai.defineTool(
 
 const businessChatPrompt = ai.definePrompt({
     name: 'businessChatPrompt',
-    input: { schema: BusinessChatInputSchema },
+    input: { schema: z.object({ ...BusinessChatInputSchema.shape, currentDate: z.string() }) },
     output: { schema: BusinessChatOutputSchema },
     tools: [getBusinessDataTool],
     prompt: `You are a helpful business analyst for Nuel's Food Zone.
 Your role is to answer questions from the business owner or manager based on sales data.
 Use the provided tools to fetch data when asked about specific time periods.
 Be concise and clear in your answers.
-Today's date is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.
+Today's date is {{currentDate}}.
 `,
 });
 
@@ -47,7 +47,13 @@ const businessChatFlow = ai.defineFlow(
         const history: Message[] = input.history.map((msg: { role: 'user' | 'model'; content: Part[] }) => {
             return new Message(msg.role, msg.content);
         });
-        const { output } = await businessChatPrompt(input, { history });
+
+        const promptInput = {
+            ...input,
+            currentDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+        };
+
+        const { output } = await businessChatPrompt(promptInput, { history });
         return output!;
     }
 );
@@ -61,4 +67,3 @@ export async function businessChat(input: z.infer<typeof BusinessChatInputSchema
 export default async function AiChatFlow() {
   return null;
 }
-
