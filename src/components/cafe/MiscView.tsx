@@ -6,7 +6,7 @@ import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, delete
 import { db } from '@/lib/firebase';
 import type { MiscExpense } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { Trash2, Check } from 'lucide-react';
+import { Trash2, Check, PlusCircle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +25,33 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+
+const MiscExpenseForm = ({
+    formState,
+    handleFormChange,
+    handleSubmit,
+}: {
+    formState: { purpose: string; amount: string };
+    handleFormChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    handleSubmit: (e: React.FormEvent) => void;
+}) => (
+     <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+            <Label htmlFor="purpose">Purpose</Label>
+            <Input type="text" name="purpose" id="purpose" value={formState.purpose} onChange={handleFormChange} required placeholder="e.g., 'Bought new napkins'"/>
+        </div>
+        <div>
+            <Label htmlFor="amount">Amount</Label>
+            <Input type="number" name="amount" id="amount" value={formState.amount} onChange={handleFormChange} required placeholder="0.00"/>
+        </div>
+        <div className="pt-4">
+            <Button type="submit" className="w-full font-bold">Add Expense</Button>
+        </div>
+    </form>
+);
+
 
 const MiscView: React.FC = () => {
     const [expenses, setExpenses] = useState<MiscExpense[]>([]);
@@ -32,6 +59,9 @@ const MiscView: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [formState, setFormState] = useState({ purpose: '', amount: '' });
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<MiscExpense | null>(null);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const isMobile = useIsMobile();
+
 
     useEffect(() => {
         const expensesRef = collection(db, "miscExpenses");
@@ -57,6 +87,7 @@ const MiscView: React.FC = () => {
         try {
             await addDoc(collection(db, "miscExpenses"), data);
             setFormState({ purpose: '', amount: ''});
+            setIsSheetOpen(false); // Close sheet on mobile after submission
         } catch (e) { setError("Failed to save expense."); }
     };
 
@@ -76,7 +107,28 @@ const MiscView: React.FC = () => {
     return (
         <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
             <div className="flex-1 p-6 overflow-y-auto">
-                <h2 className="text-3xl font-bold mb-6">Miscellaneous Expenses</h2>
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-3xl font-bold">Miscellaneous Expenses</h2>
+                     {isMobile && (
+                        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                            <SheetTrigger asChild>
+                                <Button size="icon"><PlusCircle /></Button>
+                            </SheetTrigger>
+                            <SheetContent side="bottom" className="h-auto">
+                                <SheetHeader>
+                                    <SheetTitle className="text-2xl">Add New Expense</SheetTitle>
+                                </SheetHeader>
+                                <div className="p-4 overflow-y-auto">
+                                <MiscExpenseForm
+                                    formState={formState}
+                                    handleFormChange={handleFormChange}
+                                    handleSubmit={handleSubmit}
+                                />
+                                </div>
+                            </SheetContent>
+                        </Sheet>
+                    )}
+                </div>
                 {loading && <LoadingSpinner />}
                 {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                 {!loading && !error && (
@@ -107,26 +159,20 @@ const MiscView: React.FC = () => {
                     </Card>
                 )}
             </div>
-            <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-r-0">
-                <CardHeader>
-                    <CardTitle className="text-2xl">Add New Expense</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <Label htmlFor="purpose">Purpose</Label>
-                            <Input type="text" name="purpose" id="purpose" value={formState.purpose} onChange={handleFormChange} required placeholder="e.g., 'Bought new napkins'"/>
-                        </div>
-                        <div>
-                            <Label htmlFor="amount">Amount</Label>
-                            <Input type="number" name="amount" id="amount" value={formState.amount} onChange={handleFormChange} required placeholder="0.00"/>
-                        </div>
-                        <div className="pt-4">
-                            <Button type="submit" className="w-full font-bold">Add Expense</Button>
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
+             {!isMobile && (
+                 <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-r-0">
+                    <CardHeader>
+                        <CardTitle className="text-2xl">Add New Expense</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <MiscExpenseForm
+                            formState={formState}
+                            handleFormChange={handleFormChange}
+                            handleSubmit={handleSubmit}
+                        />
+                    </CardContent>
+                </Card>
+            )}
 
             {showDeleteConfirm && (
                 <AlertDialog open onOpenChange={() => setShowDeleteConfirm(null)}>
