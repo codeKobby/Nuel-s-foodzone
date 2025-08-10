@@ -27,7 +27,7 @@ const getBusinessDataTool = ai.defineTool(
 const businessChatPrompt = ai.definePrompt({
     name: 'businessChatPrompt',
     input: { schema: z.object({ ...BusinessChatInputSchema.shape, currentDate: z.string() }) },
-    output: { schema: BusinessChatOutputSchema },
+    output: { format: 'text' },
     tools: [getBusinessDataTool],
     prompt: `You are a helpful business analyst for Nuel's Food Zone.
 Your role is to answer questions from the business owner or manager based on sales data.
