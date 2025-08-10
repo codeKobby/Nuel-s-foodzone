@@ -26,7 +26,7 @@ const getBusinessDataTool = ai.defineTool(
 
 const businessChatPrompt = ai.definePrompt({
     name: 'businessChatPrompt',
-    input: { schema: BusinessChatInputSchema },
+    input: { schema: z.string() },
     output: { format: 'text' },
     tools: [getBusinessDataTool],
     system: `You are an expert business analyst for a cafe called "Nuel's Food Zone".
@@ -49,20 +49,27 @@ const businessChatFlow = ai.defineFlow(
     },
     async (input) => {
         const history: Message[] = (input.history || []).map((msg: any) => {
+            const contentAsParts: Part[] = [];
             if (msg.role && msg.content) {
-                const contentAsParts: Part[] = Array.isArray(msg.content)
-                    ? msg.content.map((c: any) => ({ text: c.text }))
-                    : [{ text: msg.content }]; // Handle cases where content is just a string
-                return new Message(msg.role, contentAsParts);
+                if (Array.isArray(msg.content)) {
+                    // Handle new format
+                    msg.content.forEach((c: any) => {
+                        if (c.text) {
+                            contentAsParts.push({ text: c.text });
+                        }
+                    });
+                } else if (typeof msg.content === 'object' && msg.content.text) {
+                    // Handle old format
+                    contentAsParts.push({ text: msg.content.text });
+                }
             }
-            // Handle older formats or unexpected structures gracefully
-            return new Message(msg.role || 'user', [{ text: msg.content?.text || msg.text || '' }]);
+            return new Message(msg.role || 'user', contentAsParts);
         });
 
         // Add the current user prompt to the history for the call
         history.push(new Message('user', [{text: input.prompt}]));
         
-        const { output } = await businessChatPrompt(input, { history });
+        const { output } = await businessChatPrompt(input.prompt, { history });
         return output as string;
     }
 );
