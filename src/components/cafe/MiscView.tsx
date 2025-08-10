@@ -160,7 +160,7 @@ const MiscView: React.FC = () => {
                 )}
             </div>
              {!isMobile && (
-                 <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-r-0">
+                 <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-l">
                     <CardHeader>
                         <CardTitle className="text-2xl">Add New Expense</CardTitle>
                     </CardHeader>

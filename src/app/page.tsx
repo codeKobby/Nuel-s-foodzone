@@ -2,13 +2,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, ShieldCheck, ShoppingCart, Loader } from 'lucide-react';
 import logo from '@/app/logo.png';
-import { useRouter } from 'next/navigation';
 
 export default function RoleSelectionPage() {
   const [loadingRole, setLoadingRole] = useState<'manager' | 'cashier' | null>(null);
@@ -32,13 +31,13 @@ export default function RoleSelectionPage() {
           <CardHeader className="text-center">
              <ShieldCheck className="h-12 w-12 mx-auto text-primary" />
             <CardTitle className="text-2xl mt-4">Manager View</CardTitle>
-            <CardDescription>Full access to dashboard and admin controls.</CardDescription>
+            <CardDescription>Access to dashboard and admin controls.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button 
               className="w-full text-lg h-12"
               onClick={() => handleNavigation('manager')}
-              disabled={loadingRole === 'manager' || loadingRole === 'cashier'}
+              disabled={!!loadingRole}
             >
               {loadingRole === 'manager' ? (
                 <>
@@ -58,13 +57,13 @@ export default function RoleSelectionPage() {
           <CardHeader className="text-center">
             <ShoppingCart className="h-12 w-12 mx-auto text-primary" />
             <CardTitle className="text-2xl mt-4">Cashier View</CardTitle>
-            <CardDescription>Access to POS, Orders, Accounting, and Misc for daily operations.</CardDescription>
+            <CardDescription>Access to POS, Orders, and Accounting for daily operations.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button 
               className="w-full text-lg h-12"
               onClick={() => handleNavigation('cashier')}
-              disabled={loadingRole === 'manager' || loadingRole === 'cashier'}
+              disabled={!!loadingRole}
             >
                {loadingRole === 'cashier' ? (
                 <>

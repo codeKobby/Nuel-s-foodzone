@@ -119,7 +119,7 @@ const AdminView: React.FC = () => {
 
     const handleEdit = (item: MenuItem) => {
         setEditingItem(item);
-        setFormState({ name: item.name, price: String(item.price), category: item.category, stock: String(item.stock || '') });
+        setFormState({ name: String(item.name), price: String(item.price), category: String(item.category), stock: String(item.stock || '') });
     };
 
     const handleDelete = async (itemId: string) => {
@@ -141,7 +141,7 @@ const AdminView: React.FC = () => {
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-3xl font-bold">Menu Management</h2>
                     {isMobile && (
-                        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                        <Sheet open={isSheetOpen} onOpenChange={(open) => { setIsSheetOpen(open); if (!open) clearForm(); }}>
                             <SheetTrigger asChild>
                                 <Button size="icon"><PlusCircle /></Button>
                             </SheetTrigger>
@@ -193,7 +193,7 @@ const AdminView: React.FC = () => {
             </div>
             
             {!isMobile && (
-                <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-r-0">
+                <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-l">
                     <CardHeader>
                         <CardTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</CardTitle>
                     </CardHeader>
@@ -230,5 +230,3 @@ const AdminView: React.FC = () => {
 };
 
 export default AdminView;
-
-    

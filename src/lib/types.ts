@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 import type { AnalyzeBusinessOutputSchema } from '@/ai/schemas';
 import { z } from 'zod';
