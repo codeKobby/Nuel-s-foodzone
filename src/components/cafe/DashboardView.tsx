@@ -24,6 +24,14 @@ import { businessChat } from '@/ai/flows/business-chat-flow';
 import { type BusinessChatInput } from '@/ai/schemas';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 
 
 interface DashboardStats {
@@ -74,6 +82,7 @@ const DashboardView: React.FC = () => {
     const [chatInput, setChatInput] = useState('');
     const [isAiReplying, setIsAiReplying] = useState(false);
     const chatContainerRef = useRef<HTMLDivElement>(null);
+    const [isChatSheetOpen, setIsChatSheetOpen] = useState(false);
 
 
     useEffect(() => {
@@ -203,6 +212,57 @@ const DashboardView: React.FC = () => {
 
     const topItems = useMemo(() => stats?.itemPerformance.slice(0, 5) || [], [stats]);
     const bottomItems = useMemo(() => stats && stats.itemPerformance.length > 5 ? stats.itemPerformance.slice(-5).reverse() : [], [stats]);
+    
+    const renderChatContent = () => (
+         <div className="h-full flex flex-col">
+            <ScrollArea className="flex-grow p-4" ref={chatContainerRef}>
+                <div className="space-y-4">
+                    {chatHistory.map((message, index) => (
+                        <div key={index} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}>
+                            {message.role === 'model' && (
+                                <Avatar className="h-8 w-8">
+                                    <AvatarFallback><Bot /></AvatarFallback>
+                                </Avatar>
+                            )}
+                            <div className={`rounded-lg px-4 py-2 max-w-sm whitespace-pre-wrap ${message.role === 'model' ? 'bg-secondary' : 'bg-primary text-primary-foreground'}`}>
+                                {message.content[0].text}
+                            </div>
+                            {message.role === 'user' && (
+                                <Avatar className="h-8 w-8">
+                                    <AvatarFallback><User /></AvatarFallback>
+                                </Avatar>
+                            )}
+                        </div>
+                    ))}
+                    {isAiReplying && (
+                         <div className="flex items-start gap-3">
+                            <Avatar className="h-8 w-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>
+                            <div className="rounded-lg px-4 py-2 bg-secondary"><LoadingSpinner /></div>
+                         </div>
+                    )}
+                    {chatHistory.length === 0 && !isAiReplying && (
+                        <div className="text-center text-muted-foreground pt-16">
+                            <p>Ask a question to get started, like:</p>
+                            <p className="italic font-medium">"What were the top 3 selling items yesterday?"</p>
+                        </div>
+                    )}
+                </div>
+            </ScrollArea>
+            <div className="mt-auto p-4 border-t flex gap-2">
+                <Input
+                    placeholder="Type your question..."
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                    disabled={isAiReplying}
+                    className="h-12"
+                />
+                <Button onClick={handleSendMessage} disabled={isAiReplying || !chatInput} className="h-12">
+                    <Send />
+                </Button>
+            </div>
+        </div>
+    );
 
     return (
         <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
@@ -247,61 +307,6 @@ const DashboardView: React.FC = () => {
                     <StatCard icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Cash Discrepancy" value={formatCurrency(stats.cashDiscrepancy)} description="Sum of cash surplus/deficit" />
                     <StatCard icon={<AlertCircle className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-red-500"}/>} title="Unpaid Orders" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
                 </div>
-                
-                 <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle className="flex items-center"><Sparkles className="mr-2 text-primary" /> AI Business Assistant</CardTitle>
-                        <CardDescription>Ask me anything about your business performance.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="h-[400px] flex flex-col">
-                        <ScrollArea className="flex-grow p-4 border rounded-lg" ref={chatContainerRef}>
-                            <div className="space-y-4">
-                                {chatHistory.map((message, index) => (
-                                    <div key={index} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}>
-                                        {message.role === 'model' && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback><Bot /></AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                        <div className={`rounded-lg px-4 py-2 max-w-sm whitespace-pre-wrap ${message.role === 'model' ? 'bg-secondary' : 'bg-primary text-primary-foreground'}`}>
-                                            {message.content[0].text}
-                                        </div>
-                                        {message.role === 'user' && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback><User /></AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                    </div>
-                                ))}
-                                {isAiReplying && (
-                                     <div className="flex items-start gap-3">
-                                        <Avatar className="h-8 w-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>
-                                        <div className="rounded-lg px-4 py-2 bg-secondary"><LoadingSpinner /></div>
-                                     </div>
-                                )}
-                                {chatHistory.length === 0 && !isAiReplying && (
-                                    <div className="text-center text-muted-foreground pt-16">
-                                        <p>Ask a question to get started, like:</p>
-                                        <p className="italic font-medium">"What were the top 3 selling items yesterday?"</p>
-                                    </div>
-                                )}
-                            </div>
-                        </ScrollArea>
-                        <div className="mt-4 flex gap-2">
-                            <Input
-                                placeholder="Type your question..."
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                disabled={isAiReplying}
-                                className="h-12"
-                            />
-                            <Button onClick={handleSendMessage} disabled={isAiReplying || !chatInput} className="h-12">
-                                <Send />
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                     <Card className="lg:col-span-3">
@@ -353,8 +358,26 @@ const DashboardView: React.FC = () => {
                 </div>
             </>
             )}
+            
+            <Sheet open={isChatSheetOpen} onOpenChange={setIsChatSheetOpen}>
+                <SheetTrigger asChild>
+                     <Button className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-lg z-20">
+                        <Sparkles className="h-8 w-8" />
+                    </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0">
+                    <SheetHeader className="p-4 border-b">
+                        <SheetTitle>AI Business Assistant</SheetTitle>
+                        <SheetDescription>Ask me anything about your business performance.</SheetDescription>
+                    </SheetHeader>
+                   {renderChatContent()}
+                </SheetContent>
+            </Sheet>
+
         </div>
     );
 };
 
 export default DashboardView;
+
+    
