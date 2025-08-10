@@ -61,9 +61,3 @@ const businessChatFlow = ai.defineFlow(
 export async function businessChat(input: z.infer<typeof BusinessChatInputSchema>): Promise<z.infer<typeof BusinessChatOutputSchema>> {
     return businessChatFlow(input);
 }
-
-// Dummy component to satisfy Next.js compiler for including a server-side flow
-// This will not be rendered.
-export default async function AiChatFlow() {
-  return null;
-}

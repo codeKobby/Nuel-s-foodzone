@@ -56,9 +56,3 @@ const analyzeBusinessFlow = ai.defineFlow(
 export async function analyzeBusiness(input: AnalyzeBusinessInput): Promise<AnalyzeBusinessOutput> {
     return analyzeBusinessFlow(input);
 }
-
-// Dummy component to satisfy Next.js compiler for including a server-side flow
-// This will not be rendered.
-export default async function AiFlow() {
-  return null;
-}
