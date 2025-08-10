@@ -32,6 +32,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 interface DashboardStats {
@@ -83,6 +84,7 @@ const DashboardView: React.FC = () => {
     const [isAiReplying, setIsAiReplying] = useState(false);
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const [isChatSheetOpen, setIsChatSheetOpen] = useState(false);
+    const isMobile = useIsMobile();
 
 
     useEffect(() => {
@@ -365,7 +367,13 @@ const DashboardView: React.FC = () => {
                         <Sparkles className="h-8 w-8" />
                     </Button>
                 </SheetTrigger>
-                <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0">
+                <SheetContent 
+                    side={isMobile ? 'bottom' : 'right'} 
+                    className={cn(
+                        isMobile ? 'h-[85vh]' : 'h-full',
+                        'flex flex-col p-0'
+                    )}
+                >
                     <SheetHeader className="p-4 border-b">
                         <SheetTitle>AI Business Assistant</SheetTitle>
                         <SheetDescription>Ask me anything about your business performance.</SheetDescription>
