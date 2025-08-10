@@ -16,6 +16,15 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -70,6 +79,7 @@ const AccountingView: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+    const [isCloseOutOpen, setIsCloseOutOpen] = useState(false);
 
     const totalCountedCash = useMemo(() => {
         return denominations.reduce((acc, d) => {
@@ -108,7 +118,6 @@ const AccountingView: React.FC = () => {
                     if(order.paymentMethod === 'cash') {
                        cashSales += order.amountPaid;
                        totalChangeGiven += order.changeGiven;
-                       // Change owed is balanceDue when customer has paid enough
                        if(order.amountPaid >= order.total && order.balanceDue > 0) {
                            totalChangeOwed += order.balanceDue;
                        }
@@ -152,6 +161,12 @@ const AccountingView: React.FC = () => {
     const handleCountChange = (name: string, value: string) => {
         setCounts(prev => ({ ...prev, [name]: value.replace(/[^0-9]/g, '') }));
     };
+    
+    const resetForm = () => {
+        setCounts(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
+        setCountedMomo('');
+        setNotes('');
+    }
 
     const handleSaveReport = async () => {
         if (totalCountedCash <= 0 && !countedMomo) {
@@ -176,9 +191,8 @@ const AccountingView: React.FC = () => {
             };
             await addDoc(collection(db, "reconciliationReports"), reportData);
             
-            setCounts(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
-            setCountedMomo('');
-            setNotes('');
+            resetForm();
+            setIsCloseOutOpen(false);
 
         } catch (e) {
             console.error(e);
@@ -203,118 +217,136 @@ const AccountingView: React.FC = () => {
     if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
 
     return (
-        <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
-            <div className="flex-1 p-6 overflow-y-auto">
-                <h2 className="text-3xl font-bold mb-6">Accounting & Reconciliation</h2>
-                {error && <Alert variant="destructive" className="mb-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+        <div className="p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+                 <h2 className="text-3xl font-bold">Accounting</h2>
+                 <Dialog open={isCloseOutOpen} onOpenChange={setIsCloseOutOpen}>
+                    <DialogTrigger asChild>
+                         <Button>Start End-of-Day Close Out</Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl">
+                        <DialogHeader>
+                            <DialogTitle>Close Out for Today</DialogTitle>
+                            <DialogDescription>Count physical cash and reconcile accounts. This action will save a permanent report for the day.</DialogDescription>
+                        </DialogHeader>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                             <div className="space-y-4">
+                                <Label className="text-lg font-semibold">Cash Count</Label>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 p-3 border rounded-md bg-secondary">
+                                    {denominations.map(d => (
+                                        <div key={d.name} className="flex items-center space-x-2">
+                                            <Label htmlFor={`count-${d.name}`} className="w-24 text-sm">{d.name}</Label>
+                                            <Input id={`count-${d.name}`} type="text" pattern="[0-9]*" value={counts[d.name]} onChange={e => handleCountChange(d.name, e.target.value)} placeholder="Qty" className="h-8"/>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div>
+                                    <Label className="text-lg font-semibold">Momo/Card Count</Label>
+                                    <Input id="counted-momo" type="number" value={countedMomo} onChange={e => setCountedMomo(e.target.value)} placeholder="Total from device" className="h-10 mt-2"/>
+                                </div>
+                                <div>
+                                    <Label className="text-lg font-semibold" htmlFor="notes">Notes</Label>
+                                    <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any notes about today's sales (e.g., reason for deficit)" className="mt-2"/>
+                                </div>
+                             </div>
 
-                 <Tabs defaultValue="summary" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="summary">Today's Summary</TabsTrigger>
-                    <TabsTrigger value="history">History ({reports.length})</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="summary">
-                        <Card className="mt-4">
-                            <CardHeader>
-                                <CardTitle>Today's Financial Summary</CardTitle>
-                                <CardDescription>All financial data since midnight. This is a real-time view.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales (Paid)" value={formatCurrency(stats.totalSales)} />
-                                <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
-                                <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
-                                <StatCard icon={<Coins className="text-red-500"/>} title="Change Given" value={formatCurrency(stats.changeGiven)} description="Cash returned to customers" />
-                                <StatCard icon={<Coins className="text-yellow-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change to be given" />
-                                <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Settled Misc. Expenses" value={formatCurrency(stats.miscExpenses)} />
-                            </CardContent>
-                            <CardFooter>
-                                <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
+                             <div className="space-y-4">
+                                <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-900/20 text-center">
                                     <Label className="text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash in Drawer</Label>
                                     <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
                                     <p className="text-xs text-muted-foreground">(Cash Sales - Change Given - Misc. Expenses)</p>
                                 </div>
-                            </CardFooter>
-                        </Card>
-                  </TabsContent>
-                  <TabsContent value="history">
-                      <Card className="mt-4">
-                          <CardHeader>
-                              <CardTitle>Reconciliation History</CardTitle>
-                              <CardDescription>Review past end-of-day reports.</CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-3 max-h-[500px] overflow-y-auto">
-                            {reports.length === 0 && <p className="text-muted-foreground italic text-center py-4">No reports saved yet.</p>}
-                            {reports.map(report => (
-                                <div key={report.id} className="p-3 rounded-lg bg-secondary">
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="font-semibold">{report.period}</p>
-                                            <p className="text-sm text-muted-foreground">{formatTimestamp(report.timestamp)}</p>
-                                        </div>
-                                        {renderDifference(report.cashDifference)}
-                                    </div>
-                                    <div className="text-xs grid grid-cols-2 gap-x-4 gap-y-1 mt-2 border-t pt-2">
-                                        <p>Expected Cash: {formatCurrency(report.expectedCash)}</p>
-                                        <p>Counted Cash: {formatCurrency(report.countedCash)}</p>
-                                        <p>Expected Momo: {formatCurrency(report.momoSales)}</p>
-                                        <p>Counted Momo: {formatCurrency(report.countedMomo)}</p>
-                                    </div>
-                                    {report.notes && <p className="text-xs italic mt-2">Notes: {report.notes}</p>}
+                                <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-900/20 text-center">
+                                    <Label className="text-lg font-semibold text-blue-700 dark:text-blue-300">Counted Cash Total</Label>
+                                    <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(totalCountedCash)}</p>
                                 </div>
-                            ))}
-                          </CardContent>
-                      </Card>
-                  </TabsContent>
-                </Tabs>
+                                <div className="p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20 text-center">
+                                    <Label className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">Cash Difference</Label>
+                                    {renderDifference(cashDifference)}
+                                </div>
+                             </div>
+                        </div>
+                        
+                        {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+
+                        <DialogFooter>
+                            <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting} className="w-full h-12 text-lg font-bold">
+                                {isSubmitting ? 'Saving...' : 'Save Reconciliation Report'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                 </Dialog>
             </div>
             
-            <Card className="w-full md:w-[450px] rounded-none border-t md:border-t-0 md:border-l flex flex-col">
-                <CardHeader>
-                    <CardTitle className="text-2xl">Close Out for Today</CardTitle>
-                    <CardDescription>Count physical cash and reconcile accounts.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow overflow-y-auto space-y-4">
-                    <div>
-                        <Label className="text-lg font-semibold">Cash Count</Label>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 p-3 border rounded-md bg-secondary">
-                            {denominations.map(d => (
-                                <div key={d.name} className="flex items-center space-x-2">
-                                    <Label htmlFor={`count-${d.name}`} className="w-24 text-sm">{d.name}</Label>
-                                    <Input id={`count-${d.name}`} type="text" pattern="[0-9]*" value={counts[d.name]} onChange={e => handleCountChange(d.name, e.target.value)} placeholder="Qty" className="h-8"/>
+            {error && !isCloseOutOpen && <Alert variant="destructive" className="mb-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+
+            <Tabs defaultValue="summary" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="summary">Today's Summary</TabsTrigger>
+                <TabsTrigger value="history">History ({reports.length})</TabsTrigger>
+              </TabsList>
+              <TabsContent value="summary">
+                    <Card className="mt-4">
+                        <CardHeader>
+                            <CardTitle>Today's Financial Summary</CardTitle>
+                            <CardDescription>All financial data since midnight. This is a real-time view.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales (Paid)" value={formatCurrency(stats.totalSales)} />
+                            <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
+                            <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
+                            <StatCard icon={<Coins className="text-red-500"/>} title="Change Given" value={formatCurrency(stats.changeGiven)} description="Cash returned to customers" />
+                            <StatCard icon={<Coins className="text-yellow-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change to be given" />
+                            <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Settled Misc. Expenses" value={formatCurrency(stats.miscExpenses)} />
+                        </CardContent>
+                        <CardFooter>
+                            <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
+                                <Label className="text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash in Drawer</Label>
+                                <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
+                                <p className="text-xs text-muted-foreground">(Cash Sales - Change Given - Settled Misc. Expenses)</p>
+                            </div>
+                        </CardFooter>
+                    </Card>
+              </TabsContent>
+              <TabsContent value="history">
+                  <Card className="mt-4">
+                      <CardHeader>
+                          <CardTitle>Reconciliation History</CardTitle>
+                          <CardDescription>Review past end-of-day reports.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3 max-h-[500px] overflow-y-auto">
+                        {reports.length === 0 && <p className="text-muted-foreground italic text-center py-4">No reports saved yet.</p>}
+                        {reports.map(report => (
+                            <div key={report.id} className="p-3 rounded-lg bg-secondary">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-semibold">{report.period}</p>
+                                        <p className="text-sm text-muted-foreground">{formatTimestamp(report.timestamp)}</p>
+                                    </div>
+                                    {renderDifference(report.cashDifference)}
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                     <div>
-                        <Label className="text-lg font-semibold">Momo/Card Count</Label>
-                         <Input id="counted-momo" type="number" value={countedMomo} onChange={e => setCountedMomo(e.target.value)} placeholder="Total from device" className="h-10 mt-2"/>
-                    </div>
-                    <div>
-                        <Label className="text-lg font-semibold" htmlFor="notes">Notes</Label>
-                         <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any notes about today's sales (e.g., reason for deficit)" className="mt-2"/>
-                    </div>
-                </CardContent>
-                 <CardFooter className="bg-card border-t pt-4 flex-col items-stretch space-y-4">
-                    <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-900/20 text-center">
-                        <Label className="text-lg font-semibold text-blue-700 dark:text-blue-300">Counted Cash Total</Label>
-                        <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(totalCountedCash)}</p>
-                    </div>
-                     <div className="p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20 text-center">
-                        <Label className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">Cash Difference</Label>
-                        {renderDifference(cashDifference)}
-                    </div>
-                    <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting} className="w-full h-12 text-lg font-bold">
-                        {isSubmitting ? 'Saving...' : 'Save Reconciliation Report'}
-                    </Button>
-                </CardFooter>
-            </Card>
+                                <div className="text-xs grid grid-cols-2 gap-x-4 gap-y-1 mt-2 border-t pt-2">
+                                    <p>Expected Cash: {formatCurrency(report.expectedCash)}</p>
+                                    <p>Counted Cash: {formatCurrency(report.countedCash)}</p>
+                                    <p>Expected Momo: {formatCurrency(report.momoSales)}</p>
+                                    <p>Counted Momo: {formatCurrency(report.countedMomo)}</p>
+                                </div>
+                                {report.notes && <p className="text-xs italic mt-2">Notes: {report.notes}</p>}
+                            </div>
+                        ))}
+                      </CardContent>
+                  </Card>
+              </TabsContent>
+            </Tabs>
+            
             {showConfirm && (
                 <AlertDialog open onOpenChange={setShowConfirm}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
                             <AlertDialogTitle>Confirm Report Submission</AlertDialogTitle>
                             <AlertDialogDescription>
-                                Are you sure you want to save this reconciliation report? This action cannot be undone.
+                                Are you sure you want to save this reconciliation report? This action cannot be undone and will be permanently recorded.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -329,5 +361,3 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
-
-    
