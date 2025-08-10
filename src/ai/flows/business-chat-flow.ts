@@ -26,14 +26,18 @@ const getBusinessDataTool = ai.defineTool(
 
 const businessChatPrompt = ai.definePrompt({
     name: 'businessChatPrompt',
-    input: { schema: z.object({ ...BusinessChatInputSchema.shape, currentDate: z.string() }) },
+    input: { schema: BusinessChatInputSchema },
     output: { format: 'text' },
     tools: [getBusinessDataTool],
-    prompt: `You are a helpful business analyst for Nuel's Food Zone.
+    system: `You are an expert business analyst for a cafe called "Nuel's Food Zone".
 Your role is to answer questions from the business owner or manager based on sales data.
-Use the provided tools to fetch the data when asked about specific time periods.
-Be concise and clear in your answers.
-Today's date is {{currentDate}}.
+You have access to a tool called 'getBusinessData' that can retrieve sales, orders, and item performance for specific date ranges.
+
+- When the user asks a question about performance, sales, or items (e.g., "What were our sales yesterday?", "How many spring rolls did we sell last week?"), you MUST use the 'getBusinessData' tool to find the answer.
+- Today's date is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}. Use this to determine the correct date range for terms like "yesterday", "last week", or "last month".
+- When you receive data from the tool, analyze it and present the key information to the user in a clear, friendly, and concise way.
+- If the tool returns no data (e.g., zero sales), state that clearly to the user. Do not invent data.
+- If the user's question is unclear, ask for clarification.
 `,
 });
 
@@ -44,19 +48,21 @@ const businessChatFlow = ai.defineFlow(
         outputSchema: BusinessChatOutputSchema,
     },
     async (input) => {
-        const history: Message[] = input.history.map((msg: any) => {
-            const contentAsParts: Part[] = Array.isArray(msg.content) 
-                ? msg.content.map((c: any) => ({ text: c.text })) 
-                : [{ text: msg.content.text }];
-            return new Message(msg.role, contentAsParts);
+        const history: Message[] = (input.history || []).map((msg: any) => {
+            if (msg.role && msg.content) {
+                const contentAsParts: Part[] = Array.isArray(msg.content)
+                    ? msg.content.map((c: any) => ({ text: c.text }))
+                    : [{ text: msg.content }]; // Handle cases where content is just a string
+                return new Message(msg.role, contentAsParts);
+            }
+            // Handle older formats or unexpected structures gracefully
+            return new Message(msg.role || 'user', [{ text: msg.content?.text || msg.text || '' }]);
         });
 
-        const promptInput = {
-            ...input,
-            currentDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-        };
+        // Add the current user prompt to the history for the call
+        history.push(new Message('user', [{text: input.prompt}]));
         
-        const { output } = await businessChatPrompt(promptInput, { history });
+        const { output } = await businessChatPrompt(input, { history });
         return output as string;
     }
 );
