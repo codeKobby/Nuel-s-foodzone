@@ -78,5 +78,3 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
 };
 
 export default Sidebar;
-
-    

@@ -204,31 +204,37 @@ export default function CafePage() {
             </div>
         );
     }
-
-    return (
+    
+    const MainContent = () => (
         <div className="flex h-screen bg-secondary/50 dark:bg-background font-body text-foreground">
-             {isMobile ? (
-                <MobileNav 
-                    activeView={activeView}
-                    setActiveView={setActiveView}
-                    theme={theme}
-                    setTheme={toggleTheme}
-                    pendingOrdersCount={pendingOrdersCount}
-                />
-            ) : (
-                <Sidebar 
-                    activeView={activeView} 
-                    setActiveView={setActiveView} 
-                    theme={theme} 
-                    setTheme={toggleTheme} 
-                    pendingOrdersCount={pendingOrdersCount} 
-                />
-            )}
+            <Sidebar 
+                activeView={activeView} 
+                setActiveView={setActiveView} 
+                theme={theme} 
+                setTheme={toggleTheme} 
+                pendingOrdersCount={pendingOrdersCount} 
+            />
             <main className="flex-1 flex flex-col overflow-hidden">
                 {renderActiveView()}
             </main>
         </div>
     );
-}
 
-    
+    const MobileContent = () => (
+        <div className="h-screen flex flex-col bg-secondary/50 dark:bg-background font-body text-foreground">
+             <MobileNav 
+                activeView={activeView}
+                setActiveView={setActiveView}
+                theme={theme}
+                setTheme={toggleTheme}
+                pendingOrdersCount={pendingOrdersCount}
+            />
+            <main className="flex-1 flex flex-col overflow-hidden">
+                {renderActiveView()}
+            </main>
+        </div>
+    );
+
+
+    return isMobile ? <MobileContent /> : <MainContent />;
+}
