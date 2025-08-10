@@ -9,7 +9,6 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { BusinessChatInputSchema, BusinessChatOutputSchema, GetBusinessDataInputSchema, GetBusinessDataOutputSchema } from '@/ai/schemas';
 import { getBusinessDataForRange } from '@/lib/tools';
-import { Message, Part } from 'genkit';
 
 
 const getBusinessDataTool = ai.defineTool(
@@ -25,7 +24,10 @@ const getBusinessDataTool = ai.defineTool(
 
 const businessChatPrompt = ai.definePrompt({
     name: 'businessChatPrompt',
-    input: { schema: z.string() },
+    input: { schema: z.object({
+        prompt: z.string(),
+        historyContext: z.string().optional()
+    }) },
     output: { format: 'text' },
     tools: [getBusinessDataTool],
     system: `You are an expert business analyst for a cafe called "Nuel's Food Zone".
@@ -37,7 +39,13 @@ You have access to a tool called 'getBusinessData' that can retrieve sales, orde
 - When you receive data from the tool, analyze it and present the key information to the user in a clear, friendly, and concise way.
 - If the tool returns no data (e.g., zero sales), state that clearly to the user. Do not invent data.
 - If the user's question is unclear, ask for clarification.
+{{#if historyContext}}
+
+Previous conversation context:
+{{historyContext}}
+{{/if}}
 `,
+    prompt: `User question: {{prompt}}`
 });
 
 const businessChatFlow = ai.defineFlow(
@@ -47,34 +55,37 @@ const businessChatFlow = ai.defineFlow(
         outputSchema: BusinessChatOutputSchema,
     },
     async (input) => {
-        const history: Message[] = (input.history || []).map((msg: any) => {
-            const contentAsParts: Part[] = [];
-            
-            if (msg.role && msg.content) {
-                if (Array.isArray(msg.content)) {
-                    // Handle array format
-                    msg.content.forEach((c: any) => {
-                        if (c.text) {
-                            contentAsParts.push({ text: c.text });
-                        }
-                    });
-                } else if (typeof msg.content === 'object' && msg.content.text) {
-                    // Handle object format with text property
-                    contentAsParts.push({ text: msg.content.text });
-                } else if (typeof msg.content === 'string') {
-                    // Handle simple string format
-                    contentAsParts.push({ text: msg.content });
-                }
+        try {
+            // Convert history to a simple string context instead of Message objects
+            let historyContext = '';
+            if (input.history && input.history.length > 0) {
+                historyContext = input.history.map((msg: any) => {
+                    const role = msg.role || 'user';
+                    let content = '';
+                    
+                    if (typeof msg.content === 'string') {
+                        content = msg.content;
+                    } else if (Array.isArray(msg.content)) {
+                        content = msg.content.map((c: any) => c.text || '').join(' ');
+                    } else if (msg.content && typeof msg.content === 'object') {
+                        content = msg.content.text || '';
+                    }
+                    
+                    return `${role}: ${content}`;
+                }).join('\n');
             }
-            
-            return new Message(msg.role || 'user', contentAsParts);
-        });
 
-        // Add the current user prompt to the history for the call
-        history.push(new Message('user', [{text: input.prompt}]));
-        
-        const { output } = await businessChatPrompt(input.prompt, { history });
-        return output as string;
+            const { output } = await businessChatPrompt({
+                prompt: input.prompt,
+                historyContext: historyContext || undefined
+            });
+            
+            return output as string;
+        } catch (error) {
+            console.error('Error in business chat flow:', error);
+            // Fallback response
+            return "I'm sorry, I encountered an error while processing your request. Please try rephrasing your question about the business performance.";
+        }
     }
 );
 
