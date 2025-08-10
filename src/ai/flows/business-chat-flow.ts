@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview An AI flow for a conversational business analysis chat.
@@ -50,19 +49,24 @@ const businessChatFlow = ai.defineFlow(
     async (input) => {
         const history: Message[] = (input.history || []).map((msg: any) => {
             const contentAsParts: Part[] = [];
+            
             if (msg.role && msg.content) {
                 if (Array.isArray(msg.content)) {
-                    // Handle new format
+                    // Handle array format
                     msg.content.forEach((c: any) => {
                         if (c.text) {
                             contentAsParts.push({ text: c.text });
                         }
                     });
                 } else if (typeof msg.content === 'object' && msg.content.text) {
-                    // Handle old format
+                    // Handle object format with text property
                     contentAsParts.push({ text: msg.content.text });
+                } else if (typeof msg.content === 'string') {
+                    // Handle simple string format
+                    contentAsParts.push({ text: msg.content });
                 }
             }
+            
             return new Message(msg.role || 'user', contentAsParts);
         });
 
