@@ -14,6 +14,33 @@ interface SidebarProps {
     pendingOrdersCount: number;
 }
 
+const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: string, setActiveView: (view: string) => void }) => (
+    <li className="relative">
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    onClick={() => setActiveView(item.id)}
+                    className={`w-14 h-14 flex items-center justify-center rounded-xl transition-all duration-300 group ${
+                        activeView === item.id 
+                        ? 'bg-primary text-primary-foreground shadow-lg scale-110' 
+                        : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                    }`}
+                >
+                    <item.icon size={24} />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+                <p>{item.label}</p>
+            </TooltipContent>
+        </Tooltip>
+        {item.badge > 0 && (
+            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse border-2 border-card">
+                {item.badge}
+            </span>
+        )}
+    </li>
+);
+
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, setTheme, pendingOrdersCount }) => {
     const navItems = [
         { id: 'pos', icon: Home, label: 'POS' },
@@ -26,35 +53,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
 
     return (
         <TooltipProvider>
-            <nav className="w-20 bg-card border-r border-border flex flex-col items-center justify-between py-6 shadow-md z-20">
+            <nav className="hidden md:flex w-20 bg-card border-r border-border flex-col items-center justify-between py-6 shadow-md z-20">
                 <div>
                     <Image src={logo} alt="Nuel's Food Zone Logo" width={48} height={48} className="mb-10 mx-auto rounded-md shadow-md" />
                     <ul className="space-y-4">
                         {navItems.map(item => (
-                             <li key={item.id} className="relative">
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <button
-                                            onClick={() => setActiveView(item.id)}
-                                            className={`w-14 h-14 flex items-center justify-center rounded-xl transition-all duration-300 group ${
-                                                activeView === item.id 
-                                                ? 'bg-primary text-primary-foreground shadow-lg scale-110' 
-                                                : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
-                                            }`}
-                                        >
-                                            <item.icon size={24} />
-                                        </button>
-                                    </TooltipTrigger>
-                                     <TooltipContent side="right">
-                                        <p>{item.label}</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                                {item.badge > 0 && (
-                                    <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse border-2 border-card">
-                                        {item.badge}
-                                    </span>
-                                )}
-                            </li>
+                            <NavItem key={item.id} item={item} activeView={activeView} setActiveView={setActiveView} />
                         ))}
                     </ul>
                 </div>
@@ -64,7 +68,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
                             {theme === 'light' ? <Moon size={24} /> : <Sun size={24} />}
                         </button>
                     </TooltipTrigger>
-                     <TooltipContent side="right">
+                    <TooltipContent side="right">
                         <p>Toggle {theme === 'light' ? 'Dark' : 'Light'} Mode</p>
                     </TooltipContent>
                 </Tooltip>
@@ -74,3 +78,5 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
 };
 
 export default Sidebar;
+
+    

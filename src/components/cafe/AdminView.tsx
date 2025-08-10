@@ -6,7 +6,7 @@ import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from 'fireb
 import { db } from '@/lib/firebase';
 import type { MenuItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, PlusCircle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +23,47 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+
+const AdminForm = ({
+    editingItem,
+    formState,
+    handleFormChange,
+    handleSubmit,
+    onCancel,
+}: {
+    editingItem: MenuItem | null;
+    formState: { name: string; price: string; category: string; stock: string };
+    handleFormChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    handleSubmit: (e: React.FormEvent) => void;
+    onCancel: () => void;
+}) => (
+    <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+            <Label htmlFor="name">Item Name</Label>
+            <Input type="text" name="name" id="name" value={formState.name} onChange={handleFormChange} required />
+        </div>
+        <div>
+            <Label htmlFor="price">Price</Label>
+            <Input type="number" name="price" id="price" value={formState.price} onChange={handleFormChange} required />
+        </div>
+        <div>
+            <Label htmlFor="category">Category</Label>
+            <Input type="text" name="category" id="category" value={formState.category} onChange={handleFormChange} required />
+        </div>
+        <div>
+            <Label htmlFor="stock">Stock Quantity</Label>
+            <Input type="number" name="stock" id="stock" value={formState.stock} onChange={handleFormChange} />
+        </div>
+        <div className="flex space-x-2 pt-4">
+            <Button type="submit" className="flex-1 font-bold">{editingItem ? 'Update Item' : 'Add Item'}</Button>
+            {editingItem && <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>}
+        </div>
+    </form>
+);
+
 
 const AdminView: React.FC = () => {
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -32,6 +72,8 @@ const AdminView: React.FC = () => {
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
     const [formState, setFormState] = useState({ name: '', price: '', category: '', stock: '' });
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<MenuItem | null>(null);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const isMobile = useIsMobile();
 
     useEffect(() => {
         const menuRef = collection(db, "menuItems");
@@ -41,8 +83,20 @@ const AdminView: React.FC = () => {
         }, (e) => { setError("Failed to load menu for admin."); setLoading(false); });
         return () => unsubscribe();
     }, []);
+
+    useEffect(() => {
+        if (editingItem) {
+            setIsSheetOpen(true);
+        }
+    }, [editingItem]);
     
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormState(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+    const clearForm = () => {
+        setFormState({ name: '', price: '', category: '', stock: '' });
+        setEditingItem(null);
+        setIsSheetOpen(false);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -59,8 +113,7 @@ const AdminView: React.FC = () => {
             } else {
                 await addDoc(collection(db, "menuItems"), data);
             }
-            setFormState({ name: '', price: '', category: '', stock: '' });
-            setEditingItem(null);
+            clearForm();
         } catch (e) { setError("Failed to save menu item."); }
     };
 
@@ -85,7 +138,31 @@ const AdminView: React.FC = () => {
     return (
         <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
             <div className="flex-1 p-6 overflow-y-auto">
-                <h2 className="text-3xl font-bold mb-6">Menu Management</h2>
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-3xl font-bold">Menu Management</h2>
+                    {isMobile && (
+                        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                            <SheetTrigger asChild>
+                                <Button size="icon"><PlusCircle /></Button>
+                            </SheetTrigger>
+                            <SheetContent side="bottom" className="h-[85vh]">
+                                <SheetHeader>
+                                    <SheetTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</SheetTitle>
+                                </SheetHeader>
+                                <div className="p-4 overflow-y-auto">
+                                <AdminForm 
+                                    editingItem={editingItem}
+                                    formState={formState}
+                                    handleFormChange={handleFormChange}
+                                    handleSubmit={handleSubmit}
+                                    onCancel={clearForm}
+                                />
+                                </div>
+                            </SheetContent>
+                        </Sheet>
+                    )}
+                </div>
+
                 {loading && <LoadingSpinner />}
                 {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                 {!loading && !error && (
@@ -114,35 +191,23 @@ const AdminView: React.FC = () => {
                     </div>
                 )}
             </div>
-            <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-r-0">
-                <CardHeader>
-                    <CardTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <Label htmlFor="name">Item Name</Label>
-                            <Input type="text" name="name" id="name" value={formState.name} onChange={handleFormChange} required />
-                        </div>
-                        <div>
-                            <Label htmlFor="price">Price</Label>
-                            <Input type="number" name="price" id="price" value={formState.price} onChange={handleFormChange} required />
-                        </div>
-                        <div>
-                            <Label htmlFor="category">Category</Label>
-                            <Input type="text" name="category" id="category" value={formState.category} onChange={handleFormChange} required />
-                        </div>
-                        <div>
-                            <Label htmlFor="stock">Stock Quantity</Label>
-                            <Input type="number" name="stock" id="stock" value={formState.stock} onChange={handleFormChange} />
-                        </div>
-                        <div className="flex space-x-2 pt-4">
-                            <Button type="submit" className="flex-1 font-bold">{editingItem ? 'Update Item' : 'Add Item'}</Button>
-                            {editingItem && <Button type="button" variant="secondary" onClick={() => { setEditingItem(null); setFormState({ name: '', price: '', category: '', stock: '' }); }}>Cancel</Button>}
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
+            
+            {!isMobile && (
+                <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-r-0">
+                    <CardHeader>
+                        <CardTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                         <AdminForm 
+                            editingItem={editingItem}
+                            formState={formState}
+                            handleFormChange={handleFormChange}
+                            handleSubmit={handleSubmit}
+                            onCancel={clearForm}
+                        />
+                    </CardContent>
+                </Card>
+            )}
 
             {showDeleteConfirm && (
                 <AlertDialog open onOpenChange={() => setShowDeleteConfirm(null)}>
@@ -165,3 +230,5 @@ const AdminView: React.FC = () => {
 };
 
 export default AdminView;
+
+    
