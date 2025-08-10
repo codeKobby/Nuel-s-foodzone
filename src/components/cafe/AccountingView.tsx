@@ -96,7 +96,7 @@ const AccountingView: React.FC = () => {
                 const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
 
                 let cashSales = 0, momoSales = 0;
-                ordersSnapshot.forEach(doc => {
+                ordersSnapshot.docs.forEach(doc => {
                     const order = doc.data() as Order;
                     if (order.paymentStatus === 'Unpaid') return;
                     

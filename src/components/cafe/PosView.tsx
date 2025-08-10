@@ -386,7 +386,7 @@ const PosView: React.FC = () => {
                     onClose={() => setShowOrderOptionsModal(false)}
                     onOrderPlaced={() => {
                         setCurrentOrder({});
-                        setShowOrderOptionsMdal(false);
+                        setShowOrderOptionsModal(false);
                     }}
                 />
             )}
@@ -421,5 +421,3 @@ const PosView: React.FC = () => {
 };
 
 export default PosView;
-
-    
