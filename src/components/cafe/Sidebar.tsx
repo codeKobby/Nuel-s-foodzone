@@ -12,6 +12,7 @@ interface SidebarProps {
     theme: string;
     setTheme: () => void;
     pendingOrdersCount: number;
+    role: 'manager' | 'cashier';
 }
 
 const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: string, setActiveView: (view: string) => void }) => (
@@ -41,21 +42,33 @@ const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: s
     </li>
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, setTheme, pendingOrdersCount }) => {
-    const navItems = [
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, setTheme, pendingOrdersCount, role }) => {
+    const allNavItems = [
         { id: 'pos', icon: Home, label: 'POS' },
         { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
-        { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
-        { id: 'accounting', icon: Scale, label: 'Accounting' },
-        { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
-        { id: 'admin', icon: Settings, label: 'Admin' },
+        { id: 'dashboard', icon: BarChart2, label: 'Dashboard', role: 'manager' },
+        { id: 'accounting', icon: Scale, label: 'Accounting', role: 'manager' },
+        { id: 'misc', icon: Briefcase, label: 'Miscellaneous', role: 'manager' },
+        { id: 'admin', icon: Settings, label: 'Admin', role: 'manager' },
     ];
+
+    const navItems = allNavItems.filter(item => !item.role || item.role === role);
 
     return (
         <TooltipProvider>
             <nav className="hidden md:flex w-20 bg-card border-r border-border flex-col items-center justify-between py-6 shadow-md z-20">
                 <div>
-                    <Image src={logo} alt="Nuel's Food Zone Logo" width={48} height={48} className="mb-10 mx-auto rounded-md shadow-md" />
+                    <Tooltip>
+                         <TooltipTrigger asChild>
+                            <div className='mb-10 mx-auto text-center'>
+                                <Image src={logo} alt="Nuel's Food Zone Logo" width={48} height={48} className="rounded-md shadow-md" />
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                            <p className="capitalize">{role} View</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    
                     <ul className="space-y-4">
                         {navItems.map(item => (
                             <NavItem key={item.id} item={item} activeView={activeView} setActiveView={setActiveView} />
