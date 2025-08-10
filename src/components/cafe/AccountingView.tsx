@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serve
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -39,6 +39,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 interface DailyStats {
@@ -50,6 +51,7 @@ interface DailyStats {
     changeGiven: number;
     changeOwed: number;
     todaysOrders: Order[];
+    itemCounts: Record<string, number>;
 }
 
 const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, color?: string, description?: string }> = ({ icon, title, value, color, description }) => (
@@ -74,7 +76,7 @@ const denominations = [
 ];
 
 const AccountingView: React.FC = () => {
-    const [stats, setStats] = useState<DailyStats>({ totalSales: 0, cashSales: 0, momoSales: 0, miscExpenses: 0, expectedCash: 0, changeGiven: 0, changeOwed: 0, todaysOrders: [] });
+    const [stats, setStats] = useState<DailyStats>({ totalSales: 0, cashSales: 0, momoSales: 0, miscExpenses: 0, expectedCash: 0, changeGiven: 0, changeOwed: 0, todaysOrders: [], itemCounts: {} });
     const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
     const [countedMomo, setCountedMomo] = useState('');
     const [notes, setNotes] = useState('');
@@ -117,9 +119,16 @@ const AccountingView: React.FC = () => {
 
                 let cashSales = 0, momoSales = 0, totalSales = 0, totalChangeGiven = 0, totalChangeOwed = 0;
                 const todaysOrders: Order[] = [];
+                const itemCounts: Record<string, number> = {};
+
                 ordersSnapshot.docs.forEach(doc => {
                     const order = { id: doc.id, ...doc.data() } as Order;
                     todaysOrders.push(order);
+
+                    order.items.forEach(item => {
+                        itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
+                    });
+                    
                     if (order.paymentStatus === 'Unpaid') return;
                     
                     totalSales += order.total;
@@ -145,7 +154,7 @@ const AccountingView: React.FC = () => {
                 
                 const expectedCash = cashSales - totalChangeGiven - miscExpenses;
                 
-                setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, changeGiven: totalChangeGiven, changeOwed: totalChangeOwed, todaysOrders });
+                setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, changeGiven: totalChangeGiven, changeOwed: totalChangeOwed, todaysOrders, itemCounts });
             } catch (e) {
                 console.error(e);
                 setError("Failed to load daily financial data. Check Firestore indexes.");
@@ -225,6 +234,10 @@ const AccountingView: React.FC = () => {
 
         return <Badge variant="default" className={`${colorClass} text-lg ${className}`}>{text}</Badge>;
     }
+    
+    const sortedItemCounts = useMemo(() => {
+        return Object.entries(stats.itemCounts).sort(([, a], [, b]) => b - a);
+    }, [stats.itemCounts]);
     
     if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
 
@@ -339,27 +352,51 @@ const AccountingView: React.FC = () => {
                 <TabsTrigger value="history">History ({reports.length})</TabsTrigger>
               </TabsList>
               <TabsContent value="summary">
-                    <Card className="mt-4">
-                        <CardHeader>
-                            <CardTitle>Today's Financial Summary</CardTitle>
-                            <CardDescription>All financial data since midnight. This is a real-time view.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales (Paid)" value={formatCurrency(stats.totalSales)} />
-                            <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
-                            <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
-                            <StatCard icon={<Coins className="text-green-500"/>} title="Change Given" value={formatCurrency(stats.changeGiven)} description="Cash returned to customers" />
-                            <StatCard icon={<Coins className="text-red-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change to be given" />
-                            <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Settled Misc. Expenses" value={formatCurrency(stats.miscExpenses)} />
-                        </CardContent>
-                        <CardFooter>
-                            <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
-                                <Label className="text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash in Drawer</Label>
-                                <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
-                                <p className="text-xs text-muted-foreground">(Cash Sales - Change Given - Settled Misc. Expenses)</p>
-                            </div>
-                        </CardFooter>
-                    </Card>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+                        <div className="lg:col-span-2">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Today's Financial Summary</CardTitle>
+                                    <CardDescription>All financial data since midnight. This is a real-time view.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales (Paid)" value={formatCurrency(stats.totalSales)} />
+                                    <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
+                                    <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
+                                    <StatCard icon={<Coins className="text-green-500"/>} title="Change Given" value={formatCurrency(stats.changeGiven)} description="Cash returned to customers" />
+                                    <StatCard icon={<Coins className="text-red-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change to be given" />
+                                    <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Settled Misc. Expenses" value={formatCurrency(stats.miscExpenses)} />
+                                </CardContent>
+                                <CardFooter>
+                                    <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
+                                        <Label className="text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash in Drawer</Label>
+                                        <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
+                                        <p className="text-xs text-muted-foreground">(Cash Sales - Change Given - Settled Misc. Expenses)</p>
+                                    </div>
+                                </CardFooter>
+                            </Card>
+                        </div>
+                         <Card>
+                            <CardHeader>
+                                <CardTitle>Today's Item Sales</CardTitle>
+                                <CardDescription>Total count of each item sold today.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-[400px]">
+                                    <div className="space-y-3">
+                                        {sortedItemCounts.length > 0 ? sortedItemCounts.map(([name, count]) => (
+                                            <div key={name} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
+                                                <span className="font-medium">{name}</span>
+                                                <Badge variant="default" className="bg-primary/80">{count} sold</Badge>
+                                            </div>
+                                        )) : (
+                                            <p className="text-muted-foreground text-center italic py-4">No items sold yet today.</p>
+                                        )}
+                                    </div>
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </div>
               </TabsContent>
               <TabsContent value="history">
                   <Card className="mt-4">
