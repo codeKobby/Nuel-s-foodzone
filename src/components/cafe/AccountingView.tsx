@@ -54,7 +54,7 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
 
 const denominations = [
     { name: '200 GHS', value: 200 }, { name: '100 GHS', value: 100 },
-    { name: '50 GHS', value = 50 }, { name: '20 GHS', value: 20 },
+    { name: '50 GHS', value: 50 }, { name: '20 GHS', value: 20 },
     { name: '10 GHS', value: 10 }, { name: '5 GHS', value: 5 },
     { name: '2 GHS', value: 2 }, { name: '1 GHS', value: 1 },
     { name: '50 Pesewas', value: 0.5 },
@@ -108,7 +108,8 @@ const AccountingView: React.FC = () => {
                     if(order.paymentMethod === 'cash') {
                        cashSales += order.amountPaid;
                        totalChangeGiven += order.changeGiven;
-                       if(order.amountPaid >= order.total) {
+                       // Change owed is balanceDue when customer has paid enough
+                       if(order.amountPaid >= order.total && order.balanceDue > 0) {
                            totalChangeOwed += order.balanceDue;
                        }
                     } else if (order.paymentMethod === 'momo') {
