@@ -1,12 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, Lightbulb, UserCheck, Calendar as CalendarIcon, FileWarning, Activity } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -19,9 +19,12 @@ import { addDays, format } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { analyzeBusiness } from '@/ai/flows/analyze-business-flow';
-import { type AnalyzeBusinessInput, type AnalyzeBusinessOutput } from '@/ai/schemas';
 import { ScrollArea } from '../ui/scroll-area';
+import { businessChat } from '@/ai/flows/business-chat-flow';
+import { type BusinessChatInput } from '@/ai/schemas';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
 
 interface DashboardStats {
     totalSales: number;
@@ -33,6 +36,12 @@ interface DashboardStats {
     salesData: { date: string; sales: number }[];
     itemPerformance: { name: string; count: number }[];
 }
+
+interface ChatMessage {
+    role: 'user' | 'model';
+    content: { text: string }[];
+}
+
 
 const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, description?: string }> = ({ icon, title, value, description }) => (
     <Card>
@@ -59,20 +68,31 @@ const DashboardView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [date, setDate] = useState<DateRange | undefined>({ from: addDays(new Date(), -6), to: new Date() });
-    const [aiReport, setAiReport] = useState<AnalyzeBusinessOutput | null>(null);
-    const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+    
+    // AI Chat State
+    const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+    const [chatInput, setChatInput] = useState('');
+    const [isAiReplying, setIsAiReplying] = useState(false);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+
 
     useEffect(() => {
         fetchDashboardData();
     }, [date]);
+    
+     useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [chatHistory]);
+
 
     const fetchDashboardData = async () => {
         if (!date?.from || !date?.to) return;
         setLoading(true);
         setError(null);
         setStats(null);
-        setAiReport(null);
-
+        
         try {
             const startDate = Timestamp.fromDate(date.from);
             const endDate = Timestamp.fromDate(new Date(date.to.getTime() + 86400000)); // Include the whole end day
@@ -155,28 +175,31 @@ const DashboardView: React.FC = () => {
         }
     };
     
-    const handleGenerateReport = async () => {
-        if (!stats) return;
-        setIsGeneratingReport(true);
-        setError(null);
+    const handleSendMessage = async () => {
+        if (!chatInput.trim() || isAiReplying) return;
+
+        const newUserMessage: ChatMessage = { role: 'user', content: [{ text: chatInput }] };
+        const newHistory = [...chatHistory, newUserMessage];
+        setChatHistory(newHistory);
+        setChatInput('');
+        setIsAiReplying(true);
+
         try {
-            const input: AnalyzeBusinessInput = {
-                period: `From ${date?.from ? format(date.from, "PPP") : ''} to ${date?.to ? format(date.to, "PPP") : ''}`,
-                totalSales: stats.totalSales,
-                netSales: stats.netSales,
-                totalOrders: stats.totalOrders,
-                itemPerformance: stats.itemPerformance,
-                cashDiscrepancy: stats.cashDiscrepancy,
+            const input: BusinessChatInput = {
+                history: newHistory.slice(0, -1), // Send history without the latest user message
+                prompt: chatInput,
             };
-            const report = await analyzeBusiness(input);
-            setAiReport(report);
+            const response = await businessChat(input);
+            const newModelMessage: ChatMessage = { role: 'model', content: [{ text: response }] };
+            setChatHistory(prev => [...prev, newModelMessage]);
         } catch (e) {
-            console.error("Error generating AI report:", e);
-            setError("Failed to generate the AI analysis report.");
+            console.error("Error with AI chat:", e);
+            const errorMessage: ChatMessage = { role: 'model', content: [{ text: "Sorry, I encountered an error. Please try again." }] };
+            setChatHistory(prev => [...prev, errorMessage]);
         } finally {
-            setIsGeneratingReport(false);
+            setIsAiReplying(false);
         }
-    }
+    };
 
     const topItems = useMemo(() => stats?.itemPerformance.slice(0, 5) || [], [stats]);
     const bottomItems = useMemo(() => stats && stats.itemPerformance.length > 5 ? stats.itemPerformance.slice(-5).reverse() : [], [stats]);
@@ -225,28 +248,59 @@ const DashboardView: React.FC = () => {
                     <StatCard icon={<AlertCircle className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-red-500"}/>} title="Unpaid Orders" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
                 </div>
                 
-                <Card className="mb-6">
-                     <CardHeader className="flex flex-row items-center justify-between">
-                        <div>
-                            <CardTitle>AI Business Report</CardTitle>
-                            <CardDescription>Get an AI-generated summary of your business performance.</CardDescription>
-                        </div>
-                         <Button onClick={handleGenerateReport} disabled={isGeneratingReport}>
-                            {isGeneratingReport ? <><LoadingSpinner /> Analyzing...</> : <><Sparkles className="mr-2 h-4 w-4" /> Generate Analysis</>}
-                        </Button>
+                 <Card className="mb-6">
+                    <CardHeader>
+                        <CardTitle className="flex items-center"><Sparkles className="mr-2 text-primary" /> AI Business Assistant</CardTitle>
+                        <CardDescription>Ask me anything about your business performance.</CardDescription>
                     </CardHeader>
-                    {aiReport && (
-                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                 <h3 className="text-lg font-semibold flex items-center"><Activity className="mr-2 text-primary"/> Performance Report</h3>
-                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{aiReport.analysis}</p>
+                    <CardContent className="h-[400px] flex flex-col">
+                        <ScrollArea className="flex-grow p-4 border rounded-lg" ref={chatContainerRef}>
+                            <div className="space-y-4">
+                                {chatHistory.map((message, index) => (
+                                    <div key={index} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}>
+                                        {message.role === 'model' && (
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarFallback><Bot /></AvatarFallback>
+                                            </Avatar>
+                                        )}
+                                        <div className={`rounded-lg px-4 py-2 max-w-sm whitespace-pre-wrap ${message.role === 'model' ? 'bg-secondary' : 'bg-primary text-primary-foreground'}`}>
+                                            {message.content[0].text}
+                                        </div>
+                                        {message.role === 'user' && (
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarFallback><User /></AvatarFallback>
+                                            </Avatar>
+                                        )}
+                                    </div>
+                                ))}
+                                {isAiReplying && (
+                                     <div className="flex items-start gap-3">
+                                        <Avatar className="h-8 w-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>
+                                        <div className="rounded-lg px-4 py-2 bg-secondary"><LoadingSpinner /></div>
+                                     </div>
+                                )}
+                                {chatHistory.length === 0 && !isAiReplying && (
+                                    <div className="text-center text-muted-foreground pt-16">
+                                        <p>Ask a question to get started, like:</p>
+                                        <p className="italic font-medium">"What were the top 3 selling items yesterday?"</p>
+                                    </div>
+                                )}
                             </div>
-                            <div className="space-y-2">
-                                <h3 className="text-lg font-semibold flex items-center"><Lightbulb className="mr-2 text-primary"/> Sales Suggestions</h3>
-                                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{aiReport.suggestions}</p>
-                            </div>
-                        </CardContent>
-                    )}
+                        </ScrollArea>
+                        <div className="mt-4 flex gap-2">
+                            <Input
+                                placeholder="Type your question..."
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                disabled={isAiReplying}
+                                className="h-12"
+                            />
+                            <Button onClick={handleSendMessage} disabled={isAiReplying || !chatInput} className="h-12">
+                                <Send />
+                            </Button>
+                        </div>
+                    </CardContent>
                 </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
