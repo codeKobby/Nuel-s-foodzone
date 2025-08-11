@@ -158,9 +158,8 @@ const AccountingView: React.FC = () => {
             let miscExpenses = 0;
             miscSnapshot.forEach(doc => {
                 const expense = doc.data() as MiscExpense;
-                if (expense.settled) {
-                    miscExpenses += expense.amount;
-                }
+                // Cashier reconciliation should account for ALL money spent, not just settled.
+                miscExpenses += expense.amount;
             });
             
             const expectedCash = cashSales - totalChangeGiven - miscExpenses;
@@ -525,3 +524,5 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
+
+    
