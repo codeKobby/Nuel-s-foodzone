@@ -150,7 +150,7 @@ const DashboardView: React.FC = () => {
             ]);
 
             // Process Orders
-            let cashSales = 0, momoSales = 0, unpaidOrdersValue = 0, totalOrders = 0;
+            let totalSales = 0, cashSales = 0, momoSales = 0, unpaidOrdersValue = 0, totalOrders = 0;
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             const salesByDay: Record<string, number> = {};
             
@@ -160,6 +160,10 @@ const DashboardView: React.FC = () => {
             sortedDocs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 totalOrders++;
+
+                if (order.status === 'Completed') {
+                    totalSales += order.total;
+                }
 
                 if (order.paymentStatus === 'Unpaid') {
                     unpaidOrdersValue += order.balanceDue;
@@ -202,7 +206,6 @@ const DashboardView: React.FC = () => {
                 totalMiscExpenses += expense.amount;
             });
             
-            const totalSales = cashSales + momoSales + unpaidOrdersValue;
             const netRevenue = (cashSales + momoSales) - totalMiscExpenses;
             
             const salesData = Object.entries(salesByDay).map(([date, sales]) => ({ date, sales }));
@@ -538,7 +541,7 @@ const DashboardView: React.FC = () => {
                 )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
-                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Cash + MoMo + Unpaid"/>
+                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Completed Orders"/>
                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - All Expenses"/>
                     <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} description="All created orders"/>
                     <StatCard icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Cash Discrepancy" value={formatCurrency(stats.cashDiscrepancy)} description="Sum of cash surplus/deficit" />
@@ -731,5 +734,7 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    
 
     

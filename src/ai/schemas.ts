@@ -1,4 +1,5 @@
 
+
 /**
  * @fileOverview This file contains the Zod schemas and TypeScript types for the AI flows.
  * It is separated from the flow definitions to avoid exporting non-async objects
@@ -10,8 +11,8 @@ import { z } from 'zod';
 // Schemas for the original business analysis flow
 export const AnalyzeBusinessInputSchema = z.object({
   period: z.string().describe('The date range for the analysis period.'),
-  totalSales: z.number().describe('The total sales revenue for the period.'),
-  netSales: z.number().describe('The net sales after deducting expenses.'),
+  totalSales: z.number().describe('The total sales revenue for the period from all completed orders.'),
+  netSales: z.number().describe('The net sales (paid sales - expenses).'),
   totalOrders: z.number().describe('The total number of orders.'),
   itemPerformance: z.array(z.object({
     name: z.string().describe('The name of the menu item.'),
@@ -49,7 +50,7 @@ export const GetBusinessDataInputSchema = z.object({
 export type GetBusinessDataInput = z.infer<typeof GetBusinessDataInputSchema>;
 
 export const GetBusinessDataOutputSchema = z.object({
-  totalSales: z.number(),
+  totalSales: z.number().describe('The total sales revenue for the period from all completed orders.'),
   netSales: z.number(),
   totalOrders: z.number(),
   itemPerformance: z.array(z.object({
@@ -103,3 +104,5 @@ export const DeleteMenuItemInputSchema = z.object({
     name: z.string().describe("The name of the menu item to delete."),
 });
 export type DeleteMenuItemInput = z.infer<typeof DeleteMenuItemInputSchema>;
+
+    

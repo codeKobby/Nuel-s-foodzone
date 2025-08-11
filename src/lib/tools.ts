@@ -29,6 +29,7 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             getDocs(reportsQuery),
         ]);
 
+        let totalSales = 0;
         let cashSales = 0;
         let momoSales = 0;
         let changeOwed = 0;
@@ -39,6 +40,10 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         ordersSnapshot.forEach(doc => {
             const order = doc.data() as Order;
             totalOrders++;
+
+            if (order.status === 'Completed') {
+                totalSales += order.total;
+            }
             
             if (order.paymentStatus === 'Unpaid') {
                 unpaidOrdersValue += order.balanceDue;
@@ -62,8 +67,6 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             });
         });
         
-        const totalSales = cashSales + momoSales + unpaidOrdersValue;
-
         let totalMiscExpenses = 0;
         miscSnapshot.forEach(doc => {
             const expense = doc.data() as MiscExpense;

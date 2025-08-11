@@ -19,7 +19,8 @@ const analysisPrompt = ai.definePrompt({
         Your task is to analyze the provided sales data and generate a performance report and actionable suggestions.
 
         Data for the period: {{period}}
-        - Net Sales: GH₵{{netSales}} (Total Sales: GH₵{{totalSales}})
+        - Total Sales (from completed orders): GH₵{{totalSales}}
+        - Net Revenue (Paid Sales - Expenses): GH₵{{netSales}}
         - Total Orders: {{totalOrders}}
         - Top Selling Items:
         {{#each itemPerformance}}
@@ -56,3 +57,5 @@ const analyzeBusinessFlow = ai.defineFlow(
 export async function analyzeBusiness(input: AnalyzeBusinessInput): Promise<AnalyzeBusinessOutput> {
     return analyzeBusinessFlow(input);
 }
+
+    

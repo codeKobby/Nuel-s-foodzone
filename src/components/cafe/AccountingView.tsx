@@ -132,7 +132,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             
             const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
 
-            let cashSales = 0, momoSales = 0, totalChangeOwed = 0, unpaidOrdersValue = 0;
+            let totalSales = 0, cashSales = 0, momoSales = 0, totalChangeOwed = 0, unpaidOrdersValue = 0;
             const periodOrders: Order[] = [];
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
 
@@ -140,6 +140,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             ordersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 periodOrders.push(order);
+
+                if (order.status === 'Completed') {
+                    totalSales += order.total;
+                }
                 
                 if (order.paymentStatus === 'Unpaid') {
                     unpaidOrdersValue += order.balanceDue;
@@ -172,7 +176,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 miscExpenses += expense.amount;
             });
             
-            const totalSales = cashSales + momoSales + unpaidOrdersValue;
             const netRevenue = totalSales - miscExpenses - unpaidOrdersValue;
             const expectedCash = cashSales - miscExpenses;
             
@@ -203,7 +206,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     }, []);
 
     const handleCountChange = (name: string, value: string) => {
-        setCounts(prev => ({ ...prev, [name]: value.replace(/[^0-9]/g, '') }));
+        setCounts(prev => ({ ...prev, [d.name]: value.replace(/[^0-9]/g, '') }));
     };
     
     const resetForm = () => {
@@ -465,7 +468,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Cash + MoMo + Unpaid"/>
+                                    <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Completed Orders"/>
                                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
                                     <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
                                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Orders" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
@@ -572,3 +575,5 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+    
