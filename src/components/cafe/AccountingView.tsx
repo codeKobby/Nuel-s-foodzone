@@ -131,7 +131,7 @@ const AccountingView: React.FC = () => {
             
             const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
 
-            let cashSales = 0, momoSales = 0, totalSales = 0, totalChangeOwed = 0, unpaidOrdersValue = 0;
+            let cashSales = 0, momoSales = 0, totalChangeOwed = 0, unpaidOrdersValue = 0;
             const periodOrders: Order[] = [];
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
 
@@ -140,12 +140,21 @@ const AccountingView: React.FC = () => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 periodOrders.push(order);
                 
-                if (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') {
+                if (order.paymentStatus === 'Unpaid') {
                     unpaidOrdersValue += order.balanceDue;
+                } else if (order.paymentStatus === 'Partially Paid') {
+                    unpaidOrdersValue += order.balanceDue;
+                    if(order.paymentMethod === 'cash') cashSales += order.amountPaid;
+                    if(order.paymentMethod === 'momo') momoSales += order.amountPaid;
+                } else if (order.paymentStatus === 'Paid') {
+                    if(order.paymentMethod === 'cash') cashSales += order.total;
+                    if(order.paymentMethod === 'momo') momoSales += order.total;
                 }
-                if (order.paymentStatus === 'Unpaid') return;
                 
-                totalSales += order.amountPaid;
+                if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
+                   totalChangeOwed += order.balanceDue;
+                }
+
                 order.items.forEach(item => {
                     const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
                     itemStats[item.name] = {
@@ -153,16 +162,6 @@ const AccountingView: React.FC = () => {
                         totalValue: currentStats.totalValue + (item.quantity * item.price)
                     };
                 });
-
-
-                if (order.paymentMethod === 'cash') {
-                   cashSales += Math.min(order.total, order.amountPaid);
-                   if (order.balanceDue > 0 && order.amountPaid >= order.total) {
-                       totalChangeOwed += order.balanceDue;
-                   }
-                } else if (order.paymentMethod === 'momo') {
-                    momoSales += order.amountPaid;
-                }
             });
 
             let miscExpenses = 0;
@@ -171,8 +170,9 @@ const AccountingView: React.FC = () => {
                 miscExpenses += expense.amount;
             });
             
+            const totalSales = cashSales + momoSales + unpaidOrdersValue;
+            const netRevenue = totalSales - miscExpenses - unpaidOrdersValue;
             const expectedCash = cashSales - miscExpenses;
-            const netRevenue = totalSales - miscExpenses;
             
             setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, netRevenue, changeOwed: totalChangeOwed, unpaidOrdersValue, orders: periodOrders, itemStats });
         } catch (e) {
@@ -433,7 +433,7 @@ const AccountingView: React.FC = () => {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales (Paid)" value={formatCurrency(stats.totalSales)} />
+                                    <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Cash + MoMo + Unpaid"/>
                                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
                                     <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
                                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Orders" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
@@ -444,7 +444,10 @@ const AccountingView: React.FC = () => {
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
                                         <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Net Revenue</Label>
                                         <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.netRevenue)}</p>
-                                        <p className="text-xs text-muted-foreground">(Total Sales - Misc. Expenses)</p>
+                                        <p className="text-xs text-muted-foreground">(Paid Sales - Misc. Expenses)</p>
+                                        {stats.changeOwed > 0 && (
+                                            <p className="text-xs text-red-500 font-semibold mt-1">Remember to keep {formatCurrency(stats.changeOwed)} for change.</p>
+                                        )}
                                     </div>
                                 </CardFooter>
                             </Card>
@@ -537,9 +540,3 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
-
-    
-
-    
-
-    
