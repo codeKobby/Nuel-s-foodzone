@@ -116,11 +116,22 @@ const businessChatFlow = ai.defineFlow(
     },
     async (input) => {
         try {
-            const { output } = await businessChatPrompt(input);
-            return output as string;
+            let response = await businessChatPrompt(input);
+
+            // Handle tool calls if the model requests them
+            while (response.isToolRequest()) {
+                const toolResponse = await response.executeTool();
+                response = await businessChatPrompt(input, {
+                    history: [response.request, toolResponse],
+                });
+            }
+
+            // Return the final text response
+            return response.text;
+
         } catch (error) {
             console.error('Error in business chat flow:', error);
-            // Fallback response
+            // Fallback response in case of any error during the flow
             return "I'm sorry, I encountered an error while processing your request. Please try rephrasing your question about the business performance.";
         }
     }
