@@ -145,8 +145,10 @@ const AccountingView: React.FC = () => {
                 });
 
                 if (order.paymentMethod === 'cash') {
-                   cashSales += order.amountPaid;
+                   // Only count the actual order total as sales, not overpayment for change
+                   cashSales += Math.min(order.total, order.amountPaid);
                    totalChangeGiven += order.changeGiven;
+                   // This defines change owed *to* the customer from a single transaction
                    if (order.balanceDue > 0 && order.amountPaid >= order.total) {
                        totalChangeOwed += order.balanceDue;
                    }
@@ -158,7 +160,7 @@ const AccountingView: React.FC = () => {
             let miscExpenses = 0;
             miscSnapshot.forEach(doc => {
                 const expense = doc.data() as MiscExpense;
-                // Cashier reconciliation should account for ALL money spent, not just settled.
+                // Cashier reconciliation should account for ALL money spent from the drawer
                 miscExpenses += expense.amount;
             });
             
