@@ -267,7 +267,9 @@ const AccountingView: React.FC = () => {
             <DialogContent className="max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>End-of-Day Reconciliation</DialogTitle>
-                    <DialogDescription>Count physical cash and reconcile accounts for today's sales. This action will save a permanent report.</DialogDescription>
+                    <DialogDescription>
+                        Count physical cash and reconcile accounts for today's sales. This action will save a permanent report.
+                    </DialogDescription>
                 </DialogHeader>
                 
                 {!stats ? <LoadingSpinner /> : (
@@ -433,7 +435,7 @@ const AccountingView: React.FC = () => {
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
                                         <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash from Sales</Label>
                                         <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
-                                        <p className="text-xs text-muted-foreground">(Cash - Change Given - Expenses)</p>
+                                        <p className="text-xs text-muted-foreground">(Cash Sales - Change Given - Misc. Expenses)</p>
                                     </div>
                                 </CardFooter>
                             </Card>

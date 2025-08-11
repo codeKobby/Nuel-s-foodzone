@@ -34,6 +34,7 @@ export interface Order {
   balanceDue: number; // For amount owed by customer OR change owed to customer
   status: 'Pending' | 'Completed';
   timestamp: Timestamp;
+  creditSource?: string[]; // Array of simplifiedOrderIds from which credit was used
 }
 
 export interface MiscExpense {

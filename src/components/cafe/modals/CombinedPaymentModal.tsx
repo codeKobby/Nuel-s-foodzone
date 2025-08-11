@@ -29,6 +29,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [creditApplied, setCreditApplied] = useState(0);
+    const [creditSourceOrderIds, setCreditSourceOrderIds] = useState<string[]>([]);
 
     const totalToPayBeforeCredit = useMemo(() => {
         // Only sum up balances owed by the customer, not change owed to them.
@@ -47,11 +48,12 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             if (customerTags.length > 0) {
                 // For simplicity, we use the first tag to find credit. 
                 // A more complex system could handle multiple customers, but this handles the common case.
-                const { creditFound } = await findAndApplyCustomerCredit(customerTags[0]);
+                const { creditFound, creditOrders } = await findAndApplyCustomerCredit(customerTags[0]);
                 // Only apply credit up to the amount needed to pay.
                 const creditToUse = Math.min(creditFound, totalToPayBeforeCredit);
                 if (creditToUse > 0) {
                     setCreditApplied(creditToUse);
+                    setCreditSourceOrderIds(creditOrders.map(o => o.simplifiedId));
                 }
             }
         };
@@ -104,14 +106,21 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 const newAmountPaid = order.amountPaid + amountToPayForOrder;
                 const newPaymentStatus = newAmountPaid >= order.total ? 'Paid' : 'Partially Paid';
                 const newBalanceDue = Math.max(0, order.total - newAmountPaid);
-
-                batch.update(orderRef, {
+                
+                const updateData: any = {
                     // Don't override the original payment method unless it was unpaid
                     paymentMethod: order.paymentMethod === 'Unpaid' ? paymentMethod : order.paymentMethod,
                     paymentStatus: newPaymentStatus,
                     amountPaid: newAmountPaid,
                     balanceDue: newBalanceDue,
-                });
+                };
+                
+                // Add the credit source if credit was used on this payment
+                if (creditSourceOrderIds.length > 0) {
+                    updateData.creditSource = creditSourceOrderIds;
+                }
+
+                batch.update(orderRef, updateData);
 
                 remainingPaid -= amountToPayForOrder;
             }

@@ -56,6 +56,9 @@ const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, r
             {isBalanceOwedByCustomer && <p className="text-right font-bold">Balance Due: {formatCurrency(order.balanceDue)}</p>}
             <p className="text-right">Change Given: {formatCurrency(order.changeGiven)}</p>
             {isChangeOwedToCustomer && <p className="text-right font-bold text-red-600">Change Owed: {formatCurrency(order.balanceDue)}</p>}
+             {(order.creditSource && order.creditSource.length > 0) && (
+                <p className="text-right text-xs">Credit from: {order.creditSource.join(', ')}</p>
+            )}
             <hr className="my-2 border-dashed border-black" />
             <p className="text-center">Thank you!</p>
         </div>
