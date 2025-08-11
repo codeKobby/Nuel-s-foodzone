@@ -285,10 +285,12 @@ const DashboardView: React.FC = () => {
             const input: AnalyzeBusinessInput = {
                 period,
                 totalSales: stats.totalSales,
-                netSales: stats.netRevenue,
+                netRevenue: stats.netRevenue,
                 totalOrders: stats.totalOrders,
+                avgOrderValue: stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0,
                 itemPerformance: stats.itemPerformance.slice(0, 10), // Send top 10 items
                 cashDiscrepancy: stats.cashDiscrepancy,
+                miscExpenses: stats.totalMiscExpenses,
             };
             const result = await analyzeBusiness(input);
             setAnalysisResult(result);
@@ -533,7 +535,7 @@ const DashboardView: React.FC = () => {
                             </DialogHeader>
                             <div className="max-h-[60vh] overflow-y-auto p-1">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content space-y-4">
-                                   {`### Analysis\n${analysisResult.analysis}\n\n### Suggestions\n${analysisResult.suggestions}`}
+                                   {analysisResult.analysis}
                                 </ReactMarkdown>
                             </div>
                         </DialogContent>
@@ -541,7 +543,7 @@ const DashboardView: React.FC = () => {
                 )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
-                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Completed Orders"/>
+                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Revenue from completed orders"/>
                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - All Expenses"/>
                     <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} description="All created orders"/>
                     <StatCard icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Cash Discrepancy" value={formatCurrency(stats.cashDiscrepancy)} description="Sum of cash surplus/deficit" />
@@ -734,7 +736,3 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
-
-    
-
-    

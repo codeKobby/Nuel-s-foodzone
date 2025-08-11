@@ -11,20 +11,22 @@ import { z } from 'zod';
 // Schemas for the original business analysis flow
 export const AnalyzeBusinessInputSchema = z.object({
   period: z.string().describe('The date range for the analysis period.'),
-  totalSales: z.number().describe('The total sales revenue for the period from all completed orders.'),
-  netSales: z.number().describe('The net sales (paid sales - expenses).'),
-  totalOrders: z.number().describe('The total number of orders.'),
+  totalSales: z.number().describe('Revenue from all completed orders.'),
+  netRevenue: z.number().describe('The net revenue (Paid Sales - Misc. Expenses).'),
+  totalOrders: z.number().describe('The total number of orders created.'),
+  avgOrderValue: z.number().describe('The average value of each order (Total Sales / Total Orders).'),
   itemPerformance: z.array(z.object({
     name: z.string().describe('The name of the menu item.'),
     count: z.number().describe('The quantity of this item sold.'),
   })).describe('A list of menu items and their sales counts.'),
   cashDiscrepancy: z.number().describe('The total cash discrepancy (surplus or deficit) from reconciliations.'),
+  miscExpenses: z.number().describe('Total cash paid out for miscellaneous items.'),
 });
 export type AnalyzeBusinessInput = z.infer<typeof AnalyzeBusinessInputSchema>;
 
 export const AnalyzeBusinessOutputSchema = z.object({
-  analysis: z.string().describe("A concise analysis of the business's performance for the period. Analyze the key metrics. Keep it to 2-3 short paragraphs."),
-  suggestions: z.string().describe("Actionable suggestions to boost sales or improve operations. Provide 3-5 bullet points. Each suggestion should be specific and based on the data provided."),
+  analysis: z.string().describe("A detailed analysis of the business's performance for the period, formatted in Markdown. Include an executive summary, a KPI table, item performance analysis, and actionable suggestions. Use bolding for key figures."),
+  suggestions: z.string().describe("A summary of the actionable suggestions provided in the main analysis. This can be a simple bulleted list in plain text."),
 });
 export type AnalyzeBusinessOutput = z.infer<typeof AnalyzeBusinessOutputSchema>;
 
@@ -60,7 +62,7 @@ export const GetBusinessDataOutputSchema = z.object({
   cashDiscrepancy: z.number(),
   cashSales: z.number().describe("Total sales paid with cash."),
   momoSales: z.number().describe("Total sales paid with MoMo/Card."),
-  miscExpenses: z.number().describe("Total amount of settled miscellaneous expenses."),
+  miscExpenses: z.number().describe("Total amount of all miscellaneous expenses."),
   changeOwed: z.number().describe("Total outstanding change owed to customers from cash transactions."),
 });
 export type GetBusinessDataOutput = z.infer<typeof GetBusinessDataOutputSchema>;
@@ -104,5 +106,3 @@ export const DeleteMenuItemInputSchema = z.object({
     name: z.string().describe("The name of the menu item to delete."),
 });
 export type DeleteMenuItemInput = z.infer<typeof DeleteMenuItemInputSchema>;
-
-    

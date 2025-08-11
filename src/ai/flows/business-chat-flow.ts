@@ -74,12 +74,30 @@ const deleteMenuItemTool = ai.defineTool(
 );
 
 
-const businessChatPrompt = ai.definePrompt({
-    name: 'businessChatPrompt',
-    input: { schema: BusinessChatInputSchema },
-    output: { format: 'text' },
-    tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
-    system: `You are an expert business analyst and friendly assistant for a cafe called "Nuel's Food Zone".
+const businessChatFlow = ai.defineFlow(
+    {
+        name: 'businessChatFlow',
+        inputSchema: BusinessChatInputSchema,
+        outputSchema: BusinessChatOutputSchema,
+        cache: {
+            // Cache for 10 minutes to allow for fresh data.
+            ttl: 600, 
+        }
+    },
+    async (input) => {
+        
+        // Determine which model to use based on the prompt
+        const useProModel = /detailed report|in-depth analysis/i.test(input.prompt);
+        const model = useProModel ? 'googleai/gemini-2.5-flash' : 'googleai/gemini-2.0-flash';
+        console.log(`Using model: ${model}`);
+
+        const businessChatPrompt = ai.definePrompt({
+            name: 'businessChatPrompt',
+            input: { schema: BusinessChatInputSchema },
+            output: { format: 'text' },
+            tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
+            model,
+            system: `You are an expert business analyst and friendly assistant for a cafe called "Nuel's Food Zone".
 Your role is to answer questions from the business owner or manager based on sales data, and to help them manage the menu.
 You have access to several tools to help you.
 
@@ -102,20 +120,10 @@ Previous conversation context:
 {{/each}}
 {{/if}}
 `,
-    prompt: `User question: {{prompt}}`
-});
+            prompt: `User question: {{prompt}}`
+        });
 
-const businessChatFlow = ai.defineFlow(
-    {
-        name: 'businessChatFlow',
-        inputSchema: BusinessChatInputSchema,
-        outputSchema: BusinessChatOutputSchema,
-        cache: {
-            // Cache for 10 minutes to allow for fresh data.
-            ttl: 600, 
-        }
-    },
-    async (input) => {
+
         try {
             let response = await businessChatPrompt(input);
 
