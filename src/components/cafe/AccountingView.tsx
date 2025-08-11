@@ -165,7 +165,7 @@ const AccountingView: React.FC = () => {
                 miscExpenses += expense.amount;
             });
             
-            const expectedCash = cashSales - totalChangeGiven - miscExpenses;
+            const expectedCash = cashSales - miscExpenses;
             const netRevenue = totalSales - miscExpenses;
             
             setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, netRevenue, changeGiven: totalChangeGiven, changeOwed: totalChangeOwed, orders: periodOrders, itemCounts });
@@ -341,7 +341,7 @@ const AccountingView: React.FC = () => {
                         <Separator />
                         <div className="pt-2 text-center bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
                              <Label className="text-xl font-bold text-green-700 dark:text-green-300">Cash for Deposit</Label>
-                             <p className="text-3xl md:text-4xl font-extrabold text-green-600 dark:text-green-400 mt-2">{formatCurrency(cashForDeposit)}</p>
+                             <p className="text-3xl md:text-4xl font-extrabold text-green-600 dark:text-green-400">{formatCurrency(cashForDeposit)}</p>
                               {changeSetAside && <p className="text-xs text-muted-foreground mt-1">({formatCurrency(totalCountedCash)} - {formatCurrency(stats.changeOwed)} set aside)</p>}
                         </div>
                      </div>
@@ -528,5 +528,7 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
+
+    
 
     

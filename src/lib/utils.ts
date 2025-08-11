@@ -5,7 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const formatCurrency = (amount: number) => `GH₵${(amount || 0).toFixed(2)}`;
+export const formatCurrency = (amount: number) => {
+    if (isNaN(amount)) {
+        return 'GH₵0.00';
+    }
+    return `GH₵${(amount || 0).toFixed(2)}`;
+};
 
 export const formatTimestamp = (timestamp: any): string => {
   if (!timestamp || !timestamp.toDate) return 'N/A';
@@ -35,3 +40,5 @@ export const generateSimpleOrderId = (count: number): string => {
   const num = (count).toString().padStart(4, '0');
   return `NFZ-${month}${day}-${num}`;
 };
+
+    
