@@ -6,7 +6,7 @@ import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from 'fireb
 import { db } from '@/lib/firebase';
 import type { MenuItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { Edit, Trash2, PlusCircle } from 'lucide-react';
+import { Edit, Trash2, PlusCircle, Search } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,6 +74,7 @@ const AdminView: React.FC = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<MenuItem | null>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const isMobile = useIsMobile();
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         const menuRef = collection(db, "menuItems");
@@ -128,39 +129,54 @@ const AdminView: React.FC = () => {
     };
 
     const groupedMenu = useMemo(() => {
-        const categories = [...new Set(menuItems.map(item => item.category))].sort();
+        const filteredItems = menuItems.filter(item =>
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.category.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        const categories = [...new Set(filteredItems.map(item => item.category))].sort();
         return categories.map(category => ({ 
             category, 
-            items: menuItems.filter(item => item.category === category) 
+            items: filteredItems.filter(item => item.category === category) 
         }));
-    }, [menuItems]);
+    }, [menuItems, searchQuery]);
 
     return (
         <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
             <div className="flex-1 p-4 md:p-6 overflow-y-auto">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                     <h2 className="text-2xl md:text-3xl font-bold">Menu Management</h2>
-                    {isMobile && (
-                        <Sheet open={isSheetOpen} onOpenChange={(open) => { setIsSheetOpen(open); if (!open) clearForm(); }}>
-                            <SheetTrigger asChild>
-                                <Button size="icon"><PlusCircle /></Button>
-                            </SheetTrigger>
-                            <SheetContent side="bottom" className="h-[85vh]">
-                                <SheetHeader>
-                                    <SheetTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</SheetTitle>
-                                </SheetHeader>
-                                <div className="p-4 overflow-y-auto">
-                                <AdminForm 
-                                    editingItem={editingItem}
-                                    formState={formState}
-                                    handleFormChange={handleFormChange}
-                                    handleSubmit={handleSubmit}
-                                    onCancel={clearForm}
-                                />
-                                </div>
-                            </SheetContent>
-                        </Sheet>
-                    )}
+                    <div className="flex gap-2">
+                        <div className="relative flex-grow">
+                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                             <Input 
+                                placeholder="Search menu..." 
+                                className="pl-10"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        {isMobile && (
+                            <Sheet open={isSheetOpen} onOpenChange={(open) => { setIsSheetOpen(open); if (!open) clearForm(); }}>
+                                <SheetTrigger asChild>
+                                    <Button size="icon" className="flex-shrink-0"><PlusCircle /></Button>
+                                </SheetTrigger>
+                                <SheetContent side="bottom" className="h-[85vh]">
+                                    <SheetHeader>
+                                        <SheetTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</SheetTitle>
+                                    </SheetHeader>
+                                    <div className="p-4 overflow-y-auto">
+                                    <AdminForm 
+                                        editingItem={editingItem}
+                                        formState={formState}
+                                        handleFormChange={handleFormChange}
+                                        handleSubmit={handleSubmit}
+                                        onCancel={clearForm}
+                                    />
+                                    </div>
+                                </SheetContent>
+                            </Sheet>
+                        )}
+                    </div>
                 </div>
 
                 {loading && <LoadingSpinner />}
@@ -230,5 +246,3 @@ const AdminView: React.FC = () => {
 };
 
 export default AdminView;
-
-    

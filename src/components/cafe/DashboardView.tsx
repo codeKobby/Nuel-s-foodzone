@@ -33,6 +33,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Sheet,
@@ -67,6 +68,7 @@ interface DashboardStats {
     cashDiscrepancy: number;
     salesData: { date: string; sales: number }[];
     itemPerformance: { name: string; count: number; totalValue: number }[];
+    discrepancyReports: ReconciliationReport[];
 }
 
 interface ChatMessage {
@@ -75,8 +77,8 @@ interface ChatMessage {
 }
 
 
-const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, description?: string }> = ({ icon, title, value, description }) => (
-    <Card>
+const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, description?: string, onClick?: () => void }> = ({ icon, title, value, description, onClick }) => (
+    <Card onClick={onClick} className={onClick ? 'cursor-pointer hover:bg-secondary' : ''}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             {icon}
@@ -116,6 +118,7 @@ const DashboardView: React.FC = () => {
     const isMobile = useIsMobile();
     const [itemSearchQuery, setItemSearchQuery] = useState('');
     const [miscExpenses, setMiscExpenses] = useState<MiscExpense[]>([]);
+    const [isDiscrepancyModalOpen, setIsDiscrepancyModalOpen] = useState(false);
 
 
     const fetchDashboardData = useCallback(async () => {
@@ -194,9 +197,13 @@ const DashboardView: React.FC = () => {
             });
             
             let cashDiscrepancy = 0;
+            const discrepancyReports: ReconciliationReport[] = [];
             reportsSnapshot.forEach(doc => {
-                const report = doc.data() as ReconciliationReport;
+                const report = {id: doc.id, ...doc.data()} as ReconciliationReport;
                 cashDiscrepancy += report.cashDifference;
+                if(report.cashDifference !== 0) {
+                    discrepancyReports.push(report);
+                }
             });
 
             // Get total miscellaneous expenses
@@ -225,6 +232,7 @@ const DashboardView: React.FC = () => {
                 cashDiscrepancy,
                 salesData,
                 itemPerformance,
+                discrepancyReports
             });
 
         } catch (e) {
@@ -542,11 +550,46 @@ const DashboardView: React.FC = () => {
                     </Dialog>
                 )}
 
+                 {isDiscrepancyModalOpen && (
+                    <Dialog open onOpenChange={setIsDiscrepancyModalOpen}>
+                        <DialogContent>
+                             <DialogHeader>
+                                <DialogTitle>Cash Discrepancy Report</DialogTitle>
+                                <DialogDescription>Breakdown of cash surplus/deficit reports for the selected period.</DialogDescription>
+                            </DialogHeader>
+                            <ScrollArea className="h-72 my-4">
+                               <div className="space-y-3 pr-4">
+                                {stats.discrepancyReports.length > 0 ? stats.discrepancyReports.map(report => (
+                                    <div key={report.id} className="p-3 rounded-lg bg-secondary">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="font-semibold">{report.period}</p>
+                                                <p className="text-sm text-muted-foreground">{formatTimestamp(report.timestamp)}</p>
+                                            </div>
+                                             <Badge variant="default" className={report.cashDifference > 0 ? 'bg-blue-500' : 'bg-red-500'}>
+                                                {formatCurrency(report.cashDifference)}
+                                            </Badge>
+                                        </div>
+                                         {report.notes && <p className="text-xs italic mt-2 border-t pt-2">Notes: {report.notes}</p>}
+                                    </div>
+                                )) : <p className="text-muted-foreground text-center italic py-10">No discrepancies recorded in this period.</p>}
+                               </div>
+                            </ScrollArea>
+                        </DialogContent>
+                    </Dialog>
+                )}
+
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
                     <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Revenue from completed orders"/>
                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - All Expenses"/>
                     <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} description="All created orders"/>
-                    <StatCard icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Cash Discrepancy" value={formatCurrency(stats.cashDiscrepancy)} description="Sum of cash surplus/deficit" />
+                    <StatCard 
+                        icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
+                        title="Cash Discrepancy" 
+                        value={formatCurrency(stats.cashDiscrepancy)} 
+                        description="Click to view details"
+                        onClick={() => setIsDiscrepancyModalOpen(true)}
+                    />
                 </div>
                 
                  <Card className="mb-6">
