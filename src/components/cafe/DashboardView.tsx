@@ -144,7 +144,7 @@ const DashboardView: React.FC = () => {
             ]);
 
             // Process Orders
-            let cashSales = 0, momoSales = 0, unpaidOrdersValue = 0, totalOrders = 0;
+            let totalSales = 0, unpaidOrdersValue = 0, totalOrders = 0;
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             const salesByDay: Record<string, number> = {};
             
@@ -158,9 +158,9 @@ const DashboardView: React.FC = () => {
                 if (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') {
                     unpaidOrdersValue += order.balanceDue;
                 }
+                
                 if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                    if (order.paymentMethod === 'cash') cashSales += order.amountPaid;
-                    if (order.paymentMethod === 'momo') momoSales += order.amountPaid;
+                    totalSales += order.amountPaid;
                 }
                 
                 order.items.forEach(item => {
@@ -171,16 +171,14 @@ const DashboardView: React.FC = () => {
                     };
                 });
 
-                if (order.timestamp) {
+                if (order.timestamp && (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid')) {
                     const orderDate = order.timestamp.toDate();
                     const dayKey = format(orderDate, 'MMM d');
-                    if(order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                        salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.amountPaid;
-                    }
+                    salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.amountPaid;
                 }
             });
             
-            // Process Reconciliation Reports
+            // Process Reconciliation Reports for cash discrepancy
             let cashDiscrepancy = 0;
             reportsSnapshot.forEach(doc => {
                 const report = doc.data() as ReconciliationReport;
@@ -189,8 +187,7 @@ const DashboardView: React.FC = () => {
 
             // Get total settled misc expenses from the dedicated listener
             const totalMiscExpenses = miscExpenses.filter(e => e.settled).reduce((sum, e) => sum + e.amount, 0);
-
-            const totalSales = cashSales + momoSales;
+            
             const netSales = totalSales - totalMiscExpenses;
             const salesData = Object.entries(salesByDay).map(([date, sales]) => ({ date, sales }));
             const itemPerformance = Object.entries(itemStats)
@@ -704,5 +701,3 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
-
-    
