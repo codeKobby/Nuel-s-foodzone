@@ -54,6 +54,7 @@ interface PeriodStats {
     momoSales: number;
     miscExpenses: number;
     expectedCash: number;
+    netRevenue: number;
     changeGiven: number;
     changeOwed: number;
     orders: Order[];
@@ -165,8 +166,9 @@ const AccountingView: React.FC = () => {
             });
             
             const expectedCash = cashSales - totalChangeGiven - miscExpenses;
+            const netRevenue = totalSales - miscExpenses;
             
-            setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, changeGiven: totalChangeGiven, changeOwed: totalChangeOwed, orders: periodOrders, itemCounts });
+            setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, netRevenue, changeGiven: totalChangeGiven, changeOwed: totalChangeOwed, orders: periodOrders, itemCounts });
         } catch (e) {
             console.error(e);
             setError("Failed to load financial data for the selected period.");
@@ -434,9 +436,9 @@ const AccountingView: React.FC = () => {
                                 </CardContent>
                                 <CardFooter>
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
-                                        <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Expected Cash from Sales</Label>
-                                        <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.expectedCash)}</p>
-                                        <p className="text-xs text-muted-foreground">(Cash Sales - Change Given - Misc. Expenses)</p>
+                                        <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Net Revenue</Label>
+                                        <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.netRevenue)}</p>
+                                        <p className="text-xs text-muted-foreground">(Total Sales - Misc. Expenses)</p>
                                     </div>
                                 </CardFooter>
                             </Card>
@@ -526,3 +528,5 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
+
+    
