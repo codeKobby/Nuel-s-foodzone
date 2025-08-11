@@ -524,5 +524,3 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
-
-    

@@ -183,24 +183,25 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                     <>
                         <DialogHeader>
                             <DialogTitle>{editingOrder ? 'Update Payment' : 'Complete Payment'}</DialogTitle>
-                            <div className="text-center text-4xl font-bold text-primary py-4">{formatCurrency(total)}</div>
+                            <DialogDescription>Finalize the payment details for this order.</DialogDescription>
+                            <div className="text-center text-4xl font-bold text-primary pt-4">{formatCurrency(total)}</div>
                         </DialogHeader>
                         <div className="space-y-4">
                             {isCreditLoading ? <LoadingSpinner/> : customerCredit > 0 && creditApplied === 0 && (
                                 <Alert variant="default" className="bg-green-50 dark:bg-green-900/20">
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="font-semibold">Available Credit: {formatCurrency(customerCredit)}</p>
-                                        </div>
+                                    <AlertDescription className="flex justify-between items-center">
+                                        <p className="font-semibold">Available Credit: {formatCurrency(customerCredit)}</p>
                                         <Button size="sm" onClick={handleApplyCredit}>Apply Credit</Button>
-                                    </div>
+                                    </AlertDescription>
                                 </Alert>
                             )}
 
                              {creditApplied > 0 && (
                                 <Alert variant="default" className="bg-green-100 dark:bg-green-900/20 border-green-500 text-center">
-                                    <p className="font-bold">{formatCurrency(creditApplied)} credit applied</p>
-                                    <p className="font-bold text-2xl">New Total: {formatCurrency(totalAfterCredit)}</p>
+                                    <AlertDescription>
+                                        <p className="font-bold">{formatCurrency(creditApplied)} credit applied</p>
+                                        <p className="font-bold text-2xl">New Total: {formatCurrency(totalAfterCredit)}</p>
+                                    </AlertDescription>
                                 </Alert>
                             )}
                             
