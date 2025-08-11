@@ -36,9 +36,14 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
     
     const isBalanceOwedByCustomer = (order.paymentStatus === 'Partially Paid' || order.paymentStatus === 'Unpaid') && order.balanceDue > 0;
     const isChangeOwedToCustomer = order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total;
+    
+    const itemSnippet = useMemo(() => {
+        return order.items.map(item => `${item.quantity}x ${item.name}`).join(', ');
+    }, [order.items]);
+
 
     return (
-        <Card className={`flex flex-col justify-between transition hover:shadow-lg ${isSelected ? 'border-primary ring-2 ring-primary' : ''} ${order.status === 'Completed' ? 'bg-secondary/50' : ''}`}>
+        <Card className={`flex flex-col justify-between transition hover:shadow-md ${isSelected ? 'border-primary ring-2 ring-primary' : ''} ${order.status === 'Completed' ? 'bg-secondary/50' : ''}`}>
              <CardHeader className="p-4">
                 <div className="flex justify-between items-start">
                      <div className="flex items-center space-x-3">
@@ -60,8 +65,9 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                 </div>
                  {order.tag && <p className="text-muted-foreground text-sm pt-2 flex items-center"><Tag size={14} className="inline mr-2"/>{order.tag}</p>}
             </CardHeader>
-            <CardContent className="p-4">
-                <p className="text-xl md:text-2xl font-bold text-primary">{formatCurrency(order.total)}</p>
+            <CardContent className="p-4 flex-grow">
+                <p className="text-muted-foreground text-xs truncate" title={itemSnippet}>{itemSnippet}</p>
+                <p className="text-xl md:text-2xl font-bold text-primary mt-2">{formatCurrency(order.total)}</p>
                 {isBalanceOwedByCustomer && 
                     <p className="text-sm text-amber-500 flex items-center">
                         <Hourglass size={14} className="inline mr-2"/>Balance: {formatCurrency(order.balanceDue)}
@@ -74,7 +80,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                 }
                 <p className="text-xs text-muted-foreground mt-2 flex items-center"><CalendarDays size={12} className="inline mr-1.5" />{formatTimestamp(order.timestamp)}</p>
             </CardContent>
-            <CardFooter className="flex space-x-2 p-4">
+            <CardFooter className="flex space-x-2 p-4 mt-auto">
                 <Button onClick={() => onDetailsClick(order)} variant="outline" className="w-full">Details</Button>
                  {order.status === 'Pending' ? (
                     <Button onClick={() => onStatusUpdate(order.id, 'Completed')} className="w-full bg-green-500 hover:bg-green-600 text-white">Complete</Button>
