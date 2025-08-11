@@ -4,7 +4,7 @@
 import React, { useRef } from 'react';
 import type { Order } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer, Pencil } from 'lucide-react';
 import Image from 'next/image';
@@ -108,6 +108,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Order Details - {order.simplifiedId}</DialogTitle>
+                    <DialogDescription>
+                        A printable receipt and summary of the order.
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="max-h-[70vh] overflow-y-auto my-4 rounded-lg border">
                     <Receipt order={order} ref={receiptRef} />

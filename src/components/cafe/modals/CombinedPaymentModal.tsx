@@ -135,7 +135,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 
     return (
         <Dialog open onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-lg animate-fade-in-up">
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Combined Payment</DialogTitle>
                     <DialogDescription>Settle payment for {orders.length} selected orders.</DialogDescription>

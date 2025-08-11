@@ -14,9 +14,7 @@ export async function findAndApplyCustomerCredit(customerTag: string, batch?: Wr
     const ordersRef = collection(db, "orders");
     // Find orders with the same tag that have change due (balanceDue > 0 and was paid by cash)
     const q = query(ordersRef, 
-        where('tag', '==', customerTag),
-        where('paymentMethod', '==', 'cash'),
-        where('balanceDue', '>', 0)
+        where('tag', '==', customerTag)
     );
     const querySnapshot = await getDocs(q);
 
@@ -26,7 +24,7 @@ export async function findAndApplyCustomerCredit(customerTag: string, batch?: Wr
     querySnapshot.forEach(docSnap => {
         const order = { id: docSnap.id, ...docSnap.data() } as Order;
         // Further check to ensure this balance is indeed change owed, not unpaid balance
-        if (order.amountPaid >= order.total) {
+        if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
             creditFound += order.balanceDue;
             creditOrders.push(order);
         }
