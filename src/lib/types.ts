@@ -82,3 +82,8 @@ export interface OrderEditingContextType {
     loadOrderForEditing: (order: Order) => void;
     clearEditingOrder: () => void;
 }
+
+export interface Customer {
+    id: string; // Corresponds to the tag
+    credit: number;
+}

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency } from '@/lib/utils';
 import type { Order } from '@/lib/types';
@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { findAndApplyCustomerCredit } from '@/lib/customer-credit';
+import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 interface CombinedPaymentModalProps {
     orders: Order[];
@@ -28,11 +28,13 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     const [changeGiven, setChangeGiven] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    
+    // Customer Credit State
+    const [customerCredit, setCustomerCredit] = useState<number>(0);
+    const [isCreditLoading, setIsCreditLoading] = useState(false);
     const [creditApplied, setCreditApplied] = useState(0);
-    const [creditSourceOrderIds, setCreditSourceOrderIds] = useState<string[]>([]);
 
     const totalToPayBeforeCredit = useMemo(() => {
-        // Only sum up balances owed by the customer, not change owed to them.
         return orders.reduce((acc, order) => {
             if ((order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') && order.balanceDue > 0) {
                 return acc + order.balanceDue;
@@ -41,25 +43,35 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         }, 0);
     }, [orders]);
     
+    // Use the first tag as the customer identifier for credit purposes
+    const customerTag = useMemo(() => {
+        const tags = [...new Set(orders.map(o => o.tag).filter(Boolean))];
+        return tags.length > 0 ? tags[0] : null;
+    }, [orders]);
+
     useEffect(() => {
-        const applyCredit = async () => {
-            // Find unique customer tags from the selected orders
-            const customerTags = [...new Set(orders.map(o => o.tag).filter(Boolean))];
-            if (customerTags.length > 0) {
-                // For simplicity, we use the first tag to find credit. 
-                // A more complex system could handle multiple customers, but this handles the common case.
-                const { creditFound, creditOrders } = await findAndApplyCustomerCredit(customerTags[0]);
-                // Only apply credit up to the amount needed to pay.
-                const creditToUse = Math.min(creditFound, totalToPayBeforeCredit);
-                if (creditToUse > 0) {
-                    setCreditApplied(creditToUse);
-                    setCreditSourceOrderIds(creditOrders.map(o => o.simplifiedId));
+        const fetchCredit = async () => {
+            if (customerTag) {
+                setIsCreditLoading(true);
+                const customerRef = doc(db, "customers", customerTag);
+                const customerSnap = await getDoc(customerRef);
+                if (customerSnap.exists()) {
+                    setCustomerCredit(customerSnap.data().credit || 0);
+                } else {
+                    setCustomerCredit(0);
                 }
+                setIsCreditLoading(false);
+            } else {
+                setCustomerCredit(0);
             }
         };
-        applyCredit();
-    }, [orders, totalToPayBeforeCredit]);
+        fetchCredit();
+    }, [customerTag]);
 
+    const handleApplyCredit = () => {
+        const creditToApply = Math.min(customerCredit, totalToPayBeforeCredit);
+        setCreditApplied(creditToApply);
+    };
 
     const totalToPay = Math.max(0, totalToPayBeforeCredit - creditApplied);
     const amountPaidNum = parseFloat(cashPaid || '0');
@@ -86,21 +98,18 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         try {
             const batch = writeBatch(db);
 
-            // Apply credit if any was found and used
-            if (creditApplied > 0) {
-                 const customerTags = [...new Set(orders.map(o => o.tag).filter(Boolean))];
-                 await findAndApplyCustomerCredit(customerTags[0], batch, creditApplied);
+            if (creditApplied > 0 && customerTag) {
+                const customerRef = doc(db, "customers", customerTag);
+                const newCreditBalance = customerCredit - creditApplied;
+                batch.update(customerRef, { credit: newCreditBalance });
             }
 
-            // Update the orders being paid for
             let remainingPaid = paymentMethod === 'cash' ? amountPaidNum : totalToPay;
-            
-            // Filter for only orders that actually need payment
             const ordersToPay = orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0);
 
             for (const order of ordersToPay) {
                 const orderRef = doc(db, "orders", order.id);
-                const orderBalance = order.balanceDue; // We already know this is > 0
+                const orderBalance = order.balanceDue;
                 const amountToPayForOrder = Math.min(remainingPaid, orderBalance);
                 
                 const newAmountPaid = order.amountPaid + amountToPayForOrder;
@@ -108,24 +117,16 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 const newBalanceDue = Math.max(0, order.total - newAmountPaid);
                 
                 const updateData: any = {
-                    // Don't override the original payment method unless it was unpaid
                     paymentMethod: order.paymentMethod === 'Unpaid' ? paymentMethod : order.paymentMethod,
                     paymentStatus: newPaymentStatus,
                     amountPaid: newAmountPaid,
                     balanceDue: newBalanceDue,
                 };
-                
-                // Add the credit source if credit was used on this payment
-                if (creditSourceOrderIds.length > 0) {
-                    updateData.creditSource = creditSourceOrderIds;
-                }
 
                 batch.update(orderRef, updateData);
-
                 remainingPaid -= amountToPayForOrder;
             }
             
-            // Distribute change given if any, to the last order that was paid
              if (paymentMethod === 'cash' && changeGivenNum > 0 && ordersToPay.length > 0) {
                 const lastOrder = ordersToPay[ordersToPay.length - 1];
                 const lastOrderRef = doc(db, "orders", lastOrder.id);
@@ -150,7 +151,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     <DialogDescription>Settle payment for {orders.length} selected orders.</DialogDescription>
                 </DialogHeader>
 
-                <ScrollArea className="h-40 my-2 border rounded-md p-3">
+                <ScrollArea className="h-40 my-2 border rounded-md p-3 pr-4">
                     <div className="space-y-2">
                     {orders.map(order => (
                         <div key={order.id} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
@@ -159,24 +160,34 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                                 <p className="text-xs text-muted-foreground">{order.tag || 'No Tag'}</p>
                            </div>
                            <Badge variant={order.balanceDue > 0 ? "secondary" : "default"}>
-                                {formatCurrency(order.balanceDue || order.total)}
+                                {formatCurrency(order.balanceDue > 0 ? order.balanceDue : order.total)}
                            </Badge>
                         </div>
                     ))}
                     </div>
                 </ScrollArea>
                 
+                 <div className="text-center text-4xl font-bold text-primary py-2">{formatCurrency(totalToPayBeforeCredit)}</div>
+                
+                 {isCreditLoading ? <LoadingSpinner/> : customerCredit > 0 && creditApplied === 0 && (
+                    <Alert variant="default" className="bg-green-50 dark:bg-green-900/20">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <p className="font-semibold">Available Credit: {formatCurrency(customerCredit)}</p>
+                            </div>
+                            <Button size="sm" onClick={handleApplyCredit}>Apply Credit</Button>
+                        </div>
+                    </Alert>
+                )}
+
                  {creditApplied > 0 && (
-                    <Alert variant="default" className="bg-green-100 dark:bg-green-900/20 border-green-500">
-                        <AlertDescription>
-                            Applied <span className="font-bold">{formatCurrency(creditApplied)}</span> from customer's previous change.
-                        </AlertDescription>
+                    <Alert variant="default" className="bg-green-100 dark:bg-green-900/20 border-green-500 text-center">
+                        <p className="font-bold">{formatCurrency(creditApplied)} credit applied</p>
+                        <p className="font-bold text-2xl">New Total: {formatCurrency(totalToPay)}</p>
                     </Alert>
                 )}
                 
-                <div className="text-center text-4xl font-bold text-primary py-4">{formatCurrency(totalToPay)}</div>
-                
-                <div className="space-y-4">
+                <div className="space-y-4 pt-2">
                     <div className="flex justify-center space-x-4">
                         <Button onClick={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'secondary'}>Cash</Button>
                         <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'secondary'}>Momo/Card</Button>

@@ -15,8 +15,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { HandCoins } from 'lucide-react';
+import { HandCoins, Wallet } from 'lucide-react';
 import PartialSettleModal from './PartialSettleModal';
+import { addCreditToCustomer } from '@/lib/customer-credit';
 
 interface ChangeDueModalProps {
     orders: Order[];
@@ -26,11 +27,19 @@ interface ChangeDueModalProps {
 
 const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ orders, onClose, onSettle }) => {
     const [settleOrder, setSettleOrder] = useState<Order | null>(null);
+    const [isCrediting, setIsCrediting] = useState<string | null>(null);
 
     const handleSettleSubmit = (orderId: string, amount: number) => {
         onSettle(orderId, amount);
         setSettleOrder(null);
     };
+
+    const handleUseAsCredit = async (order: Order) => {
+        if (!order.tag) return;
+        setIsCrediting(order.id);
+        await addCreditToCustomer(order.tag, order.balanceDue, order.id);
+        setIsCrediting(null);
+    }
 
     return (
         <>
@@ -53,9 +62,22 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ orders, onClose, onSett
                                                 <p className="text-sm text-red-500 font-bold">{formatCurrency(order.balanceDue)} due</p>
                                                 <p className="text-xs text-muted-foreground">{formatTimestamp(order.timestamp)}</p>
                                             </div>
-                                            <Button size="sm" variant="outline" onClick={() => setSettleOrder(order)}>
-                                                <HandCoins className="h-4 w-4 mr-2" /> Settle
-                                            </Button>
+                                            <div className="flex flex-col gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => setSettleOrder(order)}>
+                                                    <HandCoins className="h-4 w-4 mr-2" /> Settle
+                                                </Button>
+                                                {order.tag && (
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="secondary" 
+                                                        onClick={() => handleUseAsCredit(order)} 
+                                                        disabled={isCrediting === order.id}
+                                                    >
+                                                        <Wallet className="h-4 w-4 mr-2" /> 
+                                                        {isCrediting === order.id ? 'Crediting...' : 'Use as Credit'}
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     </Card>
                                 ))

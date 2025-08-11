@@ -446,7 +446,7 @@ const AccountingView: React.FC = () => {
                                 <CardDescription>Total count of each item sold.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <ScrollArea className="h-[350px] md:h-[400px]">
+                                <ScrollArea className="h-[350px] md:h-[400px] pr-4">
                                     <div className="space-y-3">
                                         {sortedItemCounts.length > 0 ? sortedItemCounts.map(([name, count]) => (
                                             <div key={name} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
@@ -469,7 +469,7 @@ const AccountingView: React.FC = () => {
                           <CardTitle>Reconciliation History</CardTitle>
                           <CardDescription>Review past end-of-day reports.</CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-3 max-h-[500px] overflow-y-auto">
+                      <CardContent className="space-y-3 max-h-[500px] overflow-y-auto pr-4">
                         {reports.length === 0 && <p className="text-muted-foreground italic text-center py-4">No reports saved yet.</p>}
                         {reports.map(report => (
                             <div key={report.id} className="p-3 rounded-lg bg-secondary">
@@ -525,5 +525,3 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
-
-    

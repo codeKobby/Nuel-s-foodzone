@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, addDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, addDoc, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport, ChatSession, AnalyzeBusinessOutput } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -95,6 +95,7 @@ const chartConfig = {
 
 const DashboardView: React.FC = () => {
     const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [miscExpenses, setMiscExpenses] = useState<MiscExpense[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [date, setDate] = useState<DateRange | undefined>({ from: addDays(new Date(), -6), to: new Date() });
@@ -128,15 +129,11 @@ const DashboardView: React.FC = () => {
             const ordersRef = collection(db, "orders");
             const ordersQuery = query(ordersRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate));
             
-            const miscExpensesRef = collection(db, "miscExpenses");
-            const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate));
-            
             const reconciliationReportsRef = collection(db, "reconciliationReports");
             const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate));
 
-            const [ordersSnapshot, miscSnapshot, reportsSnapshot] = await Promise.all([
+            const [ordersSnapshot, reportsSnapshot] = await Promise.all([
                 getDocs(ordersQuery),
-                getDocs(miscQuery),
                 getDocs(reportsQuery),
             ]);
 
@@ -168,13 +165,6 @@ const DashboardView: React.FC = () => {
                     salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.amountPaid;
                 }
             });
-
-            // Process Misc Expenses
-            let totalMiscExpenses = 0;
-            miscSnapshot.forEach(doc => {
-                const expense = doc.data() as MiscExpense;
-                if (expense.settled) totalMiscExpenses += expense.amount;
-            });
             
             // Process Reconciliation Reports
             let cashDiscrepancy = 0;
@@ -182,6 +172,9 @@ const DashboardView: React.FC = () => {
                 const report = doc.data() as ReconciliationReport;
                 cashDiscrepancy += report.cashDifference;
             });
+
+            // Get total settled misc expenses from the dedicated listener
+            const totalMiscExpenses = miscExpenses.filter(e => e.settled).reduce((sum, e) => sum + e.amount, 0);
 
             const netSales = totalSales - totalMiscExpenses;
             const salesData = Object.entries(salesByDay).map(([date, sales]) => ({ date, sales }));
@@ -204,9 +197,23 @@ const DashboardView: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [date]);
+    }, [date, miscExpenses]);
     
      useEffect(() => {
+        // Listener for all miscellaneous expenses
+        const miscExpensesRef = collection(db, "miscExpenses");
+        const q = query(miscExpensesRef, orderBy('timestamp', 'desc'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setMiscExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MiscExpense)));
+        }, (err) => {
+            console.error(err);
+            setError("Failed to load miscellaneous expenses.");
+        });
+
+        return () => unsubscribe();
+    }, []);
+    
+    useEffect(() => {
         fetchDashboardData();
     }, [fetchDashboardData]);
     
@@ -256,6 +263,16 @@ const DashboardView: React.FC = () => {
             setIsAnalysisLoading(false);
         }
     }
+
+    const handleSettleExpense = async (expenseId: string) => {
+        try {
+            const expenseRef = doc(db, "miscExpenses", expenseId);
+            await updateDoc(expenseRef, { settled: true });
+        } catch (e) {
+            console.error("Error settling expense:", e);
+            setError("Failed to settle the expense.");
+        }
+    };
     
     const handleSendMessage = async () => {
         if (!chatInput.trim() || isAiReplying) return;
@@ -520,7 +537,7 @@ const DashboardView: React.FC = () => {
                             <CardDescription>Top and bottom selling items for the period.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                           <ScrollArea className="h-[250px] md:h-[300px]">
+                           <ScrollArea className="h-[250px] md:h-[300px] pr-4">
                                 <div className="space-y-4">
                                 <div>
                                     <h4 className="font-semibold text-green-600 mb-2 flex items-center"><TrendingUp className="mr-2" /> Top 5 Items</h4>
@@ -532,6 +549,35 @@ const DashboardView: React.FC = () => {
                                 </div>}
                                 </div>
                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                     <Card className="lg:col-span-5">
+                        <CardHeader>
+                            <CardTitle className="flex items-center"><Briefcase className="mr-2"/> Unsettled Miscellaneous Expenses</CardTitle>
+                            <CardDescription>Review and settle expenses recorded by cashiers.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ScrollArea className="h-64 pr-4">
+                                <div className="space-y-2">
+                                    {miscExpenses.filter(e => !e.settled).length > 0 ? (
+                                        miscExpenses.filter(e => !e.settled).map(expense => (
+                                            <div key={expense.id} className="flex justify-between items-center p-3 bg-secondary rounded-md">
+                                                <div>
+                                                    <p className="font-semibold">{expense.purpose}</p>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        {formatCurrency(expense.amount)} - <span className="text-xs">{formatTimestamp(expense.timestamp)}</span>
+                                                    </p>
+                                                </div>
+                                                <Button size="sm" variant="outline" onClick={() => handleSettleExpense(expense.id)}>
+                                                    <Check className="mr-2 h-4 w-4" /> Settle
+                                                </Button>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-center text-muted-foreground italic py-8">No unsettled expenses.</p>
+                                    )}
+                                </div>
+                            </ScrollArea>
                         </CardContent>
                     </Card>
                 </div>
@@ -593,5 +639,3 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
-
-    
