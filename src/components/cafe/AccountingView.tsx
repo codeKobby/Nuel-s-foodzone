@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serve
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass, ShoppingCart } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -82,7 +82,7 @@ const denominations = [
     { name: '50 Pesewas', value: 0.5 },
 ];
 
-const AccountingView: React.FC = () => {
+const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setActiveView}) => {
     const [stats, setStats] = useState<PeriodStats | null>(null);
     const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
     const [countedMomo, setCountedMomo] = useState('');
@@ -95,6 +95,7 @@ const AccountingView: React.FC = () => {
     const [showConfirm, setShowConfirm] = useState(false);
     const [isCloseOutOpen, setIsCloseOutOpen] = useState(false);
     const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
+    const [showUnpaidOrdersWarning, setShowUnpaidOrdersWarning] = useState(false);
     const [date, setDate] = useState<DateRange | undefined>({ from: new Date(), to: new Date() });
     const isMobile = useIsMobile();
 
@@ -144,14 +145,15 @@ const AccountingView: React.FC = () => {
                     unpaidOrdersValue += order.balanceDue;
                 } else if (order.paymentStatus === 'Partially Paid') {
                     unpaidOrdersValue += order.balanceDue;
-                    if(order.paymentMethod === 'cash') cashSales += order.amountPaid;
-                    if(order.paymentMethod === 'momo') momoSales += order.amountPaid;
+                    const paidAmount = order.amountPaid - (order.total - order.balanceDue);
+                    if(order.paymentMethod === 'cash') cashSales += paidAmount;
+                    if(order.paymentMethod === 'momo') momoSales += paidAmount;
                 } else if (order.paymentStatus === 'Paid') {
-                    if(order.paymentMethod === 'cash') cashSales += order.total;
+                    if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
                     if(order.paymentMethod === 'momo') momoSales += order.total;
                 }
                 
-                if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
+                if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid > order.total) {
                    totalChangeOwed += order.balanceDue;
                 }
 
@@ -268,11 +270,16 @@ const AccountingView: React.FC = () => {
         return Object.entries(stats.itemStats).sort(([, a], [, b]) => b.count - a.count);
     }, [stats]);
     
+    const handleStartEndOfDay = () => {
+        if (stats && stats.unpaidOrdersValue > 0) {
+            setShowUnpaidOrdersWarning(true);
+        } else {
+            setIsCloseOutOpen(true);
+        }
+    };
+    
     const CloseOutDialog = (
         <Dialog open={isCloseOutOpen} onOpenChange={setIsCloseOutOpen}>
-            <DialogTrigger asChild>
-                 <Button className="w-full md:w-auto"><FileCheck className="mr-2" /> Start End-of-Day</Button>
-            </DialogTrigger>
             <DialogContent className="max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>End-of-Day Reconciliation</DialogTitle>
@@ -400,9 +407,34 @@ const AccountingView: React.FC = () => {
                         />
                         </PopoverContent>
                     </Popover>
-                    {CloseOutDialog}
+                    <Button onClick={handleStartEndOfDay} className="w-full md:w-auto"><FileCheck className="mr-2" /> Start End-of-Day</Button>
                 </div>
             </div>
+            
+            {CloseOutDialog}
+            
+            {stats && showUnpaidOrdersWarning && (
+                <AlertDialog open onOpenChange={setShowUnpaidOrdersWarning}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Unpaid Orders Found</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                There are {stats.orders.filter(o => o.paymentStatus !== 'Paid').length} unpaid or partially paid orders totaling {formatCurrency(stats.unpaidOrdersValue)}.
+                                It's recommended to resolve these before closing the day.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                             <Button variant="secondary" onClick={() => { setShowUnpaidOrdersWarning(false); setIsCloseOutOpen(true); }}>
+                                Proceed Anyway
+                            </Button>
+                             <AlertDialogAction onClick={() => { setShowUnpaidOrdersWarning(false); setActiveView('orders'); }}>
+                                <ShoppingCart className="mr-2 h-4 w-4"/> Go to Orders
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
             
             {stats && isAdvancedModalOpen && (
                 <AdvancedReconciliationModal

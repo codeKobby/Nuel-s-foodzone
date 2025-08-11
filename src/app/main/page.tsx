@@ -216,7 +216,7 @@ function CafePage() {
             case 'pos': return role === 'cashier' ? <PosView setActiveView={setActiveView} /> : null;
             case 'orders': return role === 'cashier' ? <OrdersView setActiveView={setActiveView} /> : null;
             case 'dashboard': return role === 'manager' ? <DashboardView /> : null;
-            case 'accounting': return role === 'cashier' ? <AccountingView /> : null;
+            case 'accounting': return role === 'cashier' ? <AccountingView setActiveView={setActiveView}/> : null;
             case 'misc': return role === 'cashier' ? <MiscView /> : null;
             case 'admin': return role === 'manager' ? <AdminView /> : null;
             default: return null;
