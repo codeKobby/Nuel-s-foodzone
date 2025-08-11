@@ -2,9 +2,11 @@
 "use client";
 
 import Image from 'next/image';
-import { Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase, Scale } from 'lucide-react';
+import { Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase, Scale, LogOut } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import logo from '@/app/logo.png';
+import { useRouter } from 'next/navigation';
+import { Separator } from '../ui/separator';
 
 interface SidebarProps {
     activeView: string;
@@ -43,6 +45,11 @@ const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: s
 );
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, setTheme, pendingOrdersCount, role }) => {
+    const router = useRouter();
+
+    const handleLogout = () => {
+        router.push('/');
+    };
     
     const navItemsConfig = {
         manager: [
@@ -62,10 +69,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
     return (
         <TooltipProvider>
             <nav className="hidden md:flex w-20 bg-card border-r border-border flex-col items-center justify-between py-6 z-20">
-                <div>
+                <div className="flex flex-col items-center gap-10">
                     <Tooltip>
                          <TooltipTrigger asChild>
-                            <div className='mb-10 mx-auto text-center'>
+                            <div className='mx-auto text-center'>
                                 <Image src={logo} alt="Nuel's Food Zone Logo" width={48} height={48} className="rounded-md" />
                             </div>
                         </TooltipTrigger>
@@ -80,16 +87,29 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
                         ))}
                     </ul>
                 </div>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <button onClick={setTheme} className="w-14 h-14 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-primary">
-                            {theme === 'light' ? <Moon size={24} /> : <Sun size={24} />}
-                        </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                        <p>Toggle {theme === 'light' ? 'Dark' : 'Light'} Mode</p>
-                    </TooltipContent>
-                </Tooltip>
+                <div className="flex flex-col items-center gap-2">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button onClick={setTheme} className="w-14 h-14 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-primary">
+                                {theme === 'light' ? <Moon size={24} /> : <Sun size={24} />}
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                            <p>Toggle {theme === 'light' ? 'Dark' : 'Light'} Mode</p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Separator className="w-10" />
+                     <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button onClick={handleLogout} className="w-14 h-14 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-500/10">
+                                <LogOut size={24} />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                            <p>Logout</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </div>
             </nav>
         </TooltipProvider>
     );

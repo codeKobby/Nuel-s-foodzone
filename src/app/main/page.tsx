@@ -7,7 +7,7 @@ import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Menu } from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/app/logo.png';
 
@@ -23,6 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Separator } from '@/components/ui/separator';
 
 const MobileNav = ({
     activeView,
@@ -30,7 +31,8 @@ const MobileNav = ({
     theme,
     setTheme,
     pendingOrdersCount,
-    role
+    role,
+    onLogout
 }: {
     activeView: string;
     setActiveView: (view: string) => void;
@@ -38,6 +40,7 @@ const MobileNav = ({
     setTheme: () => void;
     pendingOrdersCount: number;
     role: 'manager' | 'cashier';
+    onLogout: () => void;
 }) => {
     const [isOpen, setIsOpen] = useState(false);
 
@@ -72,7 +75,7 @@ const MobileNav = ({
                     <Button variant="ghost" size="icon"><Menu /></Button>
                 </SheetTrigger>
             </div>
-            <SheetContent side="left" className="w-64 p-0">
+            <SheetContent side="left" className="w-64 p-0 flex flex-col">
                 <SheetHeader className="p-4 border-b">
                     <SheetTitle className="flex items-center gap-2">
                         <Image src={logo} alt="Nuel's Food Zone Logo" width={32} height={32} className="rounded-md" />
@@ -82,7 +85,7 @@ const MobileNav = ({
                         </div>
                     </SheetTitle>
                 </SheetHeader>
-                 <div className="p-4">
+                 <div className="p-4 flex-grow">
                     <ul className="space-y-2">
                         {navItems.map(item => (
                             <li key={item.id}>
@@ -103,10 +106,15 @@ const MobileNav = ({
                         ))}
                     </ul>
                 </div>
-                <div className="absolute bottom-0 w-full p-4 border-t">
-                     <Button onClick={setTheme} variant="ghost" className="w-full justify-start text-base">
+                <div className="p-4 border-t mt-auto">
+                     <Button onClick={setTheme} variant="ghost" className="w-full justify-start text-base mb-2">
                         {theme === 'light' ? <Moon className="mr-3 h-5 w-5" /> : <Sun className="mr-3 h-5 w-5" />}
                         Toggle Theme
+                    </Button>
+                    <Separator />
+                     <Button onClick={onLogout} variant="ghost" className="w-full justify-start text-base text-red-500 hover:bg-red-500/10 hover:text-red-500 mt-2">
+                        <LogOut className="mr-3 h-5 w-5" />
+                        Logout
                     </Button>
                 </div>
             </SheetContent>
@@ -185,6 +193,10 @@ function CafePage() {
         localStorage.setItem('theme', newTheme);
         setTheme(newTheme);
     };
+
+    const handleLogout = () => {
+        router.push('/');
+    };
     
     useEffect(() => {
         if (!isAuthReady || !db) return;
@@ -256,6 +268,7 @@ function CafePage() {
                 setTheme={toggleTheme}
                 pendingOrdersCount={pendingOrdersCount}
                 role={role}
+                onLogout={handleLogout}
             />
             <main className="flex-1 flex flex-col overflow-hidden">
                 {renderActiveView()}
