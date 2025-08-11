@@ -76,10 +76,7 @@ const deleteMenuItemTool = ai.defineTool(
 
 const businessChatPrompt = ai.definePrompt({
     name: 'businessChatPrompt',
-    input: { schema: z.object({
-        prompt: z.string(),
-        historyContext: z.string().optional()
-    }) },
+    input: { schema: BusinessChatInputSchema },
     output: { format: 'text' },
     tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
     system: `You are an expert business analyst and friendly assistant for a cafe called "Nuel's Food Zone".
@@ -96,10 +93,12 @@ You have access to several tools to help you.
 - When you receive data or a confirmation message from a tool, analyze it and present the key information to the user in a clear, friendly, and concise way.
 - If the tool returns no data (e.g., zero sales), state that clearly to the user. Do not invent data.
 - If the user's question is unclear, ask for clarification.
-{{#if historyContext}}
+{{#if history}}
 
 Previous conversation context:
-{{historyContext}}
+{{#each history}}
+- {{role}}: {{content}}
+{{/each}}
 {{/if}}
 `,
     prompt: `User question: {{prompt}}`
@@ -110,33 +109,14 @@ const businessChatFlow = ai.defineFlow(
         name: 'businessChatFlow',
         inputSchema: BusinessChatInputSchema,
         outputSchema: BusinessChatOutputSchema,
+        cache: {
+            // Cache for 10 minutes to allow for fresh data.
+            ttl: 600, 
+        }
     },
     async (input) => {
         try {
-            // Convert history to a simple string context instead of Message objects
-            let historyContext = '';
-            if (input.history && input.history.length > 0) {
-                historyContext = input.history.map((msg: any) => {
-                    const role = msg.role || 'user';
-                    let content = '';
-                    
-                    if (typeof msg.content === 'string') {
-                        content = msg.content;
-                    } else if (Array.isArray(msg.content)) {
-                        content = msg.content.map((c: any) => c.text || '').join(' ');
-                    } else if (msg.content && typeof msg.content === 'object') {
-                        content = msg.content.text || '';
-                    }
-                    
-                    return `${role}: ${content}`;
-                }).join('\n');
-            }
-
-            const { output } = await businessChatPrompt({
-                prompt: input.prompt,
-                historyContext: historyContext || undefined
-            });
-            
+            const { output } = await businessChatPrompt(input);
             return output as string;
         } catch (error) {
             console.error('Error in business chat flow:', error);

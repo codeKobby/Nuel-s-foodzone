@@ -73,7 +73,7 @@ interface ChatMessage {
 
 
 const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, description?: string }> = ({ icon, title, value, description }) => (
-    <Card>
+    <Card className="shadow-none">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             {icon}
@@ -125,7 +125,6 @@ const DashboardView: React.FC = () => {
             const endDate = Timestamp.fromDate(new Date(date.to.getTime() + 86400000)); // Include the whole end day
 
             const ordersRef = collection(db, "orders");
-            // Removed orderBy from here to prevent needing a composite index. We will sort client-side.
             const ordersQuery = query(ordersRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate));
             
             const miscExpensesRef = collection(db, "miscExpenses");
@@ -145,7 +144,6 @@ const DashboardView: React.FC = () => {
             const itemCounts: Record<string, number> = {};
             const salesByDay: Record<string, number> = {};
             
-            // Sort documents by timestamp client-side
             const sortedDocs = ordersSnapshot.docs.sort((a, b) => a.data().timestamp.toMillis() - b.data().timestamp.toMillis());
 
 
@@ -275,7 +273,7 @@ const DashboardView: React.FC = () => {
             const newSessionRef = await addDoc(collection(db, "chatSessions"), {
                 title: currentInput.substring(0, 40),
                 timestamp: Timestamp.now(),
-                messages: [newUserMessage]
+                messages: newHistory.slice(0, -1), // Save history up to the user message
             });
             sessionId = newSessionRef.id;
             setActiveChatSessionId(sessionId);
@@ -283,7 +281,7 @@ const DashboardView: React.FC = () => {
 
         try {
             const input: BusinessChatInput = {
-                history: newHistory.slice(0, -1),
+                history: newHistory.slice(0, -1), // Pass previous messages for context
                 prompt: currentInput,
             };
             const response = await businessChat(input);
@@ -366,7 +364,7 @@ const DashboardView: React.FC = () => {
                     )}
                 </div>
             </ScrollArea>
-            <div className="flex-shrink-0 p-4 border-t flex gap-2">
+            <div className="flex-shrink-0 p-4 border-t bg-background flex gap-2">
                 <Input
                     placeholder="Type your question..."
                     value={chatInput}
@@ -489,7 +487,7 @@ const DashboardView: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                    <Card className="lg:col-span-3">
+                    <Card className="lg:col-span-3 shadow-none">
                         <CardHeader>
                             <CardTitle>Sales Trend</CardTitle>
                         </CardHeader>
@@ -515,7 +513,7 @@ const DashboardView: React.FC = () => {
                             </ChartContainer>
                         </CardContent>
                     </Card>
-                     <Card className="lg:col-span-2">
+                     <Card className="lg:col-span-2 shadow-none">
                         <CardHeader>
                             <CardTitle>Item Performance</CardTitle>
                             <CardDescription>Top and bottom selling items for the period.</CardDescription>
@@ -541,7 +539,7 @@ const DashboardView: React.FC = () => {
             
             <Sheet open={isChatSheetOpen} onOpenChange={setIsChatSheetOpen}>
                 <SheetTrigger asChild>
-                     <Button className="fixed bottom-6 right-6 h-16 w-16 rounded-full z-20">
+                     <Button className="fixed bottom-6 right-6 h-16 w-16 rounded-full z-20 shadow-lg">
                         <Sparkles className="h-8 w-8" />
                     </Button>
                 </SheetTrigger>

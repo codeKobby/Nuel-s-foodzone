@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { getFirestore, Firestore }from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,7 +16,7 @@ let auth: Auth;
 let db: Firestore;
 
 // This check is to prevent crashing during server-side rendering or in environments where env vars are not set.
-if (firebaseConfig.apiKey) {
+if (firebaseConfig.apiKey && firebaseConfig.projectId) {
     if (!getApps().length) {
         app = initializeApp(firebaseConfig);
     } else {
@@ -25,7 +25,9 @@ if (firebaseConfig.apiKey) {
     auth = getAuth(app);
     db = getFirestore(app);
 } else {
-    console.warn("Firebase configuration is missing. Firebase services will be disabled.");
+    console.warn("Firebase configuration is missing or incomplete. Firebase services will be disabled.");
+    // Assign null or mock objects if needed to prevent runtime errors elsewhere
+    // For this app, we'll let them be undefined and handle it in components.
 }
 
 export { app, db, auth };

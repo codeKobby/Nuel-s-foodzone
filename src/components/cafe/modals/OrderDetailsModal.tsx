@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import Image from 'next/image';
+import logo from '@/app/logo.png';
 
 interface OrderDetailsModalProps {
     order: Order;
@@ -21,7 +22,7 @@ const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, r
     return (
         <div ref={ref} className="receipt p-4 bg-white text-black font-mono">
             <div className="text-center">
-                <Image src="/logo.png" alt="Logo" width={60} height={60} className="mx-auto rounded-md" />
+                <Image src={logo} alt="Logo" width={60} height={60} className="mx-auto rounded-md" />
                 <h3 className="font-bold">Nuel's Food Zone</h3>
             </div>
             <hr className="my-2 border-dashed border-black" />
