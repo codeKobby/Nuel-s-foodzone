@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serve
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -55,10 +55,10 @@ interface PeriodStats {
     miscExpenses: number;
     expectedCash: number;
     netRevenue: number;
-    changeGiven: number;
     changeOwed: number;
+    unpaidOrdersValue: number;
     orders: Order[];
-    itemCounts: Record<string, number>;
+    itemStats: Record<string, { count: number; totalValue: number }>;
 }
 
 const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, color?: string, description?: string }> = ({ icon, title, value, color, description }) => (
@@ -131,25 +131,32 @@ const AccountingView: React.FC = () => {
             
             const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
 
-            let cashSales = 0, momoSales = 0, totalSales = 0, totalChangeGiven = 0, totalChangeOwed = 0;
+            let cashSales = 0, momoSales = 0, totalSales = 0, totalChangeOwed = 0, unpaidOrdersValue = 0;
             const periodOrders: Order[] = [];
-            const itemCounts: Record<string, number> = {};
+            const itemStats: Record<string, { count: number; totalValue: number }> = {};
+
 
             ordersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 periodOrders.push(order);
+                
+                if (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') {
+                    unpaidOrdersValue += order.balanceDue;
+                }
                 if (order.paymentStatus === 'Unpaid') return;
                 
                 totalSales += order.amountPaid;
                 order.items.forEach(item => {
-                    itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
+                    const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                    itemStats[item.name] = {
+                        count: currentStats.count + item.quantity,
+                        totalValue: currentStats.totalValue + (item.quantity * item.price)
+                    };
                 });
 
+
                 if (order.paymentMethod === 'cash') {
-                   // Only count the actual order total as sales, not overpayment for change
                    cashSales += Math.min(order.total, order.amountPaid);
-                   totalChangeGiven += order.changeGiven;
-                   // This defines change owed *to* the customer from a single transaction
                    if (order.balanceDue > 0 && order.amountPaid >= order.total) {
                        totalChangeOwed += order.balanceDue;
                    }
@@ -161,14 +168,13 @@ const AccountingView: React.FC = () => {
             let miscExpenses = 0;
             miscSnapshot.forEach(doc => {
                 const expense = doc.data() as MiscExpense;
-                // Cashier reconciliation should account for ALL money spent from the drawer
                 miscExpenses += expense.amount;
             });
             
             const expectedCash = cashSales - miscExpenses;
             const netRevenue = totalSales - miscExpenses;
             
-            setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, netRevenue, changeGiven: totalChangeGiven, changeOwed: totalChangeOwed, orders: periodOrders, itemCounts });
+            setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, netRevenue, changeOwed: totalChangeOwed, unpaidOrdersValue, orders: periodOrders, itemStats });
         } catch (e) {
             console.error(e);
             setError("Failed to load financial data for the selected period.");
@@ -257,9 +263,9 @@ const AccountingView: React.FC = () => {
         return <Badge variant="default" className={`${colorClass} text-base ${className}`}>{text}</Badge>;
     }
     
-    const sortedItemCounts = useMemo(() => {
+    const sortedItemStats = useMemo(() => {
         if (!stats) return [];
-        return Object.entries(stats.itemCounts).sort(([, a], [, b]) => b - a);
+        return Object.entries(stats.itemStats).sort(([, a], [, b]) => b.count - a.count);
     }, [stats]);
     
     const CloseOutDialog = (
@@ -430,7 +436,7 @@ const AccountingView: React.FC = () => {
                                     <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales (Paid)" value={formatCurrency(stats.totalSales)} />
                                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
                                     <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
-                                    <StatCard icon={<Coins className="text-green-500"/>} title="Change Given" value={formatCurrency(stats.changeGiven)} description="Cash returned" />
+                                    <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Orders" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
                                     <StatCard icon={<Coins className="text-red-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change" />
                                     <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.miscExpenses)} />
                                 </CardContent>
@@ -446,15 +452,18 @@ const AccountingView: React.FC = () => {
                          <Card>
                             <CardHeader>
                                 <CardTitle>Item Sales</CardTitle>
-                                <CardDescription>Total count of each item sold.</CardDescription>
+                                <CardDescription>Total count and value of each item sold.</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <ScrollArea className="h-[350px] md:h-[400px] pr-4">
                                     <div className="space-y-3">
-                                        {sortedItemCounts.length > 0 ? sortedItemCounts.map(([name, count]) => (
+                                        {sortedItemStats.length > 0 ? sortedItemStats.map(([name, stats]) => (
                                             <div key={name} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
-                                                <span className="font-medium">{name}</span>
-                                                <Badge variant="default" className="bg-primary/80">{count} sold</Badge>
+                                                <div>
+                                                    <p className="font-medium">{name}</p>
+                                                    <p className="text-xs text-muted-foreground">{stats.count} sold</p>
+                                                </div>
+                                                <Badge variant="default" className="bg-primary/80">{formatCurrency(stats.totalValue)}</Badge>
                                             </div>
                                         )) : (
                                             <p className="text-muted-foreground text-center italic py-4">No items sold in this period.</p>
@@ -528,6 +537,8 @@ const AccountingView: React.FC = () => {
 };
 
 export default AccountingView;
+
+    
 
     
 
