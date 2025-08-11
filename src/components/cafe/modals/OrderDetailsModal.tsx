@@ -6,13 +6,14 @@ import type { Order } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Printer } from 'lucide-react';
+import { Printer, Pencil } from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/app/logo.png';
 
 interface OrderDetailsModalProps {
     order: Order;
     onClose: () => void;
+    onEdit: (order: Order) => void;
 }
 
 const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, ref) => {
@@ -62,7 +63,7 @@ const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, r
 });
 Receipt.displayName = "Receipt";
 
-const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose }) => {
+const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, onEdit }) => {
     const receiptRef = useRef<HTMLDivElement>(null);
     const handlePrint = () => {
         const printContents = receiptRef.current?.innerHTML;
@@ -97,6 +98,11 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose })
         printWindow.print();
     };
 
+    const handleEdit = () => {
+        onEdit(order);
+        onClose();
+    }
+
     return (
         <Dialog open onOpenChange={onClose}>
             <DialogContent>
@@ -106,8 +112,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose })
                 <div className="max-h-[70vh] overflow-y-auto my-4 rounded-lg border">
                     <Receipt order={order} ref={receiptRef} />
                 </div>
-                <DialogFooter>
-                    <Button onClick={handlePrint} className="w-full">
+                <DialogFooter className="sm:justify-between gap-2">
+                     {order.status === 'Pending' && (
+                        <Button onClick={handleEdit} variant="secondary">
+                            <Pencil size={18} className="mr-2"/>
+                            Edit Order
+                        </Button>
+                    )}
+                    <Button onClick={handlePrint} className="flex-grow">
                         <Printer size={18} className="mr-2" />
                         Print Receipt
                     </Button>

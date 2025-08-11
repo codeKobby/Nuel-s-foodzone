@@ -15,6 +15,7 @@ interface SidebarProps {
     setTheme: () => void;
     pendingOrdersCount: number;
     role: 'manager' | 'cashier';
+    onLogout: () => void;
 }
 
 const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: string, setActiveView: (view: string) => void }) => (
@@ -44,12 +45,7 @@ const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: s
     </li>
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, setTheme, pendingOrdersCount, role }) => {
-    const router = useRouter();
-
-    const handleLogout = () => {
-        router.push('/');
-    };
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, setTheme, pendingOrdersCount, role, onLogout }) => {
     
     const navItemsConfig = {
         manager: [
@@ -101,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
                     <Separator className="w-10" />
                      <Tooltip>
                         <TooltipTrigger asChild>
-                            <button onClick={handleLogout} className="w-14 h-14 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-500/10">
+                            <button onClick={onLogout} className="w-14 h-14 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-500/10">
                                 <LogOut size={24} />
                             </button>
                         </TooltipTrigger>

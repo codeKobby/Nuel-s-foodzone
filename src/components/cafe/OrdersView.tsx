@@ -1,13 +1,13 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { collection, onSnapshot, query, doc, updateDoc, orderBy, runTransaction, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, ShoppingCart, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, ShoppingCart, CheckCircle2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import CombinedPaymentModal from './modals/CombinedPaymentModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
+import { OrderEditingContext } from '@/context/OrderEditingContext';
 
 interface OrderCardProps {
     order: Order;
@@ -25,9 +26,10 @@ interface OrderCardProps {
     onSelectionChange: (orderId: string, isSelected: boolean) => void;
     onDetailsClick: (order: Order) => void;
     onStatusUpdate: (id: string, status: 'Pending' | 'Completed') => void;
+    onEdit: (order: Order) => void;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionChange, onDetailsClick, onStatusUpdate }) => {
+const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionChange, onDetailsClick, onStatusUpdate, onEdit }) => {
     const paymentStatusVariant = {
         'Paid': 'default',
         'Unpaid': 'destructive',
@@ -52,7 +54,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                             checked={isSelected}
                             onCheckedChange={(checked) => onSelectionChange(order.id, !!checked)}
                             aria-label={`Select order ${order.simplifiedId}`}
-                            disabled={order.status === 'Completed'}
+                            disabled={order.paymentStatus === 'Paid'}
                         />
                         <div>
                             <CardTitle className="cursor-pointer text-base" onClick={() => onSelectionChange(order.id, !isSelected)}>{order.simplifiedId}</CardTitle>
@@ -81,11 +83,11 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                 <p className="text-xs text-muted-foreground mt-2 flex items-center"><CalendarDays size={12} className="inline mr-1.5" />{formatTimestamp(order.timestamp)}</p>
             </CardContent>
             <CardFooter className="flex space-x-2 p-4 mt-auto">
-                <Button onClick={() => onDetailsClick(order)} variant="outline" className="w-full">Details</Button>
-                 {order.status === 'Pending' ? (
-                    <Button onClick={() => onStatusUpdate(order.id, 'Completed')} className="w-full bg-green-500 hover:bg-green-600 text-white">Complete</Button>
+                 <Button onClick={() => onDetailsClick(order)} variant="outline" className="flex-1">Details</Button>
+                {order.status === 'Pending' ? (
+                     <Button onClick={() => onEdit(order)} variant="secondary" className="flex-1"><Pencil size={16} className="mr-2"/> Edit</Button>
                 ) : (
-                    <Button disabled className="w-full" variant="outline">
+                     <Button disabled className="w-full" variant="outline">
                         <CheckCircle2 size={16} className="mr-2 text-green-500" />
                         Completed
                     </Button>
@@ -95,7 +97,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
     );
 };
 
-const OrdersView: React.FC = () => {
+const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiveView}) => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [allTimeOrders, setAllTimeOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
@@ -105,6 +107,7 @@ const OrdersView: React.FC = () => {
     const [isCombinedPaymentModalOpen, setIsCombinedPaymentModalOpen] = useState(false);
     const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
     const [timeRange, setTimeRange] = useState('Today');
+    const { loadOrderForEditing } = useContext(OrderEditingContext);
 
     useEffect(() => {
         setLoading(true);
@@ -140,7 +143,7 @@ const OrdersView: React.FC = () => {
         setSelectedOrderIds(prev => {
             const newSet = new Set(prev);
             const order = allTimeOrders.find(o => o.id === orderId);
-            if (order?.status === 'Completed') return prev; // Don't allow selection if completed
+             if (order?.paymentStatus === 'Paid') return prev; 
 
             if (isSelected) {
                 newSet.add(orderId);
@@ -158,6 +161,13 @@ const OrdersView: React.FC = () => {
             console.error("Error updating status:", e);
         }
     };
+
+    const handleEditOrder = (order: Order) => {
+        if(order.status === 'Pending') {
+            loadOrderForEditing(order);
+            setActiveView('pos');
+        }
+    }
     
     const settleChange = async (orderId: string, settleAmount: number) => {
         const orderRef = doc(db, "orders", orderId);
@@ -199,7 +209,7 @@ const OrdersView: React.FC = () => {
         if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
         if (error) return <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
         return (
-             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
                 {orderList.length > 0 ? orderList.map(order => 
                     <OrderCard 
                         key={order.id} 
@@ -208,6 +218,7 @@ const OrdersView: React.FC = () => {
                         onStatusUpdate={updateOrderStatus}
                         isSelected={selectedOrderIds.has(order.id)}
                         onSelectionChange={handleSelectionChange}
+                        onEdit={handleEditOrder}
                     />) 
                     : <p className="text-muted-foreground italic col-span-full text-center mt-8">{emptyMessage}</p>}
             </div>
@@ -272,7 +283,7 @@ const OrdersView: React.FC = () => {
                   </TabsContent>
                 </Tabs>
 
-                {selectedOrder && <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />}
+                {selectedOrder && <OrderDetailsModal order={selectedOrder} onEdit={handleEditOrder} onClose={() => setSelectedOrder(null)} />}
                 {isChangeModalOpen && <ChangeDueModal orders={changeDueOrders} onSettle={settleChange} onClose={() => setIsChangeModalOpen(false)} />}
                 {isCombinedPaymentModalOpen && <CombinedPaymentModal orders={selectedOrders} onOrderPlaced={handleCombinedPaymentSuccess} onClose={() => setIsCombinedPaymentModalOpen(false)} />}
             </div>
@@ -281,5 +292,3 @@ const OrdersView: React.FC = () => {
 };
 
 export default OrdersView;
-
-    

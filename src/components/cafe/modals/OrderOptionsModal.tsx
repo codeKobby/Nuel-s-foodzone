@@ -1,10 +1,11 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { collection, doc, addDoc, getDoc, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { collection, doc, addDoc, getDoc, setDoc, serverTimestamp, runTransaction, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
-import type { OrderItem } from '@/lib/types';
+import type { OrderItem, Order } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,11 +16,12 @@ import { AlertTriangle } from 'lucide-react';
 interface OrderOptionsModalProps {
     total: number;
     orderItems: Record<string, OrderItem>;
+    editingOrder: Order | null;
     onClose: () => void;
     onOrderPlaced: () => void;
 }
 
-const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems, onClose, onOrderPlaced }) => {
+const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems, editingOrder, onClose, onOrderPlaced }) => {
     const [step, setStep] = useState(1);
     const [orderType, setOrderType] = useState<'Dine-In' | 'Takeout' | 'Delivery'>('Dine-In');
     const [orderTag, setOrderTag] = useState('');
@@ -28,6 +30,13 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     const [changeGiven, setChangeGiven] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+     useEffect(() => {
+        if (editingOrder) {
+            setOrderType(editingOrder.orderType);
+            setOrderTag(editingOrder.tag);
+        }
+    }, [editingOrder]);
 
     const amountPaidNum = parseFloat(cashPaid || '0');
     const calculatedChange = paymentMethod === 'cash' && amountPaidNum > total ? amountPaidNum - total : 0;
@@ -51,38 +60,46 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         setIsProcessing(true);
         setError(null);
         try {
-            const counterRef = doc(db, "counters", "orderIdCounter");
+            const finalAmountPaid = isPaid ? (paymentMethod === 'cash' ? amountPaidNum : total) : 0;
+            const paymentStatus = isPaid 
+                ? (finalAmountPaid < total ? 'Partially Paid' : 'Paid')
+                : 'Unpaid';
             
-            const newOrderRef = doc(collection(db, "orders"));
+            const orderData = {
+                tag: orderTag,
+                orderType,
+                items: Object.values(orderItems).map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
+                total,
+                paymentMethod: isPaid ? paymentMethod : 'Unpaid',
+                paymentStatus,
+                amountPaid: finalAmountPaid,
+                changeGiven: isPaid && paymentMethod === 'cash' ? changeGivenNum : 0,
+                balanceDue: isPaid ? Math.max(0, finalBalanceDue) : total,
+            };
 
-            await runTransaction(db, async (transaction) => {
-                const counterSnap = await transaction.get(counterRef);
-                const newCount = (counterSnap.exists() ? counterSnap.data().count : 0) + 1;
+            if (editingOrder) {
+                const orderRef = doc(db, "orders", editingOrder.id);
+                await updateDoc(orderRef, orderData);
+            } else {
+                 const counterRef = doc(db, "counters", "orderIdCounter");
+                const newOrderRef = doc(collection(db, "orders"));
 
-                const finalAmountPaid = isPaid ? (paymentMethod === 'cash' ? amountPaidNum : total) : 0;
-                const paymentStatus = isPaid 
-                    ? (finalAmountPaid < total ? 'Partially Paid' : 'Paid')
-                    : 'Unpaid';
-    
-                const newOrder = {
-                    id: newOrderRef.id,
-                    simplifiedId: generateSimpleOrderId(newCount),
-                    tag: orderTag,
-                    orderType,
-                    items: Object.values(orderItems).map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
-                    total,
-                    paymentMethod: isPaid ? paymentMethod : 'Unpaid',
-                    paymentStatus,
-                    amountPaid: finalAmountPaid,
-                    changeGiven: isPaid && paymentMethod === 'cash' ? changeGivenNum : 0,
-                    balanceDue: isPaid ? Math.max(0, finalBalanceDue) : total,
-                    status: 'Pending',
-                    timestamp: serverTimestamp(),
-                };
+                await runTransaction(db, async (transaction) => {
+                    const counterSnap = await transaction.get(counterRef);
+                    const newCount = (counterSnap.exists() ? counterSnap.data().count : 0) + 1;
 
-                transaction.set(newOrderRef, newOrder);
-                transaction.set(counterRef, { count: newCount });
-            });
+                    const newOrder = {
+                        ...orderData,
+                        id: newOrderRef.id,
+                        simplifiedId: generateSimpleOrderId(newCount),
+                        status: 'Pending',
+                        timestamp: serverTimestamp(),
+                    };
+
+                    transaction.set(newOrderRef, newOrder);
+                    transaction.set(counterRef, { count: newCount });
+                });
+            }
 
             onOrderPlaced();
         } catch (e) {
@@ -99,7 +116,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 {step === 1 && (
                     <>
                         <DialogHeader>
-                            <DialogTitle>Order Options</DialogTitle>
+                            <DialogTitle>{editingOrder ? 'Update Order Options' : 'Order Options'}</DialogTitle>
                             <DialogDescription>Set the details for this order before payment.</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
@@ -124,7 +141,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 {step === 2 && (
                     <>
                         <DialogHeader>
-                            <DialogTitle>Complete Payment</DialogTitle>
+                            <DialogTitle>{editingOrder ? 'Update Payment' : 'Complete Payment'}</DialogTitle>
                             <div className="text-center text-4xl font-bold text-primary py-4">{formatCurrency(total)}</div>
                         </DialogHeader>
                         <div className="space-y-4">

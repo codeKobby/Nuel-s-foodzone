@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
 import { collection, onSnapshot, addDoc, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { initialMenuData } from '@/data/initial-data';
@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { OrderEditingContext } from '@/context/OrderEditingContext';
 
 interface OrderCartProps {
     currentOrder: Record<string, OrderItem>;
@@ -122,7 +123,7 @@ const OrderCart: React.FC<OrderCartProps> = ({ currentOrder, total, updateQuanti
 };
 
 
-const PosView: React.FC = () => {
+const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveView }) => {
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [currentOrder, setCurrentOrder] = useState<Record<string, OrderItem>>({});
     const [loading, setLoading] = useState(true);
@@ -134,6 +135,23 @@ const PosView: React.FC = () => {
     const [showCustomOrderModal, setShowCustomOrderModal] = useState(false);
     const [isCartSheetOpen, setIsCartSheetOpen] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
+    const { editingOrder, clearEditingOrder } = useContext(OrderEditingContext);
+
+
+    useEffect(() => {
+        if(editingOrder) {
+            const orderItemsAsCart = editingOrder.items.reduce((acc, item) => {
+                const id = crypto.randomUUID();
+                acc[id] = {
+                    ...item,
+                    id: id,
+                    category: 'N/A' // Category is not stored on order items, default it
+                };
+                return acc;
+            }, {} as Record<string, OrderItem>);
+            setCurrentOrder(orderItemsAsCart);
+        }
+    }, [editingOrder]);
 
     useEffect(() => {
         setLoading(true);
@@ -262,6 +280,7 @@ const PosView: React.FC = () => {
 
     const handleClearOrder = () => {
         setCurrentOrder({});
+        clearEditingOrder();
         setShowClearConfirm(false);
     };
 
@@ -280,8 +299,17 @@ const PosView: React.FC = () => {
         <div className="flex h-screen md:flex-row flex-col bg-background">
             <div className="flex-1 p-4 bg-secondary/50 dark:bg-background overflow-y-auto">
                 <header className="mb-4">
-                    <h1 className="text-2xl md:text-3xl font-bold">Menu</h1>
-                    <p className="text-sm text-muted-foreground">Select items to add to the order.</p>
+                     <div className="flex justify-between items-center">
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold">{editingOrder ? 'Editing Order' : 'Menu'}</h1>
+                            <p className="text-sm text-muted-foreground">
+                                {editingOrder ? `Editing Order ID: ${editingOrder.simplifiedId}` : 'Select items to add to the order.'}
+                            </p>
+                        </div>
+                        {editingOrder && (
+                            <Button variant="destructive" onClick={handleClearOrder}>Cancel Edit</Button>
+                        )}
+                    </div>
                 </header>
                 <div className="sticky top-0 bg-secondary/50 dark:bg-background py-2 z-10 -mx-4 px-4 shadow-sm">
                     <div className="flex gap-2 mb-2">
@@ -331,7 +359,7 @@ const PosView: React.FC = () => {
                 {loading && <div className="mt-8"><LoadingSpinner /></div>}
                 {error && <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                 {!loading && !error && (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pt-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pt-4">
                         {filteredItems.map(item => (
                             <Card key={item.id} onClick={() => addToOrder(item)} className="cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1 hover:border-primary/50">
                                 <CardHeader className="p-2 md:p-3">
@@ -362,7 +390,7 @@ const PosView: React.FC = () => {
                     </SheetTrigger>
                     <SheetContent side="bottom" className="flex flex-col h-[90vh]">
                         <SheetHeader className="p-4 border-b">
-                            <SheetTitle className="text-2xl">Current Order</SheetTitle>
+                            <SheetTitle className="text-2xl">{editingOrder ? 'Editing Order' : 'Current Order'}</SheetTitle>
                         </SheetHeader>
                         <div className="flex-grow overflow-y-auto">
                            <OrderCart
@@ -384,10 +412,13 @@ const PosView: React.FC = () => {
                 <OrderOptionsModal
                     total={total}
                     orderItems={currentOrder}
+                    editingOrder={editingOrder}
                     onClose={() => setShowOrderOptionsModal(false)}
                     onOrderPlaced={() => {
                         setCurrentOrder({});
                         setShowOrderOptionsModal(false);
+                        clearEditingOrder();
+                        setActiveView('orders');
                     }}
                 />
             )}
@@ -422,5 +453,3 @@ const PosView: React.FC = () => {
 };
 
 export default PosView;
-
-    

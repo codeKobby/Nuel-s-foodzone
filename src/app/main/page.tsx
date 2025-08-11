@@ -24,6 +24,7 @@ import { AlertTriangle, Home, ClipboardList, Settings, BarChart2, Sun, Moon, Bri
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
+import { OrderEditingProvider } from '@/context/OrderEditingContext';
 
 const MobileNav = ({
     activeView,
@@ -212,8 +213,8 @@ function CafePage() {
 
     const renderActiveView = () => {
         switch (activeView) {
-            case 'pos': return role === 'cashier' ? <PosView /> : null;
-            case 'orders': return role === 'cashier' ? <OrdersView /> : null;
+            case 'pos': return role === 'cashier' ? <PosView setActiveView={setActiveView} /> : null;
+            case 'orders': return role === 'cashier' ? <OrdersView setActiveView={setActiveView} /> : null;
             case 'dashboard': return role === 'manager' ? <DashboardView /> : null;
             case 'accounting': return role === 'cashier' ? <AccountingView /> : null;
             case 'misc': return role === 'cashier' ? <MiscView /> : null;
@@ -252,6 +253,7 @@ function CafePage() {
                 setTheme={toggleTheme} 
                 pendingOrdersCount={pendingOrdersCount}
                 role={role}
+                onLogout={handleLogout}
             />
             <main className="flex-1 flex flex-col overflow-hidden">
                 {renderActiveView()}
@@ -283,7 +285,9 @@ function CafePage() {
 export default function CafePageWrapper() {
     return (
         <Suspense fallback={<div className="h-screen w-screen bg-background flex flex-col items-center justify-center"><LoadingSpinner /><p className="mt-4 text-lg text-muted-foreground">Loading...</p></div>}>
-            <CafePage />
+            <OrderEditingProvider>
+                <CafePage />
+            </OrderEditingProvider>
         </Suspense>
     )
 }

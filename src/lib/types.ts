@@ -75,3 +75,9 @@ export interface ChatSession {
 }
 
 export type AnalyzeBusinessOutput = z.infer<typeof AnalyzeBusinessOutputSchema>;
+
+export interface OrderEditingContextType {
+    editingOrder: Order | null;
+    loadOrderForEditing: (order: Order) => void;
+    clearEditingOrder: () => void;
+}
