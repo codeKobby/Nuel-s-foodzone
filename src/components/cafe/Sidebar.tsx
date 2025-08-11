@@ -61,12 +61,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
 
     return (
         <TooltipProvider>
-            <nav className="hidden md:flex w-20 bg-card border-r border-border flex-col items-center justify-between py-6 shadow-md z-20">
+            <nav className="hidden md:flex w-20 bg-card border-r border-border flex-col items-center justify-between py-6 z-20">
                 <div>
                     <Tooltip>
                          <TooltipTrigger asChild>
                             <div className='mb-10 mx-auto text-center'>
-                                <Image src={logo} alt="Nuel's Food Zone Logo" width={48} height={48} className="rounded-md shadow-md" />
+                                <Image src={logo} alt="Nuel's Food Zone Logo" width={48} height={48} className="rounded-md" />
                             </div>
                         </TooltipTrigger>
                         <TooltipContent side="right">

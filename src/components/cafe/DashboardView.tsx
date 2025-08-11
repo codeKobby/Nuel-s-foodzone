@@ -541,7 +541,7 @@ const DashboardView: React.FC = () => {
             
             <Sheet open={isChatSheetOpen} onOpenChange={setIsChatSheetOpen}>
                 <SheetTrigger asChild>
-                     <Button className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-lg z-20">
+                     <Button className="fixed bottom-6 right-6 h-16 w-16 rounded-full z-20">
                         <Sparkles className="h-8 w-8" />
                     </Button>
                 </SheetTrigger>
@@ -594,5 +594,3 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
-
-    

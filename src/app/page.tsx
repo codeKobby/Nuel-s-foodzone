@@ -21,7 +21,7 @@ export default function RoleSelectionPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-secondary/50 dark:bg-background p-4 font-body">
       <div className="text-center mb-10">
-        <Image src={logo} alt="Nuel's Food Zone Logo" width={80} height={80} className="mx-auto rounded-xl shadow-lg mb-4" />
+        <Image src={logo} alt="Nuel's Food Zone Logo" width={80} height={80} className="mx-auto rounded-xl mb-4" />
         <h1 className="text-4xl font-bold tracking-tight">Welcome to Nuel's Cafe POS</h1>
         <p className="text-lg text-muted-foreground mt-2">Please select your role to continue.</p>
       </div>
