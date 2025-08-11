@@ -53,6 +53,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Badge } from '../ui/badge';
 
 
 interface DashboardStats {
@@ -73,7 +74,7 @@ interface ChatMessage {
 
 
 const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, description?: string }> = ({ icon, title, value, description }) => (
-    <Card className="shadow-none">
+    <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             {icon}
@@ -487,7 +488,7 @@ const DashboardView: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                    <Card className="lg:col-span-3 shadow-none">
+                    <Card className="lg:col-span-3">
                         <CardHeader>
                             <CardTitle>Sales Trend</CardTitle>
                         </CardHeader>
@@ -513,7 +514,7 @@ const DashboardView: React.FC = () => {
                             </ChartContainer>
                         </CardContent>
                     </Card>
-                     <Card className="lg:col-span-2 shadow-none">
+                     <Card className="lg:col-span-2">
                         <CardHeader>
                             <CardTitle>Item Performance</CardTitle>
                             <CardDescription>Top and bottom selling items for the period.</CardDescription>
@@ -523,11 +524,11 @@ const DashboardView: React.FC = () => {
                                 <div className="space-y-4">
                                 <div>
                                     <h4 className="font-semibold text-green-600 mb-2 flex items-center"><TrendingUp className="mr-2" /> Top 5 Items</h4>
-                                     <ul className="space-y-2">{topItems.length > 0 ? topItems.map(item => (<li key={item.name} className="flex justify-between items-center p-2 bg-secondary rounded-md text-sm"><span className="font-medium">{item.name}</span><span className="font-bold">{item.count} sold</span></li>)) : <p className="text-xs text-muted-foreground italic">No items sold.</p>}</ul>
+                                     <ul className="space-y-2">{topItems.length > 0 ? topItems.map(item => (<li key={item.name} className="flex justify-between items-center p-2 bg-secondary rounded-md text-sm"><span className="font-medium">{item.name}</span><Badge variant="default">{item.count} sold</Badge></li>)) : <p className="text-xs text-muted-foreground italic">No items sold.</p>}</ul>
                                 </div>
                                 {bottomItems.length > 0 && <div>
                                      <h4 className="font-semibold text-red-600 mb-2 flex items-center"><TrendingDown className="mr-2" /> Bottom 5 Items</h4>
-                                     <ul className="space-y-2">{bottomItems.map(item => (<li key={item.name} className="flex justify-between items-center p-2 bg-secondary rounded-md text-sm"><span className="font-medium">{item.name}</span><span className="font-bold">{item.count} sold</span></li>))}</ul>
+                                     <ul className="space-y-2">{bottomItems.map(item => (<li key={item.name} className="flex justify-between items-center p-2 bg-secondary rounded-md text-sm"><span className="font-medium">{item.name}</span><Badge variant="secondary">{item.count} sold</Badge></li>))}</ul>
                                 </div>}
                                 </div>
                            </ScrollArea>
@@ -592,3 +593,5 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    

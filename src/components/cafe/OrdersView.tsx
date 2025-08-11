@@ -103,7 +103,6 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
 
 const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiveView}) => {
     const [orders, setOrders] = useState<Order[]>([]);
-    const [allTimeOrders, setAllTimeOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -123,7 +122,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-            setAllTimeOrders(fetchedOrders);
+            setOrders(fetchedOrders);
             setLoading(false);
         }, (e) => { 
             console.error(e);
@@ -133,21 +132,11 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
         return () => unsubscribe();
     }, []);
 
-    useEffect(() => {
-        if (timeRange === 'Today') {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayTimestamp = Timestamp.fromDate(today).toMillis();
-            setOrders(allTimeOrders.filter(o => o.timestamp && o.timestamp.toMillis() >= todayTimestamp));
-        } else {
-            setOrders(allTimeOrders);
-        }
-    }, [timeRange, allTimeOrders]);
 
     const handleSelectionChange = (orderId: string, isSelected: boolean) => {
         setSelectedOrderIds(prev => {
             const newSet = new Set(prev);
-            const order = allTimeOrders.find(o => o.id === orderId);
+            const order = orders.find(o => o.id === orderId);
              if (order?.paymentStatus === 'Paid') return prev; 
 
             if (isSelected) {
@@ -204,37 +193,32 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
     };
 
     const filteredOrders = useMemo(() => {
-        if (!searchQuery) {
-            return orders;
+        let ordersToFilter = orders;
+
+        if (searchQuery) {
+            const lowercasedQuery = searchQuery.toLowerCase();
+            ordersToFilter = orders.filter(order => {
+                const hasMatchingTag = order.tag?.toLowerCase().includes(lowercasedQuery);
+                const hasMatchingId = order.simplifiedId.toLowerCase().includes(lowercasedQuery);
+                const hasMatchingItem = order.items.some(item => item.name.toLowerCase().includes(lowercasedQuery));
+                return hasMatchingTag || hasMatchingId || hasMatchingItem;
+            });
+        } else if (timeRange === 'Today') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayTimestamp = Timestamp.fromDate(today).toMillis();
+            ordersToFilter = orders.filter(o => o.timestamp && o.timestamp.toMillis() >= todayTimestamp);
         }
-        const lowercasedQuery = searchQuery.toLowerCase();
-        return orders.filter(order => {
-            const hasMatchingTag = order.tag?.toLowerCase().includes(lowercasedQuery);
-            const hasMatchingId = order.simplifiedId.toLowerCase().includes(lowercasedQuery);
-            const hasMatchingItem = order.items.some(item => item.name.toLowerCase().includes(lowercasedQuery));
-            return hasMatchingTag || hasMatchingId || hasMatchingItem;
-        });
-    }, [orders, searchQuery]);
+
+        return ordersToFilter;
+    }, [orders, searchQuery, timeRange]);
     
     const pendingOrders = useMemo(() => filteredOrders.filter(o => o.status === 'Pending'), [filteredOrders]);
     const completedOrders = useMemo(() => filteredOrders.filter(o => o.status === 'Completed'), [filteredOrders]);
+    const unpaidOrders = useMemo(() => filteredOrders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0), [filteredOrders]);
     
-    const filteredAllTimeOrders = useMemo(() => {
-        if (!searchQuery) {
-            return allTimeOrders;
-        }
-        const lowercasedQuery = searchQuery.toLowerCase();
-        return allTimeOrders.filter(order => {
-            const hasMatchingTag = order.tag?.toLowerCase().includes(lowercasedQuery);
-            const hasMatchingId = order.simplifiedId.toLowerCase().includes(lowercasedQuery);
-            const hasMatchingItem = order.items.some(item => item.name.toLowerCase().includes(lowercasedQuery));
-            return hasMatchingTag || hasMatchingId || hasMatchingItem;
-        });
-    }, [allTimeOrders, searchQuery]);
-
-    const unpaidOrders = useMemo(() => filteredAllTimeOrders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0), [filteredAllTimeOrders]);
-    const changeDueOrders = useMemo(() => allTimeOrders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [allTimeOrders]);
-    const selectedOrders = useMemo(() => allTimeOrders.filter(o => selectedOrderIds.has(o.id)), [allTimeOrders, selectedOrderIds]);
+    const changeDueOrders = useMemo(() => orders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [orders]);
+    const selectedOrders = useMemo(() => orders.filter(o => selectedOrderIds.has(o.id)), [orders, selectedOrderIds]);
 
 
     const renderOrderList = (orderList: Order[], emptyMessage: string) => {
@@ -314,13 +298,13 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                     <TabsTrigger value="completed">Completed ({completedOrders.length})</TabsTrigger>
                   </TabsList>
                   <TabsContent value="pending">
-                    {renderOrderList(pendingOrders, "No pending orders for this period.")}
+                    {renderOrderList(pendingOrders, "No pending orders found.")}
                   </TabsContent>
                    <TabsContent value="unpaid">
-                    {renderOrderList(unpaidOrders, "No unpaid orders. All caught up!")}
+                    {renderOrderList(unpaidOrders, "No unpaid orders found.")}
                   </TabsContent>
                   <TabsContent value="completed">
-                    {renderOrderList(completedOrders, "No completed orders for this period.")}
+                    {renderOrderList(completedOrders, "No completed orders found.")}
                   </TabsContent>
                 </Tabs>
 
