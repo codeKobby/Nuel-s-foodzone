@@ -31,21 +31,32 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     const [creditApplied, setCreditApplied] = useState(0);
 
     const totalToPayBeforeCredit = useMemo(() => {
-        return orders.reduce((acc, order) => acc + (order.balanceDue || order.total), 0);
+        // Only sum up balances owed by the customer, not change owed to them.
+        return orders.reduce((acc, order) => {
+            if ((order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') && order.balanceDue > 0) {
+                return acc + order.balanceDue;
+            }
+            return acc;
+        }, 0);
     }, [orders]);
     
     useEffect(() => {
         const applyCredit = async () => {
+            // Find unique customer tags from the selected orders
             const customerTags = [...new Set(orders.map(o => o.tag).filter(Boolean))];
             if (customerTags.length > 0) {
                 // For simplicity, we use the first tag to find credit. 
-                // A more complex system could handle multiple customers.
+                // A more complex system could handle multiple customers, but this handles the common case.
                 const { creditFound } = await findAndApplyCustomerCredit(customerTags[0]);
-                setCreditApplied(creditFound);
+                // Only apply credit up to the amount needed to pay.
+                const creditToUse = Math.min(creditFound, totalToPayBeforeCredit);
+                if (creditToUse > 0) {
+                    setCreditApplied(creditToUse);
+                }
             }
         };
         applyCredit();
-    }, [orders]);
+    }, [orders, totalToPayBeforeCredit]);
 
 
     const totalToPay = Math.max(0, totalToPayBeforeCredit - creditApplied);
@@ -73,7 +84,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         try {
             const batch = writeBatch(db);
 
-            // Apply credit if any was found
+            // Apply credit if any was found and used
             if (creditApplied > 0) {
                  const customerTags = [...new Set(orders.map(o => o.tag).filter(Boolean))];
                  await findAndApplyCustomerCredit(customerTags[0], batch, creditApplied);
@@ -81,9 +92,13 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 
             // Update the orders being paid for
             let remainingPaid = paymentMethod === 'cash' ? amountPaidNum : totalToPay;
-            for (const order of orders) {
+            
+            // Filter for only orders that actually need payment
+            const ordersToPay = orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0);
+
+            for (const order of ordersToPay) {
                 const orderRef = doc(db, "orders", order.id);
-                const orderBalance = order.balanceDue || order.total;
+                const orderBalance = order.balanceDue; // We already know this is > 0
                 const amountToPayForOrder = Math.min(remainingPaid, orderBalance);
                 
                 const newAmountPaid = order.amountPaid + amountToPayForOrder;
@@ -91,7 +106,8 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 const newBalanceDue = Math.max(0, order.total - newAmountPaid);
 
                 batch.update(orderRef, {
-                    paymentMethod: paymentMethod,
+                    // Don't override the original payment method unless it was unpaid
+                    paymentMethod: order.paymentMethod === 'Unpaid' ? paymentMethod : order.paymentMethod,
                     paymentStatus: newPaymentStatus,
                     amountPaid: newAmountPaid,
                     balanceDue: newBalanceDue,
@@ -100,11 +116,11 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 remainingPaid -= amountToPayForOrder;
             }
             
-            // Distribute change given if any, to the last order
-             if (paymentMethod === 'cash' && changeGivenNum > 0) {
-                const lastOrder = orders[orders.length - 1];
+            // Distribute change given if any, to the last order that was paid
+             if (paymentMethod === 'cash' && changeGivenNum > 0 && ordersToPay.length > 0) {
+                const lastOrder = ordersToPay[ordersToPay.length - 1];
                 const lastOrderRef = doc(db, "orders", lastOrder.id);
-                batch.update(lastOrderRef, { balanceDue: changeGivenNum });
+                batch.update(lastOrderRef, { balanceDue: changeGivenNum, changeGiven: changeGivenNum });
             }
 
             await batch.commit();
