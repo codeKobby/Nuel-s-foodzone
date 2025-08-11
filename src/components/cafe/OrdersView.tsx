@@ -82,12 +82,15 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                 }
                 <p className="text-xs text-muted-foreground mt-2 flex items-center"><CalendarDays size={12} className="inline mr-1.5" />{formatTimestamp(order.timestamp)}</p>
             </CardContent>
-            <CardFooter className="flex space-x-2 p-4 mt-auto">
-                 <Button onClick={() => onDetailsClick(order)} variant="outline" className="flex-1">Details</Button>
+            <CardFooter className="grid grid-cols-2 gap-2 p-4 mt-auto">
+                <Button onClick={() => onDetailsClick(order)} variant="outline" className="col-span-2">Details</Button>
                 {order.status === 'Pending' ? (
-                     <Button onClick={() => onEdit(order)} variant="secondary" className="flex-1"><Pencil size={16} className="mr-2"/> Edit</Button>
+                    <>
+                        <Button onClick={() => onEdit(order)} variant="secondary"><Pencil size={16} className="mr-2"/> Edit</Button>
+                        <Button onClick={() => onStatusUpdate(order.id, 'Completed')} className="bg-green-500 hover:bg-green-600"><Check size={16} className="mr-2"/> Complete</Button>
+                    </>
                 ) : (
-                     <Button disabled className="w-full" variant="outline">
+                     <Button disabled className="col-span-2" variant="outline">
                         <CheckCircle2 size={16} className="mr-2 text-green-500" />
                         Completed
                     </Button>
