@@ -97,7 +97,6 @@ const chartConfig = {
 
 const DashboardView: React.FC = () => {
     const [stats, setStats] = useState<DashboardStats | null>(null);
-    const [miscExpenses, setMiscExpenses] = useState<MiscExpense[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [date, setDate] = useState<DateRange | undefined>({ from: addDays(new Date(), -6), to: new Date() });
@@ -116,6 +115,7 @@ const DashboardView: React.FC = () => {
     const [sessionToDelete, setSessionToDelete] = useState<ChatSession | null>(null);
     const isMobile = useIsMobile();
     const [itemSearchQuery, setItemSearchQuery] = useState('');
+    const [miscExpenses, setMiscExpenses] = useState<MiscExpense[]>([]);
 
 
     const fetchDashboardData = useCallback(async () => {
@@ -139,10 +139,14 @@ const DashboardView: React.FC = () => {
             
             const reconciliationReportsRef = collection(db, "reconciliationReports");
             const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
+            
+            const miscExpensesRef = collection(db, "miscExpenses");
+            const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
 
-            const [ordersSnapshot, reportsSnapshot] = await Promise.all([
+            const [ordersSnapshot, reportsSnapshot, miscSnapshot] = await Promise.all([
                 getDocs(ordersQuery),
                 getDocs(reportsQuery),
+                getDocs(miscQuery),
             ]);
 
             // Process Orders
@@ -185,15 +189,18 @@ const DashboardView: React.FC = () => {
                 }
             });
             
-            // Process Reconciliation Reports for cash discrepancy
             let cashDiscrepancy = 0;
             reportsSnapshot.forEach(doc => {
                 const report = doc.data() as ReconciliationReport;
                 cashDiscrepancy += report.cashDifference;
             });
 
-            // Get total settled misc expenses from the dedicated listener
-            const totalMiscExpenses = miscExpenses.filter(e => e.settled).reduce((sum, e) => sum + e.amount, 0);
+            // Get total miscellaneous expenses
+            let totalMiscExpenses = 0;
+            miscSnapshot.forEach(doc => {
+                const expense = doc.data() as MiscExpense;
+                totalMiscExpenses += expense.amount;
+            });
             
             const totalSales = cashSales + momoSales + unpaidOrdersValue;
             const netRevenue = (cashSales + momoSales) - totalMiscExpenses;
@@ -223,10 +230,10 @@ const DashboardView: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [date, miscExpenses]);
+    }, [date]);
     
      useEffect(() => {
-        // Listener for all miscellaneous expenses
+        // Listener for all miscellaneous expenses (for the unsettled expenses list)
         const miscExpensesRef = collection(db, "miscExpenses");
         const q = query(miscExpensesRef, orderBy('timestamp', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -531,8 +538,8 @@ const DashboardView: React.FC = () => {
                 )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
-                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Total value of all orders created"/>
-                    <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - Settled Expenses"/>
+                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Cash + MoMo + Unpaid"/>
+                    <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - All Expenses"/>
                     <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} description="All created orders"/>
                     <StatCard icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Cash Discrepancy" value={formatCurrency(stats.cashDiscrepancy)} description="Sum of cash surplus/deficit" />
                 </div>
@@ -545,7 +552,7 @@ const DashboardView: React.FC = () => {
                         <StatCard icon={<Landmark className="text-green-600"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} />
                         <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
                         <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance" value={formatCurrency(stats.unpaidOrdersValue)} />
-                        <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Settled Expenses" value={formatCurrency(stats.totalMiscExpenses)} />
+                        <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.totalMiscExpenses)} />
                     </CardContent>
                 </Card>
 

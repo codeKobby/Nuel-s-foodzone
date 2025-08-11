@@ -29,12 +29,11 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             getDocs(reportsQuery),
         ]);
 
-        let totalSales = 0;
-        let totalOrders = 0;
         let cashSales = 0;
         let momoSales = 0;
         let changeOwed = 0;
         let unpaidOrdersValue = 0;
+        let totalOrders = 0;
         const itemCounts: Record<string, number> = {};
 
         ordersSnapshot.forEach(doc => {
@@ -63,12 +62,12 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             });
         });
         
-        totalSales = cashSales + momoSales + unpaidOrdersValue;
+        const totalSales = cashSales + momoSales + unpaidOrdersValue;
 
         let totalMiscExpenses = 0;
         miscSnapshot.forEach(doc => {
             const expense = doc.data() as MiscExpense;
-            if (expense.settled) totalMiscExpenses += expense.amount;
+            totalMiscExpenses += expense.amount;
         });
 
         let cashDiscrepancy = 0;
