@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, ShoppingCart, CheckCircle2, Pencil } from 'lucide-react';
+import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, ShoppingCart, CheckCircle2, Pencil, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import { OrderEditingContext } from '@/context/OrderEditingContext';
+import { Input } from '@/components/ui/input';
 
 interface OrderCardProps {
     order: Order;
@@ -110,6 +111,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
     const [isCombinedPaymentModalOpen, setIsCombinedPaymentModalOpen] = useState(false);
     const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
     const [timeRange, setTimeRange] = useState('Today');
+    const [searchQuery, setSearchQuery] = useState('');
     const { loadOrderForEditing } = useContext(OrderEditingContext);
 
     useEffect(() => {
@@ -200,10 +202,37 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
         setSelectedOrderIds(new Set());
         setIsCombinedPaymentModalOpen(false);
     };
+
+    const filteredOrders = useMemo(() => {
+        if (!searchQuery) {
+            return orders;
+        }
+        const lowercasedQuery = searchQuery.toLowerCase();
+        return orders.filter(order => {
+            const hasMatchingTag = order.tag?.toLowerCase().includes(lowercasedQuery);
+            const hasMatchingId = order.simplifiedId.toLowerCase().includes(lowercasedQuery);
+            const hasMatchingItem = order.items.some(item => item.name.toLowerCase().includes(lowercasedQuery));
+            return hasMatchingTag || hasMatchingId || hasMatchingItem;
+        });
+    }, [orders, searchQuery]);
     
-    const pendingOrders = useMemo(() => orders.filter(o => o.status === 'Pending'), [orders]);
-    const completedOrders = useMemo(() => orders.filter(o => o.status === 'Completed'), [orders]);
-    const unpaidOrders = useMemo(() => allTimeOrders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0), [allTimeOrders]);
+    const pendingOrders = useMemo(() => filteredOrders.filter(o => o.status === 'Pending'), [filteredOrders]);
+    const completedOrders = useMemo(() => filteredOrders.filter(o => o.status === 'Completed'), [filteredOrders]);
+    
+    const filteredAllTimeOrders = useMemo(() => {
+        if (!searchQuery) {
+            return allTimeOrders;
+        }
+        const lowercasedQuery = searchQuery.toLowerCase();
+        return allTimeOrders.filter(order => {
+            const hasMatchingTag = order.tag?.toLowerCase().includes(lowercasedQuery);
+            const hasMatchingId = order.simplifiedId.toLowerCase().includes(lowercasedQuery);
+            const hasMatchingItem = order.items.some(item => item.name.toLowerCase().includes(lowercasedQuery));
+            return hasMatchingTag || hasMatchingId || hasMatchingItem;
+        });
+    }, [allTimeOrders, searchQuery]);
+
+    const unpaidOrders = useMemo(() => filteredAllTimeOrders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0), [filteredAllTimeOrders]);
     const changeDueOrders = useMemo(() => allTimeOrders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [allTimeOrders]);
     const selectedOrders = useMemo(() => allTimeOrders.filter(o => selectedOrderIds.has(o.id)), [allTimeOrders, selectedOrderIds]);
 
@@ -234,6 +263,15 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                 <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                     <div className="flex-grow">
                         <h2 className="text-2xl md:text-3xl font-bold">Order Management</h2>
+                    </div>
+                     <div className="relative w-full md:max-w-xs">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search by ID, Tag, or Item..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                        />
                     </div>
                     <div className="flex items-center space-x-2 w-full md:w-auto">
                         {changeDueOrders.length > 0 && (
@@ -295,3 +333,5 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 };
 
 export default OrdersView;
+
+    
