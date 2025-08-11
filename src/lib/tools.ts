@@ -34,18 +34,23 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         let cashSales = 0;
         let momoSales = 0;
         let changeOwed = 0;
+        let unpaidOrdersValue = 0;
         const itemCounts: Record<string, number> = {};
 
         ordersSnapshot.forEach(doc => {
             const order = doc.data() as Order;
             totalOrders++;
-            if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                totalSales += order.amountPaid;
-                if (order.paymentMethod === 'cash') {
-                    cashSales += order.amountPaid;
-                } else if (order.paymentMethod === 'momo') {
-                    momoSales += order.amountPaid;
-                }
+            
+            if (order.paymentStatus === 'Unpaid') {
+                unpaidOrdersValue += order.balanceDue;
+            } else if (order.paymentStatus === 'Partially Paid') {
+                unpaidOrdersValue += order.balanceDue;
+                const paidAmount = order.amountPaid - (order.total - order.balanceDue);
+                if (order.paymentMethod === 'cash') cashSales += paidAmount;
+                if (order.paymentMethod === 'momo') momoSales += paidAmount;
+            } else if (order.paymentStatus === 'Paid') {
+                if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
+                if(order.paymentMethod === 'momo') momoSales += order.total;
             }
 
             // Calculate change owed to customer
@@ -57,6 +62,8 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
                 itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
             });
         });
+        
+        totalSales = cashSales + momoSales + unpaidOrdersValue;
 
         let totalMiscExpenses = 0;
         miscSnapshot.forEach(doc => {
@@ -70,7 +77,7 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             cashDiscrepancy += report.cashDifference;
         });
 
-        const netSales = totalSales - totalMiscExpenses;
+        const netSales = (cashSales + momoSales) - totalMiscExpenses;
         const itemPerformance = Object.entries(itemCounts)
             .sort(([, a], [, b]) => b - a)
             .map(([name, count]) => ({ name, count }));
@@ -103,3 +110,5 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         };
     }
 }
+
+    

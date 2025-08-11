@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, add
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport, ChatSession, AnalyzeBusinessOutput } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -58,11 +58,13 @@ import { Badge } from '../ui/badge';
 
 interface DashboardStats {
     totalSales: number;
+    netRevenue: number;
     totalOrders: number;
-    totalMiscExpenses: number;
-    netSales: number;
+    cashSales: number;
+    momoSales: number;
     unpaidOrdersValue: number;
-    cashDiscrepancy: number; // sum of deficits and surpluses
+    totalMiscExpenses: number;
+    cashDiscrepancy: number;
     salesData: { date: string; sales: number }[];
     itemPerformance: { name: string; count: number; totalValue: number }[];
 }
@@ -144,7 +146,7 @@ const DashboardView: React.FC = () => {
             ]);
 
             // Process Orders
-            let totalSales = 0, unpaidOrdersValue = 0, totalOrders = 0;
+            let cashSales = 0, momoSales = 0, unpaidOrdersValue = 0, totalOrders = 0;
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             const salesByDay: Record<string, number> = {};
             
@@ -152,15 +154,19 @@ const DashboardView: React.FC = () => {
 
 
             sortedDocs.forEach(doc => {
-                const order = doc.data() as Order;
+                const order = { id: doc.id, ...doc.data() } as Order;
                 totalOrders++;
 
-                if (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') {
+                if (order.paymentStatus === 'Unpaid') {
                     unpaidOrdersValue += order.balanceDue;
-                }
-                
-                if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                    totalSales += order.amountPaid;
+                } else if (order.paymentStatus === 'Partially Paid') {
+                    unpaidOrdersValue += order.balanceDue;
+                    const paidAmount = order.amountPaid - (order.total - order.balanceDue);
+                    if (order.paymentMethod === 'cash') cashSales += paidAmount;
+                    if (order.paymentMethod === 'momo') momoSales += paidAmount;
+                } else if (order.paymentStatus === 'Paid') {
+                    if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
+                    if(order.paymentMethod === 'momo') momoSales += order.total;
                 }
                 
                 order.items.forEach(item => {
@@ -171,10 +177,11 @@ const DashboardView: React.FC = () => {
                     };
                 });
 
+                // For sales trend chart, use paid amounts
                 if (order.timestamp && (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid')) {
                     const orderDate = order.timestamp.toDate();
                     const dayKey = format(orderDate, 'MMM d');
-                    salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.amountPaid;
+                    salesByDay[dayKey] = (salesByDay[dayKey] || 0) + (order.amountPaid - (order.total - order.balanceDue));
                 }
             });
             
@@ -188,7 +195,9 @@ const DashboardView: React.FC = () => {
             // Get total settled misc expenses from the dedicated listener
             const totalMiscExpenses = miscExpenses.filter(e => e.settled).reduce((sum, e) => sum + e.amount, 0);
             
-            const netSales = totalSales - totalMiscExpenses;
+            const totalSales = cashSales + momoSales + unpaidOrdersValue;
+            const netRevenue = (cashSales + momoSales) - totalMiscExpenses;
+            
             const salesData = Object.entries(salesByDay).map(([date, sales]) => ({ date, sales }));
             const itemPerformance = Object.entries(itemStats)
                 .map(([name, data]) => ({name, ...data}))
@@ -197,10 +206,12 @@ const DashboardView: React.FC = () => {
 
             setStats({
                 totalSales,
+                netRevenue,
                 totalOrders,
-                totalMiscExpenses,
-                netSales,
+                cashSales,
+                momoSales,
                 unpaidOrdersValue,
+                totalMiscExpenses,
                 cashDiscrepancy,
                 salesData,
                 itemPerformance,
@@ -264,7 +275,7 @@ const DashboardView: React.FC = () => {
             const input: AnalyzeBusinessInput = {
                 period,
                 totalSales: stats.totalSales,
-                netSales: stats.netSales,
+                netSales: stats.netRevenue,
                 totalOrders: stats.totalOrders,
                 itemPerformance: stats.itemPerformance.slice(0, 10), // Send top 10 items
                 cashDiscrepancy: stats.cashDiscrepancy,
@@ -520,16 +531,28 @@ const DashboardView: React.FC = () => {
                 )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
-                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Net Sales" value={formatCurrency(stats.netSales)} description={`${formatCurrency(stats.totalSales)} (Paid) - ${formatCurrency(stats.totalMiscExpenses)} (Expenses)`}/>
-                    <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} />
+                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Total value of all orders created"/>
+                    <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - Settled Expenses"/>
+                    <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} description="All created orders"/>
                     <StatCard icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Cash Discrepancy" value={formatCurrency(stats.cashDiscrepancy)} description="Sum of cash surplus/deficit" />
-                    <StatCard icon={<AlertCircle className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-red-500"}/>} title="Unpaid Orders" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
                 </div>
+                
+                 <Card className="mb-6">
+                    <CardHeader>
+                        <CardTitle>Revenue Breakdown</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <StatCard icon={<Landmark className="text-green-600"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} />
+                        <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
+                        <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance" value={formatCurrency(stats.unpaidOrdersValue)} />
+                        <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Settled Expenses" value={formatCurrency(stats.totalMiscExpenses)} />
+                    </CardContent>
+                </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                     <Card className="lg:col-span-3">
                         <CardHeader>
-                            <CardTitle>Sales Trend</CardTitle>
+                            <CardTitle>Paid Sales Trend</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <ChartContainer config={chartConfig} className="h-[250px] md:h-[300px] w-full">
@@ -701,3 +724,5 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    
