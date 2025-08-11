@@ -62,7 +62,7 @@ export const GetBusinessDataOutputSchema = z.object({
   cashDiscrepancy: z.number(),
   cashSales: z.number().describe("Total sales paid with cash."),
   momoSales: z.number().describe("Total sales paid with MoMo/Card."),
-  miscExpenses: z.number().describe("Total amount of all miscellaneous expenses."),
+  miscExpenses: z.number().describe("Total amount of all miscellaneous expenses, from both cash and momo."),
   changeOwed: z.number().describe("Total outstanding change owed to customers from cash transactions."),
 });
 export type GetBusinessDataOutput = z.infer<typeof GetBusinessDataOutputSchema>;

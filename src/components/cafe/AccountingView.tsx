@@ -52,7 +52,8 @@ interface PeriodStats {
     totalSales: number;
     cashSales: number;
     momoSales: number;
-    miscExpenses: number;
+    miscCashExpenses: number;
+    miscMomoExpenses: number;
     expectedCash: number;
     netRevenue: number;
     changeOwed: number;
@@ -132,7 +133,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             
             const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
 
-            let totalSales = 0, cashSales = 0, momoSales = 0, totalChangeOwed = 0, unpaidOrdersValue = 0;
+            let cashSales = 0, momoSales = 0, totalChangeOwed = 0, unpaidOrdersValue = 0;
             const periodOrders: Order[] = [];
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
 
@@ -140,10 +141,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             ordersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 periodOrders.push(order);
-
-                if (order.status === 'Completed') {
-                    totalSales += order.total;
-                }
                 
                 if (order.paymentStatus === 'Unpaid') {
                     unpaidOrdersValue += order.balanceDue;
@@ -157,29 +154,39 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     if(order.paymentMethod === 'momo') momoSales += order.total;
                 }
                 
-                if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid > order.total) {
+                if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
                    totalChangeOwed += order.balanceDue;
                 }
 
-                order.items.forEach(item => {
-                    const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
-                    itemStats[item.name] = {
-                        count: currentStats.count + item.quantity,
-                        totalValue: currentStats.totalValue + (item.quantity * item.price)
-                    };
-                });
+                if (order.status === 'Completed') {
+                    order.items.forEach(item => {
+                        const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                        itemStats[item.name] = {
+                            count: currentStats.count + item.quantity,
+                            totalValue: currentStats.totalValue + (item.quantity * item.price)
+                        };
+                    });
+                }
             });
 
-            let miscExpenses = 0;
+            let miscCashExpenses = 0, miscMomoExpenses = 0;
             miscSnapshot.forEach(doc => {
                 const expense = doc.data() as MiscExpense;
-                miscExpenses += expense.amount;
+                if (expense.source === 'cash') {
+                    miscCashExpenses += expense.amount;
+                } else {
+                    miscMomoExpenses += expense.amount;
+                }
             });
+
+            const totalSales = periodOrders
+                .filter(o => o.status === 'Completed')
+                .reduce((acc, order) => acc + order.total, 0);
             
-            const netRevenue = totalSales - miscExpenses - unpaidOrdersValue;
-            const expectedCash = cashSales - miscExpenses;
+            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses);
+            const expectedCash = cashSales - miscCashExpenses;
             
-            setStats({ totalSales, cashSales, momoSales, miscExpenses, expectedCash, netRevenue, changeOwed: totalChangeOwed, unpaidOrdersValue, orders: periodOrders, itemStats });
+            setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, netRevenue, changeOwed: totalChangeOwed, unpaidOrdersValue, orders: periodOrders, itemStats });
         } catch (e) {
             console.error(e);
             setError("Failed to load financial data for the selected period.");
@@ -206,7 +213,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     }, []);
 
     const handleCountChange = (name: string, value: string) => {
-        setCounts(prev => ({ ...prev, [d.name]: value.replace(/[^0-9]/g, '') }));
+        setCounts(prev => ({ ...prev, [name]: value.replace(/[^0-9]/g, '') }));
     };
     
     const resetForm = () => {
@@ -234,7 +241,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 totalSales: stats.totalSales,
                 cashSales: stats.cashSales,
                 momoSales: stats.momoSales,
-                miscExpenses: stats.miscExpenses,
+                miscExpenses: stats.miscCashExpenses + stats.miscMomoExpenses,
                 expectedCash: stats.expectedCash,
                 countedCash: totalCountedCash,
                 countedMomo: parseFloat(countedMomo) || 0,
@@ -358,7 +365,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         <div className="pt-2 text-center bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
                              <Label className="text-xl font-bold text-green-700 dark:text-green-300">Cash for Deposit</Label>
                              <p className="text-3xl md:text-4xl font-extrabold text-green-600 dark:text-green-400">{formatCurrency(cashForDeposit)}</p>
-                              {changeSetAside && <p className="text-xs text-muted-foreground mt-1">({formatCurrency(totalCountedCash)} - {formatCurrency(stats.changeOwed)} set aside)</p>}
+                              {changeSetAside && stats.changeOwed > 0 && <p className="text-xs text-muted-foreground mt-1">({formatCurrency(totalCountedCash)} - {formatCurrency(stats.changeOwed)} set aside)</p>}
                         </div>
                      </div>
                 </div>
@@ -473,7 +480,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
                                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Orders" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
                                     <StatCard icon={<Coins className="text-red-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change" />
-                                    <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.miscExpenses)} />
+                                    <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} />
                                 </CardContent>
                                 <CardFooter>
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
@@ -489,7 +496,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         </div>
                          <Card>
                             <CardHeader>
-                                <CardTitle>Item Sales</CardTitle>
+                                <CardTitle>Item Sales (Completed Orders)</CardTitle>
                                 <CardDescription>Total count and value of each item sold.</CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -575,5 +582,3 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-    

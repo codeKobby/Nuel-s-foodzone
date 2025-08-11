@@ -6,7 +6,7 @@ import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, delete
 import { db } from '@/lib/firebase';
 import type { MiscExpense } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { Trash2, Check, PlusCircle } from 'lucide-react';
+import { Trash2, Check, PlusCircle, Coins, CreditCard } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,17 +27,29 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 
 const MiscExpenseForm = ({
     formState,
     handleFormChange,
     handleSubmit,
+    source,
+    setSource
 }: {
     formState: { purpose: string; amount: string };
     handleFormChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     handleSubmit: (e: React.FormEvent) => void;
+    source: 'cash' | 'momo' | null;
+    setSource: (source: 'cash' | 'momo') => void;
 }) => (
      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+            <Label>Source</Label>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+                <Button type="button" onClick={() => setSource('cash')} variant={source === 'cash' ? 'default' : 'outline'}><Coins className="mr-2"/>Cash</Button>
+                <Button type="button" onClick={() => setSource('momo')} variant={source === 'momo' ? 'default' : 'outline'}><CreditCard className="mr-2"/>Momo</Button>
+            </div>
+        </div>
         <div>
             <Label htmlFor="purpose">Purpose</Label>
             <Input type="text" name="purpose" id="purpose" value={formState.purpose} onChange={handleFormChange} required placeholder="e.g., 'Bought new napkins'"/>
@@ -47,7 +59,7 @@ const MiscExpenseForm = ({
             <Input type="number" name="amount" id="amount" value={formState.amount} onChange={handleFormChange} required placeholder="0.00"/>
         </div>
         <div className="pt-4">
-            <Button type="submit" className="w-full font-bold">Add Expense</Button>
+            <Button type="submit" className="w-full font-bold" disabled={!formState.purpose || !formState.amount || !source}>Add Expense</Button>
         </div>
     </form>
 );
@@ -58,6 +70,7 @@ const MiscView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [formState, setFormState] = useState({ purpose: '', amount: '' });
+    const [source, setSource] = useState<'cash' | 'momo' | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<MiscExpense | null>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const isMobile = useIsMobile();
@@ -77,16 +90,18 @@ const MiscView: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formState.purpose || !formState.amount) return;
+        if (!formState.purpose || !formState.amount || !source) return;
         const data = { 
             purpose: formState.purpose, 
-            amount: parseFloat(formState.amount), 
+            amount: parseFloat(formState.amount),
+            source: source,
             settled: false,
             timestamp: serverTimestamp()
         };
         try {
             await addDoc(collection(db, "miscExpenses"), data);
             setFormState({ purpose: '', amount: ''});
+            setSource(null);
             setIsSheetOpen(false); // Close sheet on mobile after submission
         } catch (e) { setError("Failed to save expense."); }
     };
@@ -123,6 +138,8 @@ const MiscView: React.FC = () => {
                                     formState={formState}
                                     handleFormChange={handleFormChange}
                                     handleSubmit={handleSubmit}
+                                    source={source}
+                                    setSource={setSource}
                                 />
                                 </div>
                             </SheetContent>
@@ -140,10 +157,13 @@ const MiscView: React.FC = () => {
                         <CardContent className="space-y-3">
                             {expenses.length === 0 && <p className="text-muted-foreground italic text-center py-4">No expenses recorded yet.</p>}
                             {expenses.map(item => (
-                                <div key={item.id} className={`p-3 rounded-lg flex justify-between items-center ${item.settled ? 'bg-green-100 dark:bg-green-900/20' : 'bg-secondary'}`}>
+                                <div key={item.id} className={cn('p-3 rounded-lg flex justify-between items-center', item.settled ? 'bg-green-100 dark:bg-green-900/20' : 'bg-secondary')}>
                                     <div>
-                                        <p className="font-semibold">{item.purpose}</p>
-                                        <p className="text-sm text-muted-foreground">{formatCurrency(item.amount)} - {formatTimestamp(item.timestamp)}</p>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant={item.source === 'cash' ? 'outline' : 'secondary'} className="capitalize">{item.source}</Badge>
+                                            <p className="font-semibold">{item.purpose}</p>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mt-1">{formatCurrency(item.amount)} - {formatTimestamp(item.timestamp)}</p>
                                     </div>
                                     <div className="flex items-center space-x-1">
                                         {item.settled ? (
@@ -169,6 +189,8 @@ const MiscView: React.FC = () => {
                             formState={formState}
                             handleFormChange={handleFormChange}
                             handleSubmit={handleSubmit}
+                            source={source}
+                            setSource={setSource}
                         />
                     </CardContent>
                 </Card>

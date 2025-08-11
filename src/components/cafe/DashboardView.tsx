@@ -153,7 +153,7 @@ const DashboardView: React.FC = () => {
             ]);
 
             // Process Orders
-            let totalSales = 0, cashSales = 0, momoSales = 0, unpaidOrdersValue = 0, totalOrders = 0;
+            let cashSales = 0, momoSales = 0, unpaidOrdersValue = 0, totalOrders = 0;
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             const salesByDay: Record<string, number> = {};
             
@@ -163,10 +163,6 @@ const DashboardView: React.FC = () => {
             sortedDocs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 totalOrders++;
-
-                if (order.status === 'Completed') {
-                    totalSales += order.total;
-                }
 
                 if (order.paymentStatus === 'Unpaid') {
                     unpaidOrdersValue += order.balanceDue;
@@ -179,17 +175,19 @@ const DashboardView: React.FC = () => {
                     if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
                     if(order.paymentMethod === 'momo') momoSales += order.total;
                 }
-                
-                order.items.forEach(item => {
-                    const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
-                    itemStats[item.name] = {
-                        count: currentStats.count + item.quantity,
-                        totalValue: currentStats.totalValue + (item.quantity * item.price)
-                    };
-                });
 
-                // For sales trend chart, use paid amounts
-                if (order.timestamp && (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid')) {
+                if (order.status === 'Completed') {
+                    order.items.forEach(item => {
+                        const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                        itemStats[item.name] = {
+                            count: currentStats.count + item.quantity,
+                            totalValue: currentStats.totalValue + (item.quantity * item.price)
+                        };
+                    });
+                }
+                
+                // For sales trend chart, use paid amounts from completed orders
+                if (order.timestamp && order.status === 'Completed' && (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid')) {
                     const orderDate = order.timestamp.toDate();
                     const dayKey = format(orderDate, 'MMM d');
                     salesByDay[dayKey] = (salesByDay[dayKey] || 0) + (order.amountPaid - (order.total - order.balanceDue));
@@ -213,12 +211,17 @@ const DashboardView: React.FC = () => {
                 totalMiscExpenses += expense.amount;
             });
             
+            const totalSales = ordersSnapshot.docs
+                .map(doc => doc.data() as Order)
+                .filter(o => o.status === 'Completed')
+                .reduce((acc, order) => acc + order.total, 0);
+
             const netRevenue = (cashSales + momoSales) - totalMiscExpenses;
             
             const salesData = Object.entries(salesByDay).map(([date, sales]) => ({ date, sales }));
             const itemPerformance = Object.entries(itemStats)
                 .map(([name, data]) => ({name, ...data}))
-                .sort((a, b) => b.count - a.count);
+                .sort((a, b) => b.totalValue - a.count);
 
 
             setStats({
@@ -607,7 +610,7 @@ const DashboardView: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                     <Card className="lg:col-span-3">
                         <CardHeader>
-                            <CardTitle>Paid Sales Trend</CardTitle>
+                            <CardTitle>Completed Sales Trend</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <ChartContainer config={chartConfig} className="h-[250px] md:h-[300px] w-full">
@@ -633,7 +636,7 @@ const DashboardView: React.FC = () => {
                     </Card>
                      <Card className="lg:col-span-2">
                         <CardHeader>
-                            <CardTitle>Item Performance</CardTitle>
+                            <CardTitle>Item Performance (Completed Orders)</CardTitle>
                             <CardDescription>Top and bottom selling items for the period.</CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -656,7 +659,7 @@ const DashboardView: React.FC = () => {
                             <div className="flex justify-between items-start">
                                 <div>
                                     <CardTitle>Complete Item Sales List</CardTitle>
-                                    <CardDescription>All items sold in the period.</CardDescription>
+                                    <CardDescription>All items from completed orders in the period.</CardDescription>
                                 </div>
                                 <div className="relative w-48">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -41,6 +41,7 @@ export interface MiscExpense {
   id: string;
   purpose: string;
   amount: number;
+  source: 'cash' | 'momo';
   timestamp: Timestamp;
   settled: boolean;
 }
