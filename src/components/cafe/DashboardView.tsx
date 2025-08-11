@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, add
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport, ChatSession, AnalyzeBusinessOutput } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -64,7 +64,7 @@ interface DashboardStats {
     unpaidOrdersValue: number;
     cashDiscrepancy: number; // sum of deficits and surpluses
     salesData: { date: string; sales: number }[];
-    itemPerformance: { name: string; count: number }[];
+    itemPerformance: { name: string; count: number; totalValue: number }[];
 }
 
 interface ChatMessage {
@@ -113,24 +113,30 @@ const DashboardView: React.FC = () => {
     const [isHistoryView, setIsHistoryView] = useState(false);
     const [sessionToDelete, setSessionToDelete] = useState<ChatSession | null>(null);
     const isMobile = useIsMobile();
+    const [itemSearchQuery, setItemSearchQuery] = useState('');
 
 
     const fetchDashboardData = useCallback(async () => {
-        if (!date?.from || !date?.to) return;
+        if (!date?.from) return;
         setLoading(true);
         setError(null);
         setStats(null);
         setAnalysisResult(null);
         
         try {
-            const startDate = Timestamp.fromDate(date.from);
-            const endDate = Timestamp.fromDate(new Date(date.to.getTime() + 86400000)); // Include the whole end day
+            const startDate = new Date(date.from);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = date.to ? new Date(date.to) : new Date(date.from);
+            endDate.setHours(23, 59, 59, 999);
+
+            const startDateTimestamp = Timestamp.fromDate(startDate);
+            const endDateTimestamp = Timestamp.fromDate(endDate);
 
             const ordersRef = collection(db, "orders");
-            const ordersQuery = query(ordersRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate));
+            const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
             
             const reconciliationReportsRef = collection(db, "reconciliationReports");
-            const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate));
+            const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
 
             const [ordersSnapshot, reportsSnapshot] = await Promise.all([
                 getDocs(ordersQuery),
@@ -138,8 +144,8 @@ const DashboardView: React.FC = () => {
             ]);
 
             // Process Orders
-            let totalSales = 0, totalOrders = 0, unpaidOrdersValue = 0;
-            const itemCounts: Record<string, number> = {};
+            let cashSales = 0, momoSales = 0, unpaidOrdersValue = 0, totalOrders = 0;
+            const itemStats: Record<string, { count: number; totalValue: number }> = {};
             const salesByDay: Record<string, number> = {};
             
             const sortedDocs = ordersSnapshot.docs.sort((a, b) => a.data().timestamp.toMillis() - b.data().timestamp.toMillis());
@@ -148,21 +154,29 @@ const DashboardView: React.FC = () => {
             sortedDocs.forEach(doc => {
                 const order = doc.data() as Order;
                 totalOrders++;
-                if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                    totalSales += order.amountPaid;
-                }
+
                 if (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') {
                     unpaidOrdersValue += order.balanceDue;
                 }
+                if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
+                    if (order.paymentMethod === 'cash') cashSales += order.amountPaid;
+                    if (order.paymentMethod === 'momo') momoSales += order.amountPaid;
+                }
                 
                 order.items.forEach(item => {
-                    itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
+                    const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                    itemStats[item.name] = {
+                        count: currentStats.count + item.quantity,
+                        totalValue: currentStats.totalValue + (item.quantity * item.price)
+                    };
                 });
 
                 if (order.timestamp) {
                     const orderDate = order.timestamp.toDate();
                     const dayKey = format(orderDate, 'MMM d');
-                    salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.amountPaid;
+                    if(order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
+                        salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.amountPaid;
+                    }
                 }
             });
             
@@ -176,9 +190,13 @@ const DashboardView: React.FC = () => {
             // Get total settled misc expenses from the dedicated listener
             const totalMiscExpenses = miscExpenses.filter(e => e.settled).reduce((sum, e) => sum + e.amount, 0);
 
+            const totalSales = cashSales + momoSales;
             const netSales = totalSales - totalMiscExpenses;
             const salesData = Object.entries(salesByDay).map(([date, sales]) => ({ date, sales }));
-            const itemPerformance = Object.entries(itemCounts).sort(([, a], [, b]) => b - a).map(([name, count]) => ({name, count}));
+            const itemPerformance = Object.entries(itemStats)
+                .map(([name, data]) => ({name, ...data}))
+                .sort((a, b) => b.count - a.count);
+
 
             setStats({
                 totalSales,
@@ -345,6 +363,13 @@ const DashboardView: React.FC = () => {
     const topItems = useMemo(() => stats?.itemPerformance.slice(0, 5) || [], [stats]);
     const bottomItems = useMemo(() => stats && stats.itemPerformance.length > 5 ? stats.itemPerformance.slice(-5).reverse() : [], [stats]);
     
+    const filteredItemSales = useMemo(() => {
+        if (!stats) return [];
+        if (!itemSearchQuery) return stats.itemPerformance;
+        return stats.itemPerformance.filter(item => item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
+    }, [stats, itemSearchQuery]);
+
+
     const renderChatContent = () => (
          <div className="flex-grow flex flex-col overflow-hidden h-full">
             <ScrollArea className="flex-grow p-4" ref={chatContainerRef}>
@@ -498,7 +523,7 @@ const DashboardView: React.FC = () => {
                 )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
-                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Net Sales" value={formatCurrency(stats.netSales)} description={`${formatCurrency(stats.totalSales)} Total - ${formatCurrency(stats.totalMiscExpenses)} Expenses`}/>
+                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Net Sales" value={formatCurrency(stats.netSales)} description={`${formatCurrency(stats.totalSales)} (Paid) - ${formatCurrency(stats.totalMiscExpenses)} (Expenses)`}/>
                     <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} />
                     <StatCard icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Cash Discrepancy" value={formatCurrency(stats.cashDiscrepancy)} description="Sum of cash surplus/deficit" />
                     <StatCard icon={<AlertCircle className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-red-500"}/>} title="Unpaid Orders" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
@@ -551,10 +576,50 @@ const DashboardView: React.FC = () => {
                            </ScrollArea>
                         </CardContent>
                     </Card>
-                     <Card className="lg:col-span-5">
+                    <Card className="lg:col-span-3">
                         <CardHeader>
-                            <CardTitle className="flex items-center"><Briefcase className="mr-2"/> Unsettled Miscellaneous Expenses</CardTitle>
-                            <CardDescription>Review and settle expenses recorded by cashiers.</CardDescription>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <CardTitle>Complete Item Sales List</CardTitle>
+                                    <CardDescription>All items sold in the period.</CardDescription>
+                                </div>
+                                <div className="relative w-48">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input 
+                                        placeholder="Search items..." 
+                                        className="pl-10 h-9" 
+                                        value={itemSearchQuery} 
+                                        onChange={(e) => setItemSearchQuery(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                             <ScrollArea className="h-64 pr-4">
+                                {filteredItemSales.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {filteredItemSales.map((item, index) => (
+                                            <div key={item.name + index} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
+                                                <div>
+                                                    <p className="font-medium">{item.name}</p>
+                                                    <p className="text-xs text-muted-foreground">{item.count} sold</p>
+                                                </div>
+                                                <Badge variant="outline">{formatCurrency(item.totalValue)}</Badge>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-center text-muted-foreground italic py-8">
+                                        {itemSearchQuery ? 'No items match your search.' : 'No items sold in this period.'}
+                                    </p>
+                                )}
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                     <Card className="lg:col-span-2">
+                        <CardHeader>
+                            <CardTitle className="flex items-center"><Briefcase className="mr-2"/> Unsettled Expenses</CardTitle>
+                            <CardDescription>Review and settle expenses.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <ScrollArea className="h-64 pr-4">
@@ -639,3 +704,5 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    
