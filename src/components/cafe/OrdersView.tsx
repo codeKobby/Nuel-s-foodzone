@@ -2,12 +2,12 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useContext } from 'react';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, runTransaction, where, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, runTransaction, where, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, ShoppingCart, CheckCircle2, Pencil, Search } from 'lucide-react';
+import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, ShoppingCart, CheckCircle2, Pencil, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,17 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Checkbox } from '@/components/ui/checkbox';
 import { OrderEditingContext } from '@/context/OrderEditingContext';
 import { Input } from '@/components/ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 interface OrderCardProps {
     order: Order;
@@ -28,9 +39,10 @@ interface OrderCardProps {
     onDetailsClick: (order: Order) => void;
     onStatusUpdate: (id: string, status: 'Pending' | 'Completed') => void;
     onEdit: (order: Order) => void;
+    onDelete: (order: Order) => void;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionChange, onDetailsClick, onStatusUpdate, onEdit }) => {
+const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionChange, onDetailsClick, onStatusUpdate, onEdit, onDelete }) => {
     const paymentStatusVariant = {
         'Paid': 'default',
         'Unpaid': 'destructive',
@@ -41,12 +53,12 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
     const isChangeOwedToCustomer = order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total;
     
     const itemSnippet = useMemo(() => {
-        return order.items.map(item => `${item.quantity}x ${item.name}`).join(', ');
+        return order.items.map(item => `${item.quantity}x ${item.name}`).join(', ').substring(0, 100);
     }, [order.items]);
 
 
     return (
-        <Card className={`flex flex-col justify-between transition hover:shadow-md ${isSelected ? 'border-primary ring-2 ring-primary' : ''} ${order.status === 'Completed' ? 'bg-secondary/50' : ''}`}>
+        <Card className={`flex flex-col justify-between transition hover:shadow-md ${isSelected ? 'border-primary ring-2 ring-primary' : ''} ${order.status === 'Completed' ? 'bg-card' : 'bg-card'}`}>
              <CardHeader className="p-4">
                 <div className="flex justify-between items-start">
                      <div className="flex items-center space-x-3">
@@ -84,17 +96,21 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                 <p className="text-xs text-muted-foreground mt-2 flex items-center"><CalendarDays size={12} className="inline mr-1.5" />{formatTimestamp(order.timestamp)}</p>
             </CardContent>
             <CardFooter className="grid grid-cols-2 gap-2 p-4 mt-auto">
-                <Button onClick={() => onDetailsClick(order)} variant="outline" className="col-span-2">Details</Button>
-                {order.status === 'Pending' ? (
+                 {order.status === 'Pending' ? (
                     <>
                         <Button onClick={() => onEdit(order)} variant="secondary"><Pencil size={16} className="mr-2"/> Edit</Button>
                         <Button onClick={() => onStatusUpdate(order.id, 'Completed')} className="bg-green-500 hover:bg-green-600"><Check size={16} className="mr-2"/> Complete</Button>
+                        <Button onClick={() => onDetailsClick(order)} variant="outline" className="col-span-1">Details</Button>
+                        <Button onClick={() => onDelete(order)} variant="destructive" className="col-span-1"><Trash2 size={16} className="mr-2"/> Delete</Button>
                     </>
                 ) : (
+                    <>
+                     <Button onClick={() => onDetailsClick(order)} variant="outline" className="col-span-2">Details</Button>
                      <Button disabled className="col-span-2" variant="outline">
                         <CheckCircle2 size={16} className="mr-2 text-green-500" />
                         Completed
                     </Button>
+                    </>
                 )}
             </CardFooter>
         </Card>
@@ -112,6 +128,8 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
     const [timeRange, setTimeRange] = useState('Today');
     const [searchQuery, setSearchQuery] = useState('');
     const { loadOrderForEditing } = useContext(OrderEditingContext);
+    const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+
 
     useEffect(() => {
         setLoading(true);
@@ -155,6 +173,17 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
             console.error("Error updating status:", e);
         }
     };
+    
+    const handleDeleteOrder = async (orderId: string) => {
+        try {
+            await deleteDoc(doc(db, "orders", orderId));
+            setOrderToDelete(null);
+        } catch (e) {
+            console.error("Error deleting order:", e);
+            setError("Failed to delete order.");
+        }
+    };
+
 
     const handleEditOrder = (order: Order) => {
         if(order.status === 'Pending') {
@@ -197,17 +226,19 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 
         if (searchQuery) {
             const lowercasedQuery = searchQuery.toLowerCase();
-            ordersToFilter = orders.filter(order => {
+            return orders.filter(order => {
                 const hasMatchingTag = order.tag?.toLowerCase().includes(lowercasedQuery);
                 const hasMatchingId = order.simplifiedId.toLowerCase().includes(lowercasedQuery);
                 const hasMatchingItem = order.items.some(item => item.name.toLowerCase().includes(lowercasedQuery));
                 return hasMatchingTag || hasMatchingId || hasMatchingItem;
             });
-        } else if (timeRange === 'Today') {
+        } 
+        
+        if (timeRange === 'Today') {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const todayTimestamp = Timestamp.fromDate(today).toMillis();
-            ordersToFilter = orders.filter(o => o.timestamp && o.timestamp.toMillis() >= todayTimestamp);
+            ordersToFilter = ordersToFilter.filter(o => o.timestamp && o.timestamp.toMillis() >= todayTimestamp);
         }
 
         return ordersToFilter;
@@ -235,6 +266,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                         isSelected={selectedOrderIds.has(order.id)}
                         onSelectionChange={handleSelectionChange}
                         onEdit={handleEditOrder}
+                        onDelete={setOrderToDelete}
                     />) 
                     : <p className="text-muted-foreground italic col-span-full text-center mt-8">{emptyMessage}</p>}
             </div>
@@ -286,7 +318,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                         )}
                          <div className="flex flex-grow space-x-1 bg-card p-1 rounded-lg shadow-sm">
                             {['Today', 'All Time'].map(range => (
-                                <Button key={range} onClick={() => setTimeRange(range)} variant={timeRange === range ? 'default' : 'ghost'} size="sm" className="flex-1">{range}</Button>
+                                <Button key={range} onClick={() => { setSearchQuery(''); setTimeRange(range);}} variant={timeRange === range && !searchQuery ? 'default' : 'ghost'} size="sm" className="flex-1">{range}</Button>
                             ))}
                         </div>
                     </div>
@@ -311,11 +343,28 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                 {selectedOrder && <OrderDetailsModal order={selectedOrder} onEdit={handleEditOrder} onClose={() => setSelectedOrder(null)} />}
                 {isChangeModalOpen && <ChangeDueModal orders={changeDueOrders} onSettle={settleChange} onClose={() => setIsChangeModalOpen(false)} />}
                 {isCombinedPaymentModalOpen && <CombinedPaymentModal orders={selectedOrders} onOrderPlaced={handleCombinedPaymentSuccess} onClose={() => setIsCombinedPaymentModalOpen(false)} />}
+
+                {orderToDelete && (
+                     <AlertDialog open onOpenChange={() => setOrderToDelete(null)}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will permanently delete order <span className="font-bold">{orderToDelete.simplifiedId}</span>. This action cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteOrder(orderToDelete.id)} className="bg-destructive hover:bg-destructive/90">
+                                    Yes, delete it
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                )}
             </div>
         </TooltipProvider>
     );
 };
 
 export default OrdersView;
-
-    
