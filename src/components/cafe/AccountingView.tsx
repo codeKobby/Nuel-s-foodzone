@@ -45,7 +45,7 @@ import { addDays, format, isToday } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 interface PeriodStats {
@@ -132,7 +132,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             // Fetch all orders and misc expenses for the period
             const ordersQuery = query(collection(db, "orders"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
             const miscQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
-            const allOrdersQuery = query(collection(db, "orders"));
+            const allOrdersQuery = query(collection(db, "orders"), where("status", "==", "Pending"));
 
             
             const [periodOrdersSnapshot, miscSnapshot, allOrdersSnapshot] = await Promise.all([
@@ -148,10 +148,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
             allOrdersSnapshot.docs.forEach(doc => {
                  const order = { id: doc.id, ...doc.data() } as Order;
-                // Calculate all-time unpaid balance from all orders
-                if (order.status === 'Pending') {
-                    unpaidOrdersValue += order.total;
-                }
+                unpaidOrdersValue += order.total;
             });
             
             periodOrdersSnapshot.docs.forEach(doc => {
@@ -194,8 +191,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
 
             let miscCashExpenses = 0, miscMomoExpenses = 0;
-            const miscSnapshotResult = await getDocs(miscQuery);
-            miscSnapshotResult.forEach(doc => {
+            miscSnapshot.forEach(doc => {
                 const expense = doc.data() as MiscExpense;
                 if (expense.source === 'cash') {
                     miscCashExpenses += expense.amount;
