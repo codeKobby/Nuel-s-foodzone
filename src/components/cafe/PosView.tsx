@@ -2,9 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
-import { collection, onSnapshot, addDoc, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { initialMenuData } from '@/data/initial-data';
 import { Search, ShoppingBag, Plus, Minus, PlusCircle, X, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import type { MenuItem, OrderItem } from '@/lib/types';
@@ -156,33 +155,7 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
     useEffect(() => {
         setLoading(true);
         const menuRef = collection(db, "menuItems");
-        
-        const initializeMenu = async () => {
-            try {
-                const existingSnapshot = await getDocs(menuRef);
-                const existingNames = new Set(existingSnapshot.docs.map(doc => doc.data().name));
-                
-                const itemsToAdd = initialMenuData.filter(item => !existingNames.has(item.name));
-
-                if (itemsToAdd.length > 0) {
-                    console.log(`Adding ${itemsToAdd.length} new items to the menu.`);
-                    const batch = writeBatch(db);
-                    for (const item of itemsToAdd) {
-                        const newItemRef = doc(menuRef);
-                        batch.set(newItemRef, item);
-                    }
-                    await batch.commit();
-                }
-            } catch (e) {
-                console.error("Error ensuring initial menu data:", e);
-                setError("Failed to initialize menu data.");
-            }
-        };
-
-        const unsubscribe = onSnapshot(menuRef, async (snapshot) => {
-            if (snapshot.empty && initialMenuData.length > 0) {
-                await initializeMenu();
-            }
+        const unsubscribe = onSnapshot(menuRef, (snapshot) => {
             const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem));
             setMenuItems(items);
             setLoading(false);

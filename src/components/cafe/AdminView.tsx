@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { MenuItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { Edit, Trash2, PlusCircle, Search, AlertCircle, KeyRound, ShieldCheck } from 'lucide-react';
+import { Edit, Trash2, PlusCircle, Search, AlertCircle, KeyRound, ShieldCheck, RefreshCw } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { updatePassword } from '@/lib/auth-tools';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { initialMenuData } from '@/data/initial-data';
 
 
 const AdminForm = ({
@@ -80,6 +81,7 @@ const AdminView: React.FC = () => {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const isMobile = useIsMobile();
     const [searchQuery, setSearchQuery] = useState('');
+    const [isSyncing, setIsSyncing] = useState(false);
     
     // Password state
     const [currentPassword, setCurrentPassword] = useState('');
@@ -139,6 +141,46 @@ const AdminView: React.FC = () => {
     const handleDelete = async (itemId: string) => {
         try { await deleteDoc(doc(db, "menuItems", itemId)); } catch (e) { setError("Failed to delete menu item."); }
         setShowDeleteConfirm(null);
+    };
+    
+    const handleSyncInitialMenu = async () => {
+        setIsSyncing(true);
+        setError(null);
+        try {
+            const menuRef = collection(db, "menuItems");
+            const existingSnapshot = await getDocs(menuRef);
+            const existingNames = new Set(existingSnapshot.docs.map(doc => doc.data().name));
+            
+            const itemsToAdd = initialMenuData.filter(item => !existingNames.has(item.name));
+
+            if (itemsToAdd.length > 0) {
+                const batch = writeBatch(db);
+                for (const item of itemsToAdd) {
+                    const newItemRef = doc(menuRef);
+                    batch.set(newItemRef, item);
+                }
+                await batch.commit();
+                 toast({
+                    title: "Menu Synced",
+                    description: `Added ${itemsToAdd.length} new items to the menu.`,
+                });
+            } else {
+                 toast({
+                    title: "Menu Synced",
+                    description: "No new items to add. Menu is already up to date.",
+                });
+            }
+        } catch (e) {
+            console.error("Error syncing initial menu data:", e);
+            setError("Failed to sync initial menu data.");
+            toast({
+                variant: 'destructive',
+                title: "Sync Failed",
+                description: "Could not sync the initial menu data.",
+            });
+        } finally {
+            setIsSyncing(false);
+        }
     };
 
     const handlePasswordUpdate = async (e: React.FormEvent) => {
@@ -286,6 +328,12 @@ const AdminView: React.FC = () => {
                                     handleSubmit={handleSubmit}
                                     onCancel={clearForm}
                                 />
+                                <div className="mt-4 pt-4 border-t">
+                                     <Button variant="outline" className="w-full" onClick={handleSyncInitialMenu} disabled={isSyncing}>
+                                        {isSyncing ? <><RefreshCw className="mr-2 animate-spin"/> Syncing...</> : <><RefreshCw className="mr-2"/>Sync Initial Menu</>}
+                                    </Button>
+                                    <p className="text-xs text-muted-foreground mt-2">Adds any missing default menu items to your database. This will not overwrite any changes you have made.</p>
+                                </div>
                             </CardContent>
                         </TabsContent>
                         <TabsContent value="security">
@@ -338,3 +386,5 @@ const AdminView: React.FC = () => {
 };
 
 export default AdminView;
+
+    

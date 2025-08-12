@@ -119,13 +119,13 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 
                 const newAmountPaid = order.amountPaid + amountToPayForOrder;
                 const newPaymentStatus = newAmountPaid >= order.total ? 'Paid' : 'Partially Paid';
-                const newBalanceDue = Math.max(0, order.total - newAmountPaid);
+                let newBalanceDue = Math.max(0, order.total - newAmountPaid);
                 
                 const updateData: any = {
                     paymentMethod: order.paymentMethod === 'Unpaid' ? paymentMethod : order.paymentMethod,
                     paymentStatus: newPaymentStatus,
                     amountPaid: newAmountPaid,
-                    balanceDue: newBalanceDue,
+                    balanceDue: newBalanceDue, // Temporarily set balance, will be overwritten if it's the last order with change
                     lastPaymentTimestamp: now,
                     lastPaymentAmount: amountToPayForOrder,
                 };
@@ -139,12 +139,14 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             }
             
              // If there is outstanding change due to overpayment in cash, record it on the last order.
-             if (paymentMethod === 'cash' && finalBalanceDue > 0 && ordersToPay.length > 0) {
+             const overpayment = paymentMethod === 'cash' ? amountPaidNum - totalToPay : 0;
+             if (overpayment > 0 && ordersToPay.length > 0) {
                 const lastOrder = ordersToPay[ordersToPay.length - 1];
                 const lastOrderRef = doc(db, "orders", lastOrder.id);
                 // The balanceDue field tracks both money owed by customer and change owed to customer.
                 // Here we set it to the change owed.
-                batch.update(lastOrderRef, { balanceDue: finalBalanceDue, changeGiven: changeGivenNum });
+                const changeToRecord = overpayment - changeGivenNum;
+                batch.update(lastOrderRef, { balanceDue: changeToRecord, changeGiven: changeGivenNum });
             }
 
             await batch.commit();
