@@ -31,8 +31,8 @@ export interface Order {
   paymentMethod: 'cash' | 'momo' | 'Unpaid';
   paymentStatus: 'Paid' | 'Unpaid' | 'Partially Paid';
   amountPaid: number;
-  changeGiven: number;
-  balanceDue: number; // For amount owed by customer OR change owed to customer
+  changeGiven: number; // This tracks cash that has been physically returned or settled.
+  balanceDue: number; // This can be amount owed by customer OR change owed to customer.
   status: 'Pending' | 'Completed';
   timestamp: Timestamp;
   creditSource?: string[]; // Note for traceability, e.g., "Converted to credit for [customerTag]"
@@ -89,5 +89,3 @@ export interface OrderEditingContextType {
     loadOrderForEditing: (order: Order) => void;
     clearEditingOrder: () => void;
 }
-
-    

@@ -75,8 +75,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 paymentMethod: isPaid ? paymentMethod : 'Unpaid',
                 paymentStatus,
                 amountPaid: isPaid ? finalAmountPaid : 0,
-                balanceDue: isPaid ? Math.max(0, finalBalanceDue) : total,
-                changeGiven: 0, // Deprecated at this level, change is just balanceDue > 0
+                balanceDue: isPaid ? finalBalanceDue : total, // balanceDue now tracks underpayment OR change owed
+                changeGiven: 0, // This field is for manually settled change later.
             };
 
             if (isPaid) {
