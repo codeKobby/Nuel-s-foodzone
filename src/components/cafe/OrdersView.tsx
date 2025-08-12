@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Separator } from '../ui/separator';
+import { cn } from '@/lib/utils';
 
 
 interface OrderCardProps {
@@ -49,6 +50,12 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
         'Unpaid': 'destructive',
         'Partially Paid': 'secondary',
     } as const;
+
+    const tagColorClass = {
+        'Paid': 'text-green-600 dark:text-green-400',
+        'Unpaid': 'text-red-600 dark:text-red-400',
+        'Partially Paid': 'text-yellow-600 dark:text-yellow-400',
+    };
     
     const isBalanceOwedByCustomer = (order.paymentStatus === 'Partially Paid' || order.paymentStatus === 'Unpaid') && order.balanceDue > 0;
     const isChangeOwedToCustomer = order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total;
@@ -79,7 +86,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                     </div>
                     <Badge variant={paymentStatusVariant[order.paymentStatus]}>{order.paymentStatus}</Badge>
                 </div>
-                 {order.tag && <p className="text-muted-foreground text-sm pt-2 flex items-center"><Tag size={14} className="inline mr-2"/>{order.tag}</p>}
+                 {order.tag && <p className={cn("text-muted-foreground text-sm pt-2 flex items-center font-semibold", tagColorClass[order.paymentStatus])}><Tag size={14} className="inline mr-2"/>{order.tag}</p>}
             </CardHeader>
             <CardContent className="p-4 flex-grow">
                 <p className="text-muted-foreground text-xs truncate" title={itemSnippet}>{itemSnippet}</p>
@@ -232,54 +239,32 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
     }, [orders, timeRange]);
 
     const finalFilteredOrders = useMemo(() => {
-        if (!searchQuery) {
-            return {
-                pending: filteredOrdersByTime.filter(o => o.status === 'Pending'),
-                unpaid: groupOrdersByDate(orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0)),
-                completed: filteredOrdersByTime.filter(o => o.status === 'Completed'),
-            };
-        }
-
-        const lowercasedQuery = searchQuery.toLowerCase();
-        const searchFiltered = orders.filter(order => {
-            const hasMatchingTag = order.tag?.toLowerCase().includes(lowercasedQuery);
-            const hasMatchingId = order.simplifiedId.toLowerCase().includes(lowercasedQuery);
-            const hasMatchingItem = order.items.some(item => item.name.toLowerCase().includes(lowercasedQuery));
-            return hasMatchingTag || hasMatchingId || hasMatchingItem;
-        });
+        const baseOrders = searchQuery ? orders : filteredOrdersByTime;
+        
+        const searchFiltered = searchQuery 
+            ? baseOrders.filter(order => {
+                const lowercasedQuery = searchQuery.toLowerCase();
+                const hasMatchingTag = order.tag?.toLowerCase().includes(lowercasedQuery);
+                const hasMatchingId = order.simplifiedId.toLowerCase().includes(lowercasedQuery);
+                const hasMatchingItem = order.items.some(item => item.name.toLowerCase().includes(lowercasedQuery));
+                const hasMatchingPaymentMethod = order.paymentMethod.toLowerCase().includes(lowercasedQuery);
+                return hasMatchingTag || hasMatchingId || hasMatchingItem || hasMatchingPaymentMethod;
+            })
+            : baseOrders;
 
         return {
-            pending: searchFiltered.filter(o => o.status === 'Pending'),
+            pending: groupOrdersByDate(searchFiltered.filter(o => o.status === 'Pending')),
             unpaid: groupOrdersByDate(searchFiltered.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0)),
-            completed: searchFiltered.filter(o => o.status === 'Completed'),
+            completed: groupOrdersByDate(searchFiltered.filter(o => o.status === 'Completed')),
         };
     }, [orders, filteredOrdersByTime, searchQuery]);
     
     const changeDueOrders = useMemo(() => orders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [orders]);
     const selectedOrders = useMemo(() => orders.filter(o => selectedOrderIds.has(o.id)), [orders, selectedOrderIds]);
+    const pendingOrdersCount = useMemo(() => Object.values(finalFilteredOrders.pending).flat().length, [finalFilteredOrders.pending]);
     const unpaidOrdersCount = useMemo(() => Object.values(finalFilteredOrders.unpaid).flat().length, [finalFilteredOrders.unpaid]);
+    const completedOrdersCount = useMemo(() => Object.values(finalFilteredOrders.completed).flat().length, [finalFilteredOrders.completed]);
 
-
-    const renderOrderList = (orderList: Order[], emptyMessage: string) => {
-        if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
-        if (error) return <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
-        return (
-             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4">
-                {orderList.length > 0 ? orderList.map(order => 
-                    <OrderCard 
-                        key={order.id} 
-                        order={order} 
-                        onDetailsClick={setSelectedOrder} 
-                        onStatusUpdate={updateOrderStatus}
-                        isSelected={selectedOrderIds.has(order.id)}
-                        onSelectionChange={handleSelectionChange}
-                        onEdit={handleEditOrder}
-                        onDelete={setOrderToDelete}
-                    />) 
-                    : <p className="text-muted-foreground italic col-span-full text-center mt-8">{emptyMessage}</p>}
-            </div>
-        )
-    }
 
     const renderGroupedOrderList = (groupedOrders: Record<string, Order[]>, emptyMessage: string) => {
         if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
@@ -327,7 +312,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                      <div className="relative w-full md:max-w-xs">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search by ID, Tag, or Item..."
+                            placeholder="Search by ID, Tag, Item, Method..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-10"
@@ -369,18 +354,18 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                 </div>
                 <Tabs defaultValue="pending" className="w-full">
                   <TabsList className="grid w-full max-w-md grid-cols-3">
-                    <TabsTrigger value="pending">Pending ({finalFilteredOrders.pending.length})</TabsTrigger>
+                    <TabsTrigger value="pending">Pending ({pendingOrdersCount})</TabsTrigger>
                     <TabsTrigger value="unpaid">Unpaid ({unpaidOrdersCount})</TabsTrigger>
-                    <TabsTrigger value="completed">Completed ({finalFilteredOrders.completed.length})</TabsTrigger>
+                    <TabsTrigger value="completed">Completed ({completedOrdersCount})</TabsTrigger>
                   </TabsList>
                   <TabsContent value="pending">
-                    {renderOrderList(finalFilteredOrders.pending, "No pending orders found.")}
+                    {renderGroupedOrderList(finalFilteredOrders.pending, "No pending orders found.")}
                   </TabsContent>
                    <TabsContent value="unpaid">
                     {renderGroupedOrderList(finalFilteredOrders.unpaid, "No unpaid orders found.")}
                   </TabsContent>
                   <TabsContent value="completed">
-                    {renderOrderList(finalFilteredOrders.completed, "No completed orders found.")}
+                    {renderGroupedOrderList(finalFilteredOrders.completed, "No completed orders found.")}
                   </TabsContent>
                 </Tabs>
 
@@ -412,7 +397,5 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 };
 
 export default OrdersView;
-
-    
 
     
