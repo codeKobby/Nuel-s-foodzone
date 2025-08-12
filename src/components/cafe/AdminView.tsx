@@ -6,7 +6,7 @@ import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from 'fireb
 import { db } from '@/lib/firebase';
 import type { MenuItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { Edit, Trash2, PlusCircle, Search } from 'lucide-react';
+import { Edit, Trash2, PlusCircle, Search, AlertCircle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
 
 const AdminForm = ({
     editingItem,
@@ -140,6 +141,8 @@ const AdminView: React.FC = () => {
         }));
     }, [menuItems, searchQuery]);
 
+    const isDrinkCategory = (category: string) => ['Drinks', 'Breakfast Drinks'].includes(category);
+
     return (
         <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
             <div className="flex-1 p-4 md:p-6 overflow-y-auto">
@@ -193,7 +196,20 @@ const AdminView: React.FC = () => {
                                         <div key={item.id} className="bg-secondary p-3 rounded-lg flex justify-between items-center">
                                             <div>
                                                 <p className="font-semibold text-sm">{item.name}</p>
-                                                <p className="text-sm text-muted-foreground">{formatCurrency(item.price)} - Stock: {item.stock ?? 'N/A'}</p>
+                                                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                                    <span>{formatCurrency(item.price)}</span>
+                                                    {isDrinkCategory(category) && (
+                                                        <>
+                                                         <span>- Stock: {item.stock ?? 'N/A'}</span>
+                                                          {(item.stock ?? 0) <= 5 && (
+                                                            <Badge variant="destructive" className="flex items-center gap-1">
+                                                                <AlertCircle className="h-3 w-3" />
+                                                                Low Stock
+                                                            </Badge>
+                                                          )}
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div className="flex space-x-1">
                                                 <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}><Edit className="h-4 w-4 text-blue-500" /></Button>

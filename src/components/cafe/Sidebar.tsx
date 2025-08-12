@@ -2,7 +2,7 @@
 "use client";
 
 import Image from 'next/image';
-import { Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase, Scale, LogOut } from 'lucide-react';
+import { Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase, Scale, LogOut, Package } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import logo from '@/app/logo.png';
 import { useRouter } from 'next/navigation';
@@ -55,6 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
         cashier: [
             { id: 'pos', icon: Home, label: 'POS' },
             { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
+            { id: 'stock', icon: Package, label: 'Stock' },
             { id: 'accounting', icon: Scale, label: 'Accounting' },
             { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
         ],

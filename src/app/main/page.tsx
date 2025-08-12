@@ -7,7 +7,7 @@ import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Menu, LogOut } from 'lucide-react';
+import { Menu, LogOut, Package } from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/app/logo.png';
 
@@ -19,6 +19,7 @@ import AdminView from '@/components/cafe/AdminView';
 import MiscView from '@/components/cafe/MiscView';
 import AccountingView from '@/components/cafe/AccountingView';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import StockView from '@/components/cafe/StockView';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,7 @@ const MobileNav = ({
         cashier: [
             { id: 'pos', icon: Home, label: 'POS' },
             { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
+            { id: 'stock', icon: Package, label: 'Stock' },
             { id: 'accounting', icon: Scale, label: 'Accounting' },
             { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
         ],
@@ -219,6 +221,7 @@ function CafePage() {
             case 'accounting': return role === 'cashier' ? <AccountingView setActiveView={setActiveView}/> : null;
             case 'misc': return role === 'cashier' ? <MiscView /> : null;
             case 'admin': return role === 'manager' ? <AdminView /> : null;
+            case 'stock': return role === 'cashier' ? <StockView /> : null;
             default: return null;
         }
     };
