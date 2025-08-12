@@ -157,7 +157,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             // Fetch all orders and misc expenses for the period
             const ordersQuery = query(collection(db, "orders"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
             const miscQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
-            const allUnpaidOrdersQuery = query(collection(db, "orders"), where("status", "==", "Pending"));
+            const allUnpaidOrdersQuery = query(collection(db, "orders"), where("paymentStatus", "in", ["Unpaid", "Partially Paid"]));
 
             
             const [periodOrdersSnapshot, miscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
@@ -173,7 +173,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
             allUnpaidOrdersSnapshot.docs.forEach(doc => {
                  const order = { id: doc.id, ...doc.data() } as Order;
-                unpaidOrdersValue += order.total;
+                unpaidOrdersValue += order.balanceDue;
             });
             
             periodOrdersSnapshot.docs.forEach(doc => {
@@ -604,7 +604,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         <ScrollArea className="max-h-[500px] overflow-y-auto pr-4">
                         {reports.length === 0 && <p className="text-muted-foreground italic text-center py-4">No reports saved yet.</p>}
                         {reports.map(report => (
-                            <div key={report.id} className="p-3 rounded-lg bg-secondary space-y-2">
+                            <div key={report.id} className="p-3 mb-2 rounded-lg bg-secondary space-y-2">
                                 <div className="flex justify-between items-center">
                                     <div>
                                         <p className="font-semibold">{report.period}</p>
