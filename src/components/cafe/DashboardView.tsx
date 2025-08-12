@@ -138,7 +138,7 @@ const DashboardView: React.FC = () => {
             const endDateTimestamp = Timestamp.fromDate(endDate);
 
             const ordersRef = collection(db, "orders");
-            const allOrdersQuery = query(ordersRef, where("status", "==", "Completed"));
+            const allOrdersQuery = query(ordersRef);
 
             const reconciliationReportsRef = collection(db, "reconciliationReports");
             const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
@@ -156,31 +156,40 @@ const DashboardView: React.FC = () => {
             let cashSales = 0, momoSales = 0, totalSales = 0, totalOrders = 0;
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             const salesByDay: Record<string, number> = {};
+            let unpaidOrdersValue = 0;
             
             allOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 
+                // Unpaid balance for all time
+                if (order.status === 'Pending') {
+                    unpaidOrdersValue += order.total;
+                }
+                
+                // Filter orders for the selected date range for other stats
                 const orderDate = order.timestamp.toDate();
                 if (orderDate >= startDate && orderDate <= endDate) {
-                    totalOrders++;
-                    totalSales += order.total;
+                    if (order.status === 'Completed') {
+                        totalOrders++;
+                        totalSales += order.total;
 
-                    // Sales trend chart
-                    const dayKey = format(orderDate, 'MMM d');
-                    salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.total;
+                        // Sales trend chart
+                        const dayKey = format(orderDate, 'MMM d');
+                        salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.total;
 
-                    // Item performance
-                    order.items.forEach(item => {
-                        const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
-                        itemStats[item.name] = {
-                            count: currentStats.count + item.quantity,
-                            totalValue: currentStats.totalValue + (item.quantity * item.price)
-                        };
-                    });
+                        // Item performance
+                        order.items.forEach(item => {
+                            const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                            itemStats[item.name] = {
+                                count: currentStats.count + item.quantity,
+                                totalValue: currentStats.totalValue + (item.quantity * item.price)
+                            };
+                        });
+                    }
                 }
                 
                 // Accumulate payments received within the date range, even for older orders
-                if(order.paymentStatus !== 'Unpaid') {
+                if(order.paymentStatus !== 'Unpaid' && order.status === 'Completed') {
                     const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
                     if(paymentDate >= startDate && paymentDate <= endDate) {
                         const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
@@ -189,11 +198,6 @@ const DashboardView: React.FC = () => {
                     }
                 }
             });
-
-            // Get total value of all unpaid orders (all time)
-            const unpaidOrdersQuery = query(collection(db, "orders"), where("status", "==", "Pending"));
-            const unpaidOrdersSnapshot = await getDocs(unpaidOrdersQuery);
-            const unpaidOrdersValue = unpaidOrdersSnapshot.docs.reduce((acc, doc) => acc + (doc.data() as Order).total, 0);
 
             // Process reconciliations
             let cashDiscrepancy = 0;
@@ -580,9 +584,9 @@ const DashboardView: React.FC = () => {
                 )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
-                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Revenue from completed orders"/>
+                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Completed orders in period"/>
                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - Misc. Expenses"/>
-                    <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} description="All completed orders"/>
+                    <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} />
                     <StatCard 
                         icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
                         title="Cash Discrepancy" 
@@ -594,12 +598,11 @@ const DashboardView: React.FC = () => {
                 
                  <Card className="mb-6">
                     <CardHeader>
-                        <CardTitle>Revenue Breakdown</CardTitle>
+                        <CardTitle>Revenue Breakdown (Period)</CardTitle>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <CardContent className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                         <StatCard icon={<Landmark className="text-green-600"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} />
                         <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
-                        <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} />
                         <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.totalMiscExpenses)} />
                     </CardContent>
                 </Card>

@@ -129,22 +129,25 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const startDateTimestamp = Timestamp.fromDate(startDate);
             const endDateTimestamp = Timestamp.fromDate(endDate);
 
-            // Fetch all orders, regardless of date, to find past payments made today.
-            const allOrdersRef = collection(db, "orders");
-            const allOrdersQuery = query(allOrdersRef, where("status", "in", ["Completed", "Pending"]));
-
-            const miscExpensesRef = collection(db, "miscExpenses");
-            const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
+            // Fetch all orders and misc expenses
+            const allOrdersQuery = query(collection(db, "orders"));
+            const miscQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
             
             const [allOrdersSnapshot, miscSnapshot] = await Promise.all([getDocs(allOrdersQuery), getDocs(miscQuery)]);
 
-            let cashSales = 0, momoSales = 0, totalChangeOwed = 0, unpaidOrdersValue = 0, totalSalesToday = 0;
+            let cashSales = 0, momoSales = 0, totalChangeOwed = 0, totalSalesToday = 0;
             const periodOrders: Order[] = [];
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
+            let unpaidOrdersValue = 0;
 
             allOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 
+                // Calculate all-time unpaid balance
+                if (order.status === 'Pending') {
+                    unpaidOrdersValue += order.total;
+                }
+
                 // Check if the order was created within the selected date range
                 const orderDate = order.timestamp.toDate();
                 if (orderDate >= startDate && orderDate <= endDate) {
@@ -152,16 +155,15 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
                     if (order.status === 'Completed') {
                         totalSalesToday += order.total;
+
                         if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
                         if(order.paymentMethod === 'momo') momoSales += order.total;
-                    } 
 
-                    if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
-                       totalChangeOwed += order.balanceDue;
-                    }
+                        if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
+                            totalChangeOwed += order.balanceDue;
+                        }
                     
-                    if (order.status === 'Completed') {
-                         order.items.forEach(item => {
+                        order.items.forEach(item => {
                             const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
                             itemStats[item.name] = {
                                 count: currentStats.count + item.quantity,
@@ -172,7 +174,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 }
                 
                 // Account for payments made today for orders from previous days
-                if (order.lastPaymentTimestamp) {
+                if (order.lastPaymentTimestamp && order.status === 'Completed') {
                     const lastPaymentDate = order.lastPaymentTimestamp.toDate();
                     if (lastPaymentDate >= startDate && lastPaymentDate <= endDate && orderDate < startDate) {
                         const paidAmount = order.lastPaymentAmount || 0;
@@ -181,12 +183,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     }
                 }
             });
-            
-            // Get all pending orders to calculate total unpaid value
-            const pendingOrdersQuery = query(collection(db, "orders"), where("status", "==", "Pending"));
-            const pendingOrdersSnapshot = await getDocs(pendingOrdersQuery);
-            unpaidOrdersValue = pendingOrdersSnapshot.docs.reduce((acc, doc) => acc + (doc.data() as Order).total, 0);
-
 
             let miscCashExpenses = 0, miscMomoExpenses = 0;
             miscSnapshot.forEach(doc => {
