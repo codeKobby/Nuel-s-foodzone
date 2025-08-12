@@ -35,6 +35,8 @@ export interface Order {
   status: 'Pending' | 'Completed';
   timestamp: Timestamp;
   creditSource?: string[]; // Array of simplifiedOrderIds from which credit was used
+  lastPaymentTimestamp?: Timestamp;
+  lastPaymentAmount?: number;
 }
 
 export interface MiscExpense {
@@ -88,3 +90,5 @@ export interface Customer {
     id: string; // Corresponds to the tag
     credit: number;
 }
+
+    

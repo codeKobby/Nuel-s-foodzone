@@ -10,17 +10,22 @@ import { type GetBusinessDataOutput } from '@/ai/schemas';
  */
 export async function getBusinessDataForRange(startDateStr: string, endDateStr: string): Promise<GetBusinessDataOutput> {
     try {
-        const startDate = Timestamp.fromDate(new Date(startDateStr));
-        const endDate = Timestamp.fromDate(new Date(new Date(endDateStr).getTime() + 86400000)); // Include the whole end day
+        const startDate = new Date(startDateStr);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(endDateStr);
+        endDate.setHours(23, 59, 59, 999);
+
+        const startDateTimestamp = Timestamp.fromDate(startDate);
+        const endDateTimestamp = Timestamp.fromDate(endDate);
 
         const ordersRef = collection(db, "orders");
-        const ordersQuery = query(ordersRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate));
+        const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
         
         const miscExpensesRef = collection(db, "miscExpenses");
-        const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate));
+        const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<", endDateTimestamp));
         
         const reconciliationReportsRef = collection(db, "reconciliationReports");
-        const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDate), where("timestamp", "<", endDate));
+        const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<", endDateTimestamp));
 
         const [ordersSnapshot, miscSnapshot, reportsSnapshot] = await Promise.all([
             getDocs(ordersQuery),
@@ -31,35 +36,40 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         let cashSales = 0;
         let momoSales = 0;
         let changeOwed = 0;
-        let unpaidOrdersValue = 0;
         let totalOrders = 0;
         const itemCounts: Record<string, number> = {};
 
         ordersSnapshot.forEach(doc => {
             const order = doc.data() as Order;
-            totalOrders++;
-            
-            if (order.paymentStatus === 'Unpaid') {
-                unpaidOrdersValue += order.balanceDue;
-            } else if (order.paymentStatus === 'Partially Paid') {
-                unpaidOrdersValue += order.balanceDue;
-                const paidAmount = order.amountPaid - (order.total - order.balanceDue);
-                if (order.paymentMethod === 'cash') cashSales += paidAmount;
-                if (order.paymentMethod === 'momo') momoSales += paidAmount;
-            } else if (order.paymentStatus === 'Paid') {
-                if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
-                if(order.paymentMethod === 'momo') momoSales += order.total;
-            }
+            if (order.status === 'Completed') {
+                totalOrders++;
+                if (order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
+                if (order.paymentMethod === 'momo') momoSales += order.total;
 
-            // Calculate change owed to customer
-            if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
-                changeOwed += order.balanceDue;
-            }
+                // Calculate change owed to customer
+                if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
+                    changeOwed += order.balanceDue;
+                }
 
-            if(order.status === 'Completed'){
-                 order.items.forEach(item => {
+                order.items.forEach(item => {
                     itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
                 });
+            }
+        });
+        
+        // Find payments for old orders made today
+        const allCompletedOrdersQuery = query(collection(db, "orders"), where("status", "==", "Completed"));
+        const allCompletedOrdersSnapshot = await getDocs(allCompletedOrdersQuery);
+        allCompletedOrdersSnapshot.forEach(doc => {
+            const order = doc.data() as Order;
+            const orderDate = order.timestamp.toDate();
+             if (order.lastPaymentTimestamp && orderDate < startDate) {
+                const lastPaymentDate = order.lastPaymentTimestamp.toDate();
+                if (lastPaymentDate >= startDate && lastPaymentDate <= endDate) {
+                    const paidAmount = order.lastPaymentAmount || 0;
+                    if (order.paymentMethod === 'cash') cashSales += paidAmount;
+                    if (order.paymentMethod === 'momo') momoSales += paidAmount;
+                }
             }
         });
 
@@ -69,16 +79,9 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             .reduce((acc, order) => acc + order.total, 0);
         
         let totalMiscExpenses = 0;
-        let miscCashExpenses = 0;
-        let miscMomoExpenses = 0;
         miscSnapshot.forEach(doc => {
             const expense = doc.data() as MiscExpense;
             totalMiscExpenses += expense.amount;
-            if(expense.source === 'cash') {
-                miscCashExpenses += expense.amount;
-            } else {
-                miscMomoExpenses += expense.amount;
-            }
         });
 
         let cashDiscrepancy = 0;
@@ -120,3 +123,5 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         };
     }
 }
+
+    

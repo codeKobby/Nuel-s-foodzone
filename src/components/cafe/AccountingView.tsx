@@ -85,7 +85,7 @@ const denominations = [
 
 const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setActiveView}) => {
     const [stats, setStats] = useState<PeriodStats | null>(null);
-    const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
+    const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }], {}));
     const [countedMomo, setCountedMomo] = useState('');
     const [notes, setNotes] = useState('');
     const [changeSetAside, setChangeSetAside] = useState(false);
@@ -129,51 +129,66 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const startDateTimestamp = Timestamp.fromDate(startDate);
             const endDateTimestamp = Timestamp.fromDate(endDate);
 
-            const ordersRef = collection(db, "orders");
-            const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
-            
+            // Fetch all orders, regardless of date, to find past payments made today.
+            const allOrdersRef = collection(db, "orders");
+            const allOrdersQuery = query(allOrdersRef, where("status", "==", "Completed"), where("paymentStatus", "in", ["Paid", "Partially Paid"]));
+
             const miscExpensesRef = collection(db, "miscExpenses");
             const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
             
-            const [ordersSnapshot, miscSnapshot] = await Promise.all([getDocs(ordersQuery), getDocs(miscQuery)]);
+            const [allOrdersSnapshot, miscSnapshot] = await Promise.all([getDocs(allOrdersQuery), getDocs(miscQuery)]);
 
-            let cashSales = 0, momoSales = 0, totalChangeOwed = 0, unpaidOrdersValue = 0;
+            let cashSales = 0, momoSales = 0, totalChangeOwed = 0, unpaidOrdersValue = 0, totalSalesToday = 0;
             const periodOrders: Order[] = [];
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
 
-
-            ordersSnapshot.docs.forEach(doc => {
+            allOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
-                periodOrders.push(order);
                 
-                if (order.status === 'Completed') {
-                    if (order.paymentStatus === 'Partially Paid') {
-                        unpaidOrdersValue += order.balanceDue;
-                        const paidAmount = order.amountPaid - (order.total - order.balanceDue);
-                        if(order.paymentMethod === 'cash') cashSales += paidAmount;
-                        if(order.paymentMethod === 'momo') momoSales += paidAmount;
-                    } else if (order.paymentStatus === 'Paid') {
+                // Check if the order was created within the selected date range
+                const orderDate = order.timestamp.toDate();
+                if (orderDate >= startDate && orderDate <= endDate) {
+                    periodOrders.push(order);
+
+                    if (order.status === 'Completed') {
+                        totalSalesToday += order.total;
                         if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
                         if(order.paymentMethod === 'momo') momoSales += order.total;
+                    } else if (order.status === 'Pending') {
+                        unpaidOrdersValue += order.total;
                     }
-                } else {
-                     unpaidOrdersValue += order.total;
+
+                    if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
+                       totalChangeOwed += order.balanceDue;
+                    }
+                    
+                    if (order.status === 'Completed') {
+                         order.items.forEach(item => {
+                            const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                            itemStats[item.name] = {
+                                count: currentStats.count + item.quantity,
+                                totalValue: currentStats.totalValue + (item.quantity * item.price)
+                            };
+                        });
+                    }
                 }
                 
-                if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
-                   totalChangeOwed += order.balanceDue;
-                }
-
-                if (order.status === 'Completed') {
-                    order.items.forEach(item => {
-                        const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
-                        itemStats[item.name] = {
-                            count: currentStats.count + item.quantity,
-                            totalValue: currentStats.totalValue + (item.quantity * item.price)
-                        };
-                    });
+                // Account for payments made today for orders from previous days
+                if (order.lastPaymentTimestamp) {
+                    const lastPaymentDate = order.lastPaymentTimestamp.toDate();
+                    if (lastPaymentDate >= startDate && lastPaymentDate <= endDate && orderDate < startDate) {
+                        const paidAmount = order.lastPaymentAmount || 0;
+                         if (order.paymentMethod === 'cash') cashSales += paidAmount;
+                        if (order.paymentMethod === 'momo') momoSales += paidAmount;
+                    }
                 }
             });
+            
+            // Get all pending orders to calculate total unpaid value
+            const pendingOrdersQuery = query(collection(db, "orders"), where("status", "==", "Pending"));
+            const pendingOrdersSnapshot = await getDocs(pendingOrdersQuery);
+            unpaidOrdersValue = pendingOrdersSnapshot.docs.reduce((acc, doc) => acc + (doc.data() as Order).total, 0);
+
 
             let miscCashExpenses = 0, miscMomoExpenses = 0;
             miscSnapshot.forEach(doc => {
@@ -185,8 +200,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 }
             });
             
-            const totalSales = cashSales + momoSales + unpaidOrdersValue;
-            const netRevenue = totalSales - (miscCashExpenses + miscMomoExpenses) - unpaidOrdersValue;
+            const totalSales = totalSalesToday;
+            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses);
             const expectedCash = cashSales - miscCashExpenses;
             
             setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, netRevenue, changeOwed: totalChangeOwed, unpaidOrdersValue, orders: periodOrders, itemStats });
@@ -220,7 +235,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     };
     
     const resetForm = () => {
-        setCounts(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
+        setCounts(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }], {}));
         setCountedMomo('');
         setNotes('');
         setChangeSetAside(false);
@@ -485,10 +500,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Cash + MoMo + Unpaid"/>
+                                    <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="From completed orders today"/>
                                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
                                     <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
-                                    <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Orders" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
+                                    <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Orders (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
                                     <StatCard icon={<Coins className="text-red-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change" />
                                     <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} />
                                 </CardContent>
@@ -496,7 +511,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
                                         <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Net Revenue</Label>
                                         <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.netRevenue)}</p>
-                                        <p className="text-xs text-muted-foreground">(Total Sales - Misc. Expenses - Unpaid)</p>
+                                        <p className="text-xs text-muted-foreground">(Paid Sales - Misc. Expenses)</p>
                                         {stats.changeOwed > 0 && (
                                             <p className="text-xs text-red-500 font-semibold mt-1">Remember to keep {formatCurrency(stats.changeOwed)} for change.</p>
                                         )}
@@ -593,5 +608,4 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
 export default AccountingView;
 
-
-      
+    

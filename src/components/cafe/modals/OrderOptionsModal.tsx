@@ -93,6 +93,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         setError(null);
         try {
             const batch = writeBatch(db);
+            const now = serverTimestamp();
 
             // Deduct applied credit from customer's balance
             if (creditApplied > 0 && orderTag) {
@@ -106,7 +107,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 ? (finalAmountPaid < totalAfterCredit ? 'Partially Paid' : 'Paid')
                 : 'Unpaid';
             
-            const orderData = {
+            const orderData: any = {
                 tag: orderTag,
                 orderType,
                 items: Object.values(orderItems).map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
@@ -117,6 +118,15 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 changeGiven: isPaid && paymentMethod === 'cash' ? changeGivenNum : 0,
                 balanceDue: isPaid ? Math.max(0, finalBalanceDue) : total,
             };
+
+            if (isPaid) {
+                orderData.lastPaymentTimestamp = now;
+                orderData.lastPaymentAmount = finalAmountPaid;
+                if (orderData.paymentStatus === 'Paid') {
+                    orderData.status = 'Completed';
+                }
+            }
+
 
             if (editingOrder) {
                 const orderRef = doc(db, "orders", editingOrder.id);
@@ -133,7 +143,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                     id: newOrderRef.id,
                     simplifiedId: generateSimpleOrderId(newCount),
                     status: 'Pending',
-                    timestamp: serverTimestamp(),
+                    timestamp: now,
                 };
                 
                 batch.set(newOrderRef, newOrder);
@@ -241,3 +251,5 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 };
 
 export default OrderOptionsModal;
+
+    

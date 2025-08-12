@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useContext } from 'react';
-import { collection, onSnapshot, query, doc, updateDoc, orderBy, runTransaction, where, Timestamp, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, orderBy, runTransaction, where, Timestamp, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -16,7 +16,7 @@ import OrderDetailsModal from './modals/OrderDetailsModal';
 import ChangeDueModal from './modals/ChangeDueModal';
 import CombinedPaymentModal from './modals/CombinedPaymentModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import { OrderEditingContext } from '@/context/OrderEditingContext';
 import { Input } from '@/components/ui/input';
@@ -207,7 +207,9 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 
                 transaction.update(orderRef, { 
                     balanceDue: newBalance,
-                    changeGiven: newChangeGiven
+                    changeGiven: newChangeGiven,
+                    lastPaymentTimestamp: serverTimestamp(),
+                    lastPaymentAmount: settleAmount,
                 });
             });
         } catch (e) {
@@ -220,33 +222,40 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
         setSelectedOrderIds(new Set());
         setIsCombinedPaymentModalOpen(false);
     };
+    
+    const filteredOrdersByTime = useMemo(() => {
+        if (timeRange === 'All Time') {
+            return orders;
+        }
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayTimestamp = Timestamp.fromDate(today).toMillis();
+        return orders.filter(o => o.timestamp && o.timestamp.toMillis() >= todayTimestamp);
+    }, [orders, timeRange]);
 
-    const filteredOrders = useMemo(() => {
-        let ordersToFilter = orders;
-
-        if (searchQuery) {
-            const lowercasedQuery = searchQuery.toLowerCase();
-            return orders.filter(order => {
-                const hasMatchingTag = order.tag?.toLowerCase().includes(lowercasedQuery);
-                const hasMatchingId = order.simplifiedId.toLowerCase().includes(lowercasedQuery);
-                const hasMatchingItem = order.items.some(item => item.name.toLowerCase().includes(lowercasedQuery));
-                return hasMatchingTag || hasMatchingId || hasMatchingItem;
-            });
-        } 
-        
-        if (timeRange === 'Today') {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayTimestamp = Timestamp.fromDate(today).toMillis();
-            ordersToFilter = ordersToFilter.filter(o => o.timestamp && o.timestamp.toMillis() >= todayTimestamp);
+    const finalFilteredOrders = useMemo(() => {
+        if (!searchQuery) {
+            return {
+                pending: filteredOrdersByTime.filter(o => o.status === 'Pending'),
+                unpaid: orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0),
+                completed: filteredOrdersByTime.filter(o => o.status === 'Completed'),
+            };
         }
 
-        return ordersToFilter;
-    }, [orders, searchQuery, timeRange]);
-    
-    const pendingOrders = useMemo(() => filteredOrders.filter(o => o.status === 'Pending'), [filteredOrders]);
-    const completedOrders = useMemo(() => filteredOrders.filter(o => o.status === 'Completed'), [filteredOrders]);
-    const unpaidOrders = useMemo(() => filteredOrders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0), [filteredOrders]);
+        const lowercasedQuery = searchQuery.toLowerCase();
+        const searchFiltered = orders.filter(order => {
+            const hasMatchingTag = order.tag?.toLowerCase().includes(lowercasedQuery);
+            const hasMatchingId = order.simplifiedId.toLowerCase().includes(lowercasedQuery);
+            const hasMatchingItem = order.items.some(item => item.name.toLowerCase().includes(lowercasedQuery));
+            return hasMatchingTag || hasMatchingId || hasMatchingItem;
+        });
+
+        return {
+            pending: searchFiltered.filter(o => o.status === 'Pending'),
+            unpaid: searchFiltered.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0),
+            completed: searchFiltered.filter(o => o.status === 'Completed'),
+        };
+    }, [orders, filteredOrdersByTime, searchQuery]);
     
     const changeDueOrders = useMemo(() => orders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [orders]);
     const selectedOrders = useMemo(() => orders.filter(o => selectedOrderIds.has(o.id)), [orders, selectedOrderIds]);
@@ -325,18 +334,18 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                 </div>
                 <Tabs defaultValue="pending" className="w-full">
                   <TabsList className="grid w-full max-w-md grid-cols-3">
-                    <TabsTrigger value="pending">Pending ({pendingOrders.length})</TabsTrigger>
-                    <TabsTrigger value="unpaid">Unpaid ({unpaidOrders.length})</TabsTrigger>
-                    <TabsTrigger value="completed">Completed ({completedOrders.length})</TabsTrigger>
+                    <TabsTrigger value="pending">Pending ({finalFilteredOrders.pending.length})</TabsTrigger>
+                    <TabsTrigger value="unpaid">Unpaid ({finalFilteredOrders.unpaid.length})</TabsTrigger>
+                    <TabsTrigger value="completed">Completed ({finalFilteredOrders.completed.length})</TabsTrigger>
                   </TabsList>
                   <TabsContent value="pending">
-                    {renderOrderList(pendingOrders, "No pending orders found.")}
+                    {renderOrderList(finalFilteredOrders.pending, "No pending orders found.")}
                   </TabsContent>
                    <TabsContent value="unpaid">
-                    {renderOrderList(unpaidOrders, "No unpaid orders found.")}
+                    {renderOrderList(finalFilteredOrders.unpaid, "No unpaid orders found.")}
                   </TabsContent>
                   <TabsContent value="completed">
-                    {renderOrderList(completedOrders, "No completed orders found.")}
+                    {renderOrderList(finalFilteredOrders.completed, "No completed orders found.")}
                   </TabsContent>
                 </Tabs>
 
@@ -368,3 +377,5 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 };
 
 export default OrdersView;
+
+    

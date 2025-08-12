@@ -97,6 +97,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         setError(null);
         try {
             const batch = writeBatch(db);
+            const now = serverTimestamp();
 
             if (creditApplied > 0 && customerTag) {
                 const customerRef = doc(db, "customers", customerTag);
@@ -121,7 +122,13 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     paymentStatus: newPaymentStatus,
                     amountPaid: newAmountPaid,
                     balanceDue: newBalanceDue,
+                    lastPaymentTimestamp: now,
+                    lastPaymentAmount: amountToPayForOrder,
                 };
+                
+                if (newPaymentStatus === 'Paid') {
+                    updateData.status = 'Completed';
+                }
 
                 batch.update(orderRef, updateData);
                 remainingPaid -= amountToPayForOrder;
@@ -223,3 +230,5 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 };
 
 export default CombinedPaymentModal;
+
+    

@@ -60,15 +60,15 @@ import { Badge } from '../ui/badge';
 interface DashboardStats {
     totalSales: number;
     netRevenue: number;
-    totalOrders: number;
-    cashSales: number;
-    momoSales: number;
     unpaidOrdersValue: number;
     totalMiscExpenses: number;
     cashDiscrepancy: number;
     salesData: { date: string; sales: number }[];
     itemPerformance: { name: string; count: number; totalValue: number }[];
     discrepancyReports: ReconciliationReport[];
+    cashSales: number;
+    momoSales: number;
+    totalOrders: number;
 }
 
 interface ChatMessage {
@@ -138,45 +138,38 @@ const DashboardView: React.FC = () => {
             const endDateTimestamp = Timestamp.fromDate(endDate);
 
             const ordersRef = collection(db, "orders");
-            const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
-            
+            const allOrdersQuery = query(ordersRef, where("status", "==", "Completed"));
+
             const reconciliationReportsRef = collection(db, "reconciliationReports");
             const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
             
             const miscExpensesRef = collection(db, "miscExpenses");
             const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
 
-            const [ordersSnapshot, reportsSnapshot, miscSnapshot] = await Promise.all([
-                getDocs(ordersQuery),
+            const [allOrdersSnapshot, reportsSnapshot, miscSnapshot] = await Promise.all([
+                getDocs(allOrdersQuery),
                 getDocs(reportsQuery),
                 getDocs(miscQuery),
             ]);
 
             // Process Orders
-            let cashSales = 0, momoSales = 0, unpaidOrdersValue = 0, totalOrders = 0;
+            let cashSales = 0, momoSales = 0, totalSales = 0, totalOrders = 0;
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             const salesByDay: Record<string, number> = {};
             
-            const sortedDocs = ordersSnapshot.docs.sort((a, b) => a.data().timestamp.toMillis() - b.data().timestamp.toMillis());
-
-
-            sortedDocs.forEach(doc => {
+            allOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
-                totalOrders++;
+                
+                const orderDate = order.timestamp.toDate();
+                if (orderDate >= startDate && orderDate <= endDate) {
+                    totalOrders++;
+                    totalSales += order.total;
 
-                if (order.paymentStatus === 'Unpaid') {
-                    unpaidOrdersValue += order.balanceDue;
-                } else if (order.paymentStatus === 'Partially Paid') {
-                    unpaidOrdersValue += order.balanceDue;
-                    const paidAmount = order.amountPaid - (order.total - order.balanceDue);
-                    if (order.paymentMethod === 'cash') cashSales += paidAmount;
-                    if (order.paymentMethod === 'momo') momoSales += paidAmount;
-                } else if (order.paymentStatus === 'Paid') {
-                    if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
-                    if(order.paymentMethod === 'momo') momoSales += order.total;
-                }
+                    // Sales trend chart
+                    const dayKey = format(orderDate, 'MMM d');
+                    salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.total;
 
-                if (order.status === 'Completed') {
+                    // Item performance
                     order.items.forEach(item => {
                         const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
                         itemStats[item.name] = {
@@ -186,14 +179,23 @@ const DashboardView: React.FC = () => {
                     });
                 }
                 
-                // For sales trend chart, use paid amounts from completed orders
-                if (order.timestamp && order.status === 'Completed' && (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid')) {
-                    const orderDate = order.timestamp.toDate();
-                    const dayKey = format(orderDate, 'MMM d');
-                    salesByDay[dayKey] = (salesByDay[dayKey] || 0) + (order.amountPaid - (order.total - order.balanceDue));
+                // Accumulate payments received within the date range, even for older orders
+                if(order.paymentStatus !== 'Unpaid') {
+                    const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
+                    if(paymentDate >= startDate && paymentDate <= endDate) {
+                        const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
+                        if(order.paymentMethod === 'cash') cashSales += paidAmount;
+                        if(order.paymentMethod === 'momo') momoSales += paidAmount;
+                    }
                 }
             });
-            
+
+            // Get total value of all unpaid orders (all time)
+            const unpaidOrdersQuery = query(collection(db, "orders"), where("status", "==", "Pending"));
+            const unpaidOrdersSnapshot = await getDocs(unpaidOrdersQuery);
+            const unpaidOrdersValue = unpaidOrdersSnapshot.docs.reduce((acc, doc) => acc + (doc.data() as Order).total, 0);
+
+            // Process reconciliations
             let cashDiscrepancy = 0;
             const discrepancyReports: ReconciliationReport[] = [];
             reportsSnapshot.forEach(doc => {
@@ -204,18 +206,13 @@ const DashboardView: React.FC = () => {
                 }
             });
 
-            // Get total miscellaneous expenses
+            // Process misc expenses
             let totalMiscExpenses = 0;
             miscSnapshot.forEach(doc => {
                 const expense = doc.data() as MiscExpense;
                 totalMiscExpenses += expense.amount;
             });
             
-            const totalSales = ordersSnapshot.docs
-                .map(doc => doc.data() as Order)
-                .filter(o => o.status === 'Completed')
-                .reduce((acc, order) => acc + order.total, 0);
-
             const netRevenue = (cashSales + momoSales) - totalMiscExpenses;
             
             const salesData = Object.entries(salesByDay).map(([date, sales]) => ({ date, sales }));
@@ -584,8 +581,8 @@ const DashboardView: React.FC = () => {
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
                     <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Revenue from completed orders"/>
-                    <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - All Expenses"/>
-                    <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} description="All created orders"/>
+                    <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - Misc. Expenses"/>
+                    <StatCard icon={<ShoppingBag className="text-blue-500"/>} title="Total Orders" value={stats.totalOrders} description="All completed orders"/>
                     <StatCard 
                         icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
                         title="Cash Discrepancy" 
@@ -602,7 +599,7 @@ const DashboardView: React.FC = () => {
                     <CardContent className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         <StatCard icon={<Landmark className="text-green-600"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} />
                         <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
-                        <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance" value={formatCurrency(stats.unpaidOrdersValue)} />
+                        <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} />
                         <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.totalMiscExpenses)} />
                     </CardContent>
                 </Card>
@@ -782,3 +779,5 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    
