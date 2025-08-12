@@ -107,10 +107,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                 ) : (
                     <>
                      <Button onClick={() => onDetailsClick(order)} variant="outline" className="col-span-2">Details</Button>
-                     <Button disabled className="col-span-2" variant="outline">
-                        <CheckCircle2 size={16} className="mr-2 text-green-500" />
-                        Completed
-                    </Button>
+                     <Button onClick={() => onDelete(order)} variant="destructive" className="col-span-2"><Trash2 size={16} className="mr-2"/> Delete</Button>
                     </>
                 )}
             </CardFooter>
@@ -415,5 +412,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 };
 
 export default OrdersView;
+
+    
 
     
