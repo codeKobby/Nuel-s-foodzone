@@ -85,7 +85,7 @@ const denominations = [
 
 const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setActiveView}) => {
     const [stats, setStats] = useState<PeriodStats | null>(null);
-    const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }], {}));
+    const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
     const [countedMomo, setCountedMomo] = useState('');
     const [notes, setNotes] = useState('');
     const [changeSetAside, setChangeSetAside] = useState(false);
@@ -131,7 +131,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
             // Fetch all orders, regardless of date, to find past payments made today.
             const allOrdersRef = collection(db, "orders");
-            const allOrdersQuery = query(allOrdersRef, where("status", "==", "Completed"), where("paymentStatus", "in", ["Paid", "Partially Paid"]));
+            const allOrdersQuery = query(allOrdersRef, where("status", "in", ["Completed", "Pending"]));
 
             const miscExpensesRef = collection(db, "miscExpenses");
             const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
@@ -154,9 +154,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         totalSalesToday += order.total;
                         if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
                         if(order.paymentMethod === 'momo') momoSales += order.total;
-                    } else if (order.status === 'Pending') {
-                        unpaidOrdersValue += order.total;
-                    }
+                    } 
 
                     if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
                        totalChangeOwed += order.balanceDue;
@@ -235,7 +233,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     };
     
     const resetForm = () => {
-        setCounts(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }], {}));
+        setCounts(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
         setCountedMomo('');
         setNotes('');
         setChangeSetAside(false);
@@ -607,5 +605,3 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-    
