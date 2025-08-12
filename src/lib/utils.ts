@@ -1,5 +1,9 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { isToday, isYesterday, format, formatDistanceToNowStrict } from 'date-fns';
+import type { Order } from './types';
+
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -28,7 +32,7 @@ export const formatTimestamp = (timestamp: any): string => {
     return `Yesterday, ${orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
   }
   return orderDate.toLocaleString('en-US', {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true
+    month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true
   });
 };
 
@@ -39,6 +43,35 @@ export const generateSimpleOrderId = (count: number): string => {
   const day = date.getDate().toString().padStart(2, '0');
   const num = (count).toString().padStart(4, '0');
   return `NFZ-${month}${day}-${num}`;
+};
+
+export const groupOrdersByDate = (orders: Order[]): Record<string, Order[]> => {
+    const grouped: Record<string, Order[]> = {};
+
+    orders.forEach(order => {
+        const orderDate = order.timestamp.toDate();
+        let key: string;
+
+        if (isToday(orderDate)) {
+            key = 'Today';
+        } else if (isYesterday(orderDate)) {
+            key = 'Yesterday';
+        } else {
+            const distance = formatDistanceToNowStrict(orderDate, { addSuffix: true });
+            if (distance.includes('day')) {
+                 key = format(orderDate, 'EEEE, LLL d'); // E.g., Wednesday, Aug 7
+            } else {
+                key = format(orderDate, 'LLL d, yyyy'); // E.g., Aug 7, 2024
+            }
+        }
+        
+        if (!grouped[key]) {
+            grouped[key] = [];
+        }
+        grouped[key].push(order);
+    });
+
+    return grouped;
 };
 
     

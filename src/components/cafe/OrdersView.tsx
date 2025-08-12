@@ -11,12 +11,12 @@ import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, S
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, formatTimestamp } from '@/lib/utils';
+import { formatCurrency, formatTimestamp, groupOrdersByDate } from '@/lib/utils';
 import OrderDetailsModal from './modals/OrderDetailsModal';
 import ChangeDueModal from './modals/ChangeDueModal';
 import CombinedPaymentModal from './modals/CombinedPaymentModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import { OrderEditingContext } from '@/context/OrderEditingContext';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Separator } from '../ui/separator';
 
 
 interface OrderCardProps {
@@ -237,7 +238,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
         if (!searchQuery) {
             return {
                 pending: filteredOrdersByTime.filter(o => o.status === 'Pending'),
-                unpaid: orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0),
+                unpaid: groupOrdersByDate(orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0)),
                 completed: filteredOrdersByTime.filter(o => o.status === 'Completed'),
             };
         }
@@ -252,13 +253,14 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 
         return {
             pending: searchFiltered.filter(o => o.status === 'Pending'),
-            unpaid: searchFiltered.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0),
+            unpaid: groupOrdersByDate(searchFiltered.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0)),
             completed: searchFiltered.filter(o => o.status === 'Completed'),
         };
     }, [orders, filteredOrdersByTime, searchQuery]);
     
     const changeDueOrders = useMemo(() => orders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [orders]);
     const selectedOrders = useMemo(() => orders.filter(o => selectedOrderIds.has(o.id)), [orders, selectedOrderIds]);
+    const unpaidOrdersCount = useMemo(() => Object.values(finalFilteredOrders.unpaid).flat().length, [finalFilteredOrders.unpaid]);
 
 
     const renderOrderList = (orderList: Order[], emptyMessage: string) => {
@@ -281,6 +283,42 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
             </div>
         )
     }
+
+    const renderGroupedOrderList = (groupedOrders: Record<string, Order[]>, emptyMessage: string) => {
+        if (loading) return <div className="mt-8"><LoadingSpinner /></div>;
+        if (error) return <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
+        const groups = Object.keys(groupedOrders);
+        if (groups.length === 0) {
+            return <p className="text-muted-foreground italic col-span-full text-center mt-8">{emptyMessage}</p>;
+        }
+        return (
+            <div className="pt-4 space-y-6">
+                {groups.map(groupName => (
+                    <div key={groupName}>
+                        <div className="flex items-center gap-3">
+                            <h3 className="text-lg font-semibold">{groupName}</h3>
+                            <Separator className="flex-1" />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-3">
+                            {groupedOrders[groupName].map(order =>
+                                <OrderCard
+                                    key={order.id}
+                                    order={order}
+                                    onDetailsClick={setSelectedOrder}
+                                    onStatusUpdate={updateOrderStatus}
+                                    isSelected={selectedOrderIds.has(order.id)}
+                                    onSelectionChange={handleSelectionChange}
+                                    onEdit={handleEditOrder}
+                                    onDelete={setOrderToDelete}
+                                />
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
 
     return (
         <TooltipProvider>
@@ -335,14 +373,14 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                 <Tabs defaultValue="pending" className="w-full">
                   <TabsList className="grid w-full max-w-md grid-cols-3">
                     <TabsTrigger value="pending">Pending ({finalFilteredOrders.pending.length})</TabsTrigger>
-                    <TabsTrigger value="unpaid">Unpaid ({finalFilteredOrders.unpaid.length})</TabsTrigger>
+                    <TabsTrigger value="unpaid">Unpaid ({unpaidOrdersCount})</TabsTrigger>
                     <TabsTrigger value="completed">Completed ({finalFilteredOrders.completed.length})</TabsTrigger>
                   </TabsList>
                   <TabsContent value="pending">
                     {renderOrderList(finalFilteredOrders.pending, "No pending orders found.")}
                   </TabsContent>
                    <TabsContent value="unpaid">
-                    {renderOrderList(finalFilteredOrders.unpaid, "No unpaid orders found.")}
+                    {renderGroupedOrderList(finalFilteredOrders.unpaid, "No unpaid orders found.")}
                   </TabsContent>
                   <TabsContent value="completed">
                     {renderOrderList(finalFilteredOrders.completed, "No completed orders found.")}
@@ -377,7 +415,5 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 };
 
 export default OrdersView;
-
-    
 
     
