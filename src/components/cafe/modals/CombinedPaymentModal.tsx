@@ -25,7 +25,6 @@ interface CombinedPaymentModalProps {
 const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onClose, onOrderPlaced }) => {
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'momo'>('cash');
     const [cashPaid, setCashPaid] = useState('');
-    const [changeGiven, setChangeGiven] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -38,71 +37,64 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         }, 0);
     }, [orders]);
     
-    const amountPaidNum = parseFloat(cashPaid || '0');
-    const calculatedChange = paymentMethod === 'cash' && amountPaidNum > totalToPay ? amountPaidNum - totalToPay : 0;
+    // If cashPaid is empty, assume exact payment. Otherwise, use the entered value.
+    const amountPaidNum = parseFloat(cashPaid || String(totalToPay));
     
-    useEffect(() => {
-        if (paymentMethod === 'cash' && amountPaidNum >= totalToPay) {
-             setCashPaid(amountPaidNum.toString());
-             setChangeGiven(calculatedChange.toFixed(2));
-        } else {
-            setChangeGiven('');
-        }
-    }, [cashPaid, totalToPay, paymentMethod, calculatedChange, amountPaidNum]);
+    // balanceDue will be positive if change is owed to customer, negative if customer still owes money
+    const finalBalanceDue = amountPaidNum - totalToPay;
 
-
-    const changeGivenNum = parseFloat(changeGiven || '0');
-    const finalBalanceDue = paymentMethod === 'cash' 
-        ? (totalToPay > amountPaidNum ? totalToPay - amountPaidNum : calculatedChange - changeGivenNum)
-        : 0;
 
     const processCombinedPayment = async () => {
         setIsProcessing(true);
         setError(null);
+
+        // Final validation for cash payment
+        if (paymentMethod === 'cash' && amountPaidNum < totalToPay) {
+            setError('Cash paid cannot be less than the total amount for combined payment.');
+            setIsProcessing(false);
+            return;
+        }
+
         try {
             const batch = writeBatch(db);
             const now = serverTimestamp();
 
-            let paidAmountForOrders = paymentMethod === 'cash' ? amountPaidNum : totalToPay;
-            let remainingPaid = paidAmountForOrders;
+            let amountToDistribute = totalToPay;
             
             const ordersToPay = orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0).sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
 
             for (const order of ordersToPay) {
                 const orderRef = doc(db, "orders", order.id);
                 const orderBalance = order.balanceDue;
-                const amountToPayForOrder = Math.min(remainingPaid, orderBalance);
+                const amountToPayForOrder = Math.min(amountToDistribute, orderBalance);
                 
                 const newAmountPaid = order.amountPaid + amountToPayForOrder;
-                const newPaymentStatus = newAmountPaid >= order.total ? 'Paid' : 'Partially Paid';
-                let newBalanceDue = Math.max(0, order.total - newAmountPaid);
                 
                 const updateData: any = {
                     paymentMethod: order.paymentMethod === 'Unpaid' ? paymentMethod : order.paymentMethod,
-                    paymentStatus: newPaymentStatus,
+                    paymentStatus: 'Paid',
                     amountPaid: newAmountPaid,
-                    balanceDue: newBalanceDue, // Temporarily set balance, will be overwritten if it's the last order with change
+                    balanceDue: 0, // Initially zeroed out
                     lastPaymentTimestamp: now,
                     lastPaymentAmount: amountToPayForOrder,
+                    status: 'Completed'
                 };
-                
-                if (newPaymentStatus === 'Paid') {
-                    updateData.status = 'Completed';
-                }
 
                 batch.update(orderRef, updateData);
-                remainingPaid -= amountToPayForOrder;
+                amountToDistribute -= amountToPayForOrder;
             }
             
              // If there is outstanding change due to overpayment in cash, record it on the last order.
-             const overpayment = paymentMethod === 'cash' ? amountPaidNum - totalToPay : 0;
-             if (overpayment > 0 && ordersToPay.length > 0) {
+             if (paymentMethod === 'cash' && finalBalanceDue > 0 && ordersToPay.length > 0) {
                 const lastOrder = ordersToPay[ordersToPay.length - 1];
                 const lastOrderRef = doc(db, "orders", lastOrder.id);
                 // The balanceDue field tracks both money owed by customer and change owed to customer.
                 // Here we set it to the change owed.
-                const changeToRecord = overpayment - changeGivenNum;
-                batch.update(lastOrderRef, { balanceDue: changeToRecord, changeGiven: changeGivenNum });
+                batch.update(lastOrderRef, { 
+                    balanceDue: finalBalanceDue,
+                    // cashPaid and changeGiven are for single orders, not combined.
+                    // We can derive change from (amountPaid - total) on the receipt if needed.
+                });
             }
 
             await batch.commit();
@@ -149,25 +141,17 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     {paymentMethod === 'cash' && (
                         <div className="space-y-4">
                             <div>
-                                <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
-                                <Input id="cashPaid" type="number" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                <Label htmlFor="cashPaid">Amount Paid by Customer (Optional)</Label>
+                                <Input id="cashPaid" type="number" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
                             </div>
-                            {cashPaid && calculatedChange > 0 && (
-                                <div>
-                                    <Label htmlFor="changeGiven">Change Given to Customer</Label>
-                                    <Input id="changeGiven" type="number" value={changeGiven} onChange={(e) => setChangeGiven(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} className="text-lg h-12" />
-                                    <p className="text-sm text-muted-foreground mt-1">Calculated change: {formatCurrency(calculatedChange)}</p>
-                                </div>
-                            )}
-                            {cashPaid && totalToPay > amountPaidNum && <p className="font-semibold text-yellow-500">Balance Owed by Customer: {formatCurrency(totalToPay - amountPaidNum)}</p>}
-                            {cashPaid && finalBalanceDue > 0 && amountPaidNum >= totalToPay && <p className="font-semibold text-red-500">Change Owed to Customer: {formatCurrency(finalBalanceDue)}</p>}
+                            {finalBalanceDue > 0 && <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(finalBalanceDue)}</p>}
                         </div>
                     )}
                      {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                 </div>
 
                 <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
-                    <Button onClick={processCombinedPayment} disabled={isProcessing || (paymentMethod === 'cash' && !cashPaid)} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                    <Button onClick={processCombinedPayment} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
                         {isProcessing ? 'Processing...' : 'Confirm Payment'}
                     </Button>
                 </DialogFooter>

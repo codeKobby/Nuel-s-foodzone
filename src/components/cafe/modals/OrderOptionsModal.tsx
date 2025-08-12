@@ -28,7 +28,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     const [orderTag, setOrderTag] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'momo'>('cash');
     const [cashPaid, setCashPaid] = useState('');
-    const [changeGiven, setChangeGiven] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -40,31 +39,30 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     }, [editingOrder]);
 
     const amountPaidNum = parseFloat(cashPaid || '0');
-    const calculatedChange = paymentMethod === 'cash' && amountPaidNum > total ? amountPaidNum - total : 0;
     
-    useEffect(() => {
-        if (paymentMethod === 'cash' && amountPaidNum >= total) {
-             setCashPaid(amountPaidNum.toString()); 
-             setChangeGiven(calculatedChange.toFixed(2));
-        } else {
-            setChangeGiven('');
-        }
-    }, [cashPaid, total, paymentMethod, calculatedChange, amountPaidNum]);
+    // If cashPaid is empty, assume exact payment, so finalAmountPaid will be total
+    const finalAmountPaid = paymentMethod === 'cash' 
+        ? (cashPaid ? amountPaidNum : total)
+        : total;
 
-
-    const changeGivenNum = parseFloat(changeGiven || '0');
-    const finalBalanceDue = paymentMethod === 'cash' 
-        ? (total > amountPaidNum ? total - amountPaidNum : calculatedChange - changeGivenNum)
-        : 0;
+    // This will be positive if change is owed, or negative if the customer underpaid
+    const finalBalanceDue = finalAmountPaid - total;
         
     const processOrder = async (isPaid: boolean) => {
         setIsProcessing(true);
         setError(null);
+        
+        // Final validation for cash payment
+        if (isPaid && paymentMethod === 'cash' && cashPaid && amountPaidNum < total) {
+            setError('Cash paid cannot be less than the total amount.');
+            setIsProcessing(false);
+            return;
+        }
+
         try {
             const batch = writeBatch(db);
             const now = serverTimestamp();
-
-            const finalAmountPaid = isPaid ? (paymentMethod === 'cash' ? amountPaidNum : total) : 0;
+            
             const paymentStatus = isPaid 
                 ? (finalAmountPaid < total ? 'Partially Paid' : 'Paid')
                 : 'Unpaid';
@@ -76,9 +74,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 total,
                 paymentMethod: isPaid ? paymentMethod : 'Unpaid',
                 paymentStatus,
-                amountPaid: finalAmountPaid,
-                changeGiven: isPaid && paymentMethod === 'cash' ? changeGivenNum : 0,
+                amountPaid: isPaid ? finalAmountPaid : 0,
                 balanceDue: isPaid ? Math.max(0, finalBalanceDue) : total,
+                changeGiven: 0, // Deprecated at this level, change is just balanceDue > 0
             };
 
             if (isPaid) {
@@ -167,24 +165,17 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                             {paymentMethod === 'cash' && (
                                 <div className="space-y-4">
                                     <div>
-                                        <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
-                                        <Input id="cashPaid" type="number" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                        <Label htmlFor="cashPaid">Amount Paid by Customer (Optional)</Label>
+                                        <Input id="cashPaid" type="number" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
                                     </div>
-                                    {cashPaid && calculatedChange > 0 && (
-                                        <div>
-                                            <Label htmlFor="changeGiven">Change Given to Customer</Label>
-                                            <Input id="changeGiven" type="number" value={changeGiven} onChange={(e) => setChangeGiven(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} className="text-lg h-12" />
-                                            <p className="text-sm text-muted-foreground mt-1">Calculated change: {formatCurrency(calculatedChange)}</p>
-                                        </div>
-                                    )}
-                                    {cashPaid && total > amountPaidNum && <p className="font-semibold text-yellow-500">Balance Owed by Customer: {formatCurrency(total - amountPaidNum)}</p>}
-                                    {cashPaid && finalBalanceDue > 0 && amountPaidNum >= total && <p className="font-semibold text-red-500">Change Owed to Customer: {formatCurrency(finalBalanceDue)}</p>}
+                                    {cashPaid && finalBalanceDue > 0 && <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(finalBalanceDue)}</p>}
+                                    {cashPaid && finalBalanceDue < 0 && <p className="font-semibold text-yellow-500 text-center">Balance Remaining: {formatCurrency(Math.abs(finalBalanceDue))}</p>}
                                 </div>
                             )}
                              {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                         </div>
                         <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
-                            <Button onClick={() => processOrder(true)} disabled={isProcessing || (paymentMethod === 'cash' && !cashPaid)} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">{isProcessing ? 'Processing...' : 'Confirm'}</Button>
+                            <Button onClick={() => processOrder(true)} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">{isProcessing ? 'Processing...' : 'Confirm'}</Button>
                         </DialogFooter>
                         <Button onClick={() => setStep(1)} variant="link" className="w-full mt-2 text-sm">Back to Options</Button>
                     </>
