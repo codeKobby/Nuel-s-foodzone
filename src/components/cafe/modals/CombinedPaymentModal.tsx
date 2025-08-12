@@ -105,7 +105,11 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 batch.update(customerRef, { credit: newCreditBalance });
             }
 
-            let remainingPaid = paymentMethod === 'cash' ? amountPaidNum : totalToPay;
+            let paidAmountForOrders = paymentMethod === 'cash' ? amountPaidNum : totalToPay;
+            
+            // Apply credit first
+            let remainingPaid = paidAmountForOrders + creditApplied;
+            
             const ordersToPay = orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0);
 
             for (const order of ordersToPay) {
@@ -134,10 +138,13 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 remainingPaid -= amountToPayForOrder;
             }
             
-             if (paymentMethod === 'cash' && changeGivenNum > 0 && ordersToPay.length > 0) {
+             // If there is outstanding change due to overpayment in cash, record it on the last order.
+             if (paymentMethod === 'cash' && finalBalanceDue > 0 && ordersToPay.length > 0) {
                 const lastOrder = ordersToPay[ordersToPay.length - 1];
                 const lastOrderRef = doc(db, "orders", lastOrder.id);
-                batch.update(lastOrderRef, { balanceDue: changeGivenNum, changeGiven: changeGivenNum });
+                // The balanceDue field tracks both money owed by customer and change owed to customer.
+                // Here we set it to the change owed.
+                batch.update(lastOrderRef, { balanceDue: finalBalanceDue, changeGiven: changeGivenNum });
             }
 
             await batch.commit();
@@ -230,3 +237,5 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 };
 
 export default CombinedPaymentModal;
+
+    

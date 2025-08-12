@@ -160,16 +160,14 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
         const initializeMenu = async () => {
             try {
                 const existingSnapshot = await getDocs(menuRef);
-                const existingNames = new Set(existingSnapshot.docs.map(doc => doc.data().name));
-                const batch = writeBatch(db);
-
-                for (const item of initialMenuData) {
-                    if (!existingNames.has(item.name)) {
+                if (existingSnapshot.empty) {
+                    const batch = writeBatch(db);
+                    for (const item of initialMenuData) {
                         const newItemRef = doc(menuRef);
                         batch.set(newItemRef, item);
                     }
+                    await batch.commit();
                 }
-                await batch.commit();
             } catch (e) {
                 console.error("Error ensuring initial menu data:", e);
                 setError("Failed to initialize menu data.");
@@ -179,10 +177,9 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
         const unsubscribe = onSnapshot(menuRef, async (snapshot) => {
             if (snapshot.empty) {
                 await initializeMenu();
-            } else {
-                const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem));
-                setMenuItems(items);
             }
+            const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem));
+            setMenuItems(items);
             setLoading(false);
         }, (e) => {
             console.error("Menu fetch error:", e);
@@ -453,3 +450,5 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
 };
 
 export default PosView;
+
+    
