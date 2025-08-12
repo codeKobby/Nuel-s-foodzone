@@ -155,13 +155,13 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const endDateTimestamp = Timestamp.fromDate(endDate);
 
             // Fetch all orders and misc expenses for the period
-            const ordersQuery = query(collection(db, "orders"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
+            const allOrdersQuery = query(collection(db, "orders"));
             const miscQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
             const allUnpaidOrdersQuery = query(collection(db, "orders"), where("paymentStatus", "in", ["Unpaid", "Partially Paid"]));
 
             
-            const [periodOrdersSnapshot, miscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
-                getDocs(ordersQuery),
+            const [allOrdersSnapshot, miscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
+                getDocs(allOrdersQuery),
                 getDocs(miscQuery),
                 getDocs(allUnpaidOrdersQuery)
             ]);
@@ -176,18 +176,16 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 unpaidOrdersValue += order.balanceDue;
             });
             
-            periodOrdersSnapshot.docs.forEach(doc => {
+            allOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
-                periodOrders.push(order);
-
-                // Add to revenue if order is Completed or Partially Paid within the period
-                if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                    if (order.paymentMethod === 'cash') cashSales += order.amountPaid;
-                    if (order.paymentMethod === 'momo') momoSales += order.amountPaid;
+                
+                const orderDate = order.timestamp.toDate();
+                if (orderDate >= startDate && orderDate <= endDate) {
+                    periodOrders.push(order);
                 }
 
                 // Add to total sales and item performance only if completed within the period
-                if (order.status === 'Completed') {
+                if (order.status === 'Completed' && orderDate >= startDate && orderDate <= endDate) {
                     totalSalesToday += order.total;
                     order.items.forEach(item => {
                         const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
@@ -197,17 +195,12 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         };
                     });
                 }
-            });
                 
-            // Account for payments made today for orders from previous days
-            const allCompletedOrdersSnapshot = await getDocs(query(collection(db, "orders"), where("status", "==", "Completed")));
-            allCompletedOrdersSnapshot.forEach(doc => {
-                const order = doc.data() as Order;
-                const orderDate = order.timestamp.toDate();
-                if (order.lastPaymentTimestamp && orderDate < startDate) {
-                    const lastPaymentDate = order.lastPaymentTimestamp.toDate();
-                    if (lastPaymentDate >= startDate && lastPaymentDate <= endDate) {
-                        const paidAmount = order.lastPaymentAmount || 0;
+                // Add to revenue if a payment was made within the period
+                const paymentDate = order.lastPaymentTimestamp ? order.lastPaymentTimestamp.toDate() : orderDate;
+                if (paymentDate >= startDate && paymentDate <= endDate) {
+                    if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
+                         const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
                         if (order.paymentMethod === 'cash') cashSales += paidAmount;
                         if (order.paymentMethod === 'momo') momoSales += paidAmount;
                     }
@@ -228,7 +221,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const totalSales = totalSalesToday;
             const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses);
             const expectedCash = cashSales - miscCashExpenses;
-            const expectedMomo = momoSales;
+            const expectedMomo = momoSales - miscMomoExpenses;
             const totalExpectedRevenue = expectedCash + expectedMomo;
             
             setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, expectedMomo, totalExpectedRevenue, netRevenue, unpaidOrdersValue, orders: periodOrders, itemStats });
@@ -410,6 +403,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                 <div className="flex justify-between font-bold border-t pt-1"><span>Expected Cash:</span> <span>{formatCurrency(stats.expectedCash)}</span></div>
                                 <Separator className="my-2"/>
                                 <div className="flex justify-between"><span>MoMo Sales:</span> <span>{formatCurrency(stats.momoSales)}</span></div>
+                                <div className="flex justify-between"><span>(-) MoMo Expenses:</span> <span className="text-orange-500">{formatCurrency(stats.miscMomoExpenses)}</span></div>
                                 <div className="flex justify-between font-bold border-t pt-1"><span>Expected MoMo:</span> <span>{formatCurrency(stats.expectedMomo)}</span></div>
                             </CardContent>
                             <CardFooter className="bg-primary/10 p-3">
@@ -654,4 +648,3 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
