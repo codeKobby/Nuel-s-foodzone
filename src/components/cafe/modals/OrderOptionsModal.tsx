@@ -146,7 +146,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                 <Input id="tag" type="text" value={orderTag} onChange={(e) => setOrderTag(e.target.value)} placeholder="e.g., 'Table 5' or 'John D.'" />
                             </div>
                         </div>
-                        <DialogFooter>
+                        <DialogFooter className="grid grid-cols-2 gap-2">
+                             <Button onClick={() => processOrder(false)} disabled={isProcessing} variant="secondary" className="bg-yellow-500 hover:bg-yellow-600 text-white">{isProcessing ? 'Processing...' : 'Pay Later'}</Button>
                             <Button onClick={() => setStep(2)} className="w-full">Proceed to Payment</Button>
                         </DialogFooter>
                     </>
@@ -182,9 +183,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                             )}
                              {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                         </div>
-                        <DialogFooter className="grid grid-cols-2 gap-3 pt-6">
-                            <Button onClick={() => processOrder(false)} disabled={isProcessing} variant="secondary" className="bg-yellow-500 hover:bg-yellow-600 text-white">{isProcessing ? 'Processing...' : 'Pay Later'}</Button>
-                            <Button onClick={() => processOrder(true)} disabled={isProcessing || (paymentMethod === 'cash' && !cashPaid)} className="bg-green-500 hover:bg-green-600 text-white">{isProcessing ? 'Processing...' : 'Confirm'}</Button>
+                        <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
+                            <Button onClick={() => processOrder(true)} disabled={isProcessing || (paymentMethod === 'cash' && !cashPaid)} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">{isProcessing ? 'Processing...' : 'Confirm'}</Button>
                         </DialogFooter>
                         <Button onClick={() => setStep(1)} variant="link" className="w-full mt-2 text-sm">Back to Options</Button>
                     </>
