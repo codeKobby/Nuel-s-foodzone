@@ -17,10 +17,13 @@ import {
     GetMenuItemsOutputSchema,
     AddMenuItemInputSchema,
     UpdateMenuItemInputSchema,
-    DeleteMenuItemInputSchema
+    DeleteMenuItemInputSchema,
+    VerifyPasswordInputSchema,
+    UpdatePasswordInputSchema
 } from '@/ai/schemas';
 import { getBusinessDataForRange } from '@/lib/tools';
 import { getMenuItems, addMenuItem, updateMenuItem, deleteMenuItem } from '@/lib/menu-tools';
+import { verifyPassword, updatePassword } from '@/lib/auth-tools';
 
 
 const getBusinessDataTool = ai.defineTool(
@@ -71,6 +74,28 @@ const deleteMenuItemTool = ai.defineTool(
         outputSchema: z.string(),
     },
     async (input) => deleteMenuItem(input)
+);
+
+// Note: These auth tools are added here to be available to the AI,
+// but they are primarily called directly from the client for security actions.
+ai.defineTool(
+    {
+        name: 'verifyPassword',
+        description: "Verifies a user's password for a specific role.",
+        inputSchema: VerifyPasswordInputSchema,
+        outputSchema: z.boolean(),
+    },
+    async (input) => verifyPassword(input)
+);
+
+ai.defineTool(
+    {
+        name: 'updatePassword',
+        description: "Updates a user's password.",
+        inputSchema: UpdatePasswordInputSchema,
+        outputSchema: z.object({ success: z.boolean(), message: z.string() }),
+    },
+    async (input) => updatePassword(input)
 );
 
 

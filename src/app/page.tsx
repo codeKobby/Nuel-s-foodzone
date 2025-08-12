@@ -8,15 +8,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, ShieldCheck, ShoppingCart, Loader } from 'lucide-react';
 import logo from '@/app/logo.png';
+import PasswordModal from '@/components/cafe/modals/PasswordModal';
 
 export default function RoleSelectionPage() {
   const [loadingRole, setLoadingRole] = useState<'manager' | 'cashier' | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const router = useRouter();
 
-  const handleNavigation = (role: 'manager' | 'cashier') => {
-    setLoadingRole(role);
-    router.push(`/main?role=${role}`);
+  const handleCashierNavigation = () => {
+    setLoadingRole('cashier');
+    router.push(`/main?role=cashier`);
   };
+  
+  const handleManagerNavigation = () => {
+      setShowPasswordModal(true);
+  }
+
+  const onPasswordSuccess = () => {
+    setLoadingRole('manager');
+    setShowPasswordModal(false);
+    router.push(`/main?role=manager`);
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-secondary/50 dark:bg-background p-4 font-body">
@@ -36,7 +48,7 @@ export default function RoleSelectionPage() {
           <CardContent>
             <Button 
               className="w-full text-lg h-12"
-              onClick={() => handleNavigation('manager')}
+              onClick={handleManagerNavigation}
               disabled={!!loadingRole}
             >
               {loadingRole === 'manager' ? (
@@ -62,7 +74,7 @@ export default function RoleSelectionPage() {
           <CardContent>
             <Button 
               className="w-full text-lg h-12"
-              onClick={() => handleNavigation('cashier')}
+              onClick={handleCashierNavigation}
               disabled={!!loadingRole}
             >
                {loadingRole === 'cashier' ? (
@@ -83,6 +95,14 @@ export default function RoleSelectionPage() {
         <p>&copy; {new Date().getFullYear()} Nuel's Food Zone. All rights reserved.</p>
         <p>A secure and efficient Point of Sale System.</p>
       </footer>
+      
+      {showPasswordModal && (
+        <PasswordModal 
+            role="manager"
+            onSuccess={onPasswordSuccess}
+            onClose={() => setShowPasswordModal(false)}
+        />
+      )}
     </div>
   );
 }

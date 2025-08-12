@@ -6,7 +6,7 @@ import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from 'fireb
 import { db } from '@/lib/firebase';
 import type { MenuItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { Edit, Trash2, PlusCircle, Search, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, PlusCircle, Search, AlertCircle, KeyRound, ShieldCheck } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +27,10 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
+import { updatePassword } from '@/lib/auth-tools';
+import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 const AdminForm = ({
     editingItem,
@@ -76,6 +80,14 @@ const AdminView: React.FC = () => {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const isMobile = useIsMobile();
     const [searchQuery, setSearchQuery] = useState('');
+    
+    // Password state
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const { toast } = useToast();
+
 
     useEffect(() => {
         const menuRef = collection(db, "menuItems");
@@ -129,6 +141,37 @@ const AdminView: React.FC = () => {
         setShowDeleteConfirm(null);
     };
 
+    const handlePasswordUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newPassword !== confirmPassword) {
+            toast({ variant: 'destructive', title: "Passwords do not match." });
+            return;
+        }
+        if (newPassword.length < 6) {
+            toast({ variant: 'destructive', title: "Password must be at least 6 characters." });
+            return;
+        }
+        setIsUpdatingPassword(true);
+        const result = await updatePassword({
+            role: 'manager',
+            currentPassword: currentPassword,
+            newPassword: newPassword,
+        });
+        
+        toast({
+            variant: result.success ? 'default' : 'destructive',
+            title: result.success ? "Success" : "Error",
+            description: result.message,
+        });
+
+        if (result.success) {
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+        }
+        setIsUpdatingPassword(false);
+    };
+
     const groupedMenu = useMemo(() => {
         const filteredItems = menuItems.filter(item =>
             item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -147,7 +190,7 @@ const AdminView: React.FC = () => {
         <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
             <div className="flex-1 p-4 md:p-6 overflow-y-auto">
                 <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
-                    <h2 className="text-2xl md:text-3xl font-bold">Menu Management</h2>
+                    <h2 className="text-2xl md:text-3xl font-bold">Admin Panel</h2>
                     <div className="flex gap-2">
                         <div className="relative flex-grow">
                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -226,18 +269,51 @@ const AdminView: React.FC = () => {
             
             {!isMobile && (
                 <Card className="w-full md:w-80 lg:w-96 rounded-none border-t md:border-t-0 md:border-l">
-                    <CardHeader>
-                        <CardTitle className="text-xl md:text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                         <AdminForm 
-                            editingItem={editingItem}
-                            formState={formState}
-                            handleFormChange={handleFormChange}
-                            handleSubmit={handleSubmit}
-                            onCancel={clearForm}
-                        />
-                    </CardContent>
+                     <Tabs defaultValue="menu" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="menu">Menu</TabsTrigger>
+                            <TabsTrigger value="security">Security</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="menu">
+                             <CardHeader>
+                                <CardTitle className="text-xl md:text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <AdminForm 
+                                    editingItem={editingItem}
+                                    formState={formState}
+                                    handleFormChange={handleFormChange}
+                                    handleSubmit={handleSubmit}
+                                    onCancel={clearForm}
+                                />
+                            </CardContent>
+                        </TabsContent>
+                        <TabsContent value="security">
+                             <CardHeader>
+                                <CardTitle className="text-xl md:text-2xl flex items-center"><ShieldCheck className="mr-2"/> Security Settings</CardTitle>
+                                <CardDescription>Update your account password.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <form onSubmit={handlePasswordUpdate} className="space-y-4">
+                                     <div>
+                                        <Label htmlFor="current-password">Current Password</Label>
+                                        <Input type="password" id="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="new-password">New Password</Label>
+                                        <Input type="password" id="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="confirm-password">Confirm New Password</Label>
+                                        <Input type="password" id="confirm-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                                    </div>
+                                    <Button type="submit" className="w-full" disabled={isUpdatingPassword}>
+                                        {isUpdatingPassword ? <><Loader className="animate-spin mr-2"/>Updating...</> : <><KeyRound className="mr-2"/>Update Password</>}
+                                    </Button>
+                                </form>
+                            </CardContent>
+                        </TabsContent>
+                     </Tabs>
                 </Card>
             )}
 

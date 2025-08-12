@@ -106,3 +106,17 @@ export const DeleteMenuItemInputSchema = z.object({
     name: z.string().describe("The name of the menu item to delete."),
 });
 export type DeleteMenuItemInput = z.infer<typeof DeleteMenuItemInputSchema>;
+
+// Auth Tools
+export const VerifyPasswordInputSchema = z.object({
+    role: z.enum(['manager', 'cashier']),
+    password: z.string(),
+});
+export type VerifyPasswordInput = z.infer<typeof VerifyPasswordInputSchema>;
+
+export const UpdatePasswordInputSchema = z.object({
+    role: z.enum(['manager', 'cashier']),
+    currentPassword: z.string(),
+    newPassword: z.string(),
+});
+export type UpdatePasswordInput = z.infer<typeof UpdatePasswordInputSchema>;
