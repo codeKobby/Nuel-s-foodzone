@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serve
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass, ShoppingCart } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass, ShoppingCart, Lock } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -41,7 +41,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DateRange } from "react-day-picker"
-import { addDays, format } from "date-fns"
+import { addDays, format, isToday } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -100,6 +100,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     const [date, setDate] = useState<DateRange | undefined>({ from: new Date(), to: new Date() });
     const isMobile = useIsMobile();
 
+    const isTodayClosedOut = useMemo(() => {
+        return reports.some(report => isToday(report.timestamp.toDate()));
+    }, [reports]);
+
     const totalCountedCash = useMemo(() => {
         return denominations.reduce((acc, d) => {
             const count = parseInt(counts[d.name], 10) || 0;
@@ -142,16 +146,18 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const order = { id: doc.id, ...doc.data() } as Order;
                 periodOrders.push(order);
                 
-                if (order.paymentStatus === 'Unpaid') {
-                    unpaidOrdersValue += order.balanceDue;
-                } else if (order.paymentStatus === 'Partially Paid') {
-                    unpaidOrdersValue += order.balanceDue;
-                    const paidAmount = order.amountPaid - (order.total - order.balanceDue);
-                    if(order.paymentMethod === 'cash') cashSales += paidAmount;
-                    if(order.paymentMethod === 'momo') momoSales += paidAmount;
-                } else if (order.paymentStatus === 'Paid') {
-                    if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
-                    if(order.paymentMethod === 'momo') momoSales += order.total;
+                if (order.status === 'Completed') {
+                    if (order.paymentStatus === 'Partially Paid') {
+                        unpaidOrdersValue += order.balanceDue;
+                        const paidAmount = order.amountPaid - (order.total - order.balanceDue);
+                        if(order.paymentMethod === 'cash') cashSales += paidAmount;
+                        if(order.paymentMethod === 'momo') momoSales += paidAmount;
+                    } else if (order.paymentStatus === 'Paid') {
+                        if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
+                        if(order.paymentMethod === 'momo') momoSales += order.total;
+                    }
+                } else {
+                     unpaidOrdersValue += order.total;
                 }
                 
                 if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
@@ -178,12 +184,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     miscMomoExpenses += expense.amount;
                 }
             });
-
-            const totalSales = periodOrders
-                .filter(o => o.status === 'Completed')
-                .reduce((acc, order) => acc + order.total, 0);
             
-            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses);
+            const totalSales = cashSales + momoSales + unpaidOrdersValue;
+            const netRevenue = totalSales - (miscCashExpenses + miscMomoExpenses) - unpaidOrdersValue;
             const expectedCash = cashSales - miscCashExpenses;
             
             setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, netRevenue, changeOwed: totalChangeOwed, unpaidOrdersValue, orders: periodOrders, itemStats });
@@ -417,7 +420,14 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         />
                         </PopoverContent>
                     </Popover>
-                    <Button onClick={handleStartEndOfDay} className="w-full md:w-auto"><FileCheck className="mr-2" /> Start End-of-Day</Button>
+                    <Button 
+                        onClick={handleStartEndOfDay} 
+                        className="w-full md:w-auto"
+                        disabled={isTodayClosedOut}
+                    >
+                        {isTodayClosedOut ? <Lock className="mr-2"/> : <FileCheck className="mr-2" />}
+                        {isTodayClosedOut ? 'Day Closed' : 'Start End-of-Day'}
+                    </Button>
                 </div>
             </div>
             
@@ -429,7 +439,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         <AlertDialogHeader>
                             <AlertDialogTitle>Unpaid Orders Found</AlertDialogTitle>
                             <AlertDialogDescription>
-                                There are {stats.orders.filter(o => o.paymentStatus !== 'Paid').length} unpaid or partially paid orders totaling {formatCurrency(stats.unpaidOrdersValue)}.
+                                There are {stats.orders.filter(o => o.status !== 'Completed' || o.paymentStatus !== 'Paid').length} unpaid or partially paid orders totaling {formatCurrency(stats.unpaidOrdersValue)}.
                                 It's recommended to resolve these before closing the day.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
@@ -475,7 +485,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Completed Orders"/>
+                                    <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Cash + MoMo + Unpaid"/>
                                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
                                     <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
                                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Orders" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
@@ -486,7 +496,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
                                         <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Net Revenue</Label>
                                         <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.netRevenue)}</p>
-                                        <p className="text-xs text-muted-foreground">(Paid Sales - Misc. Expenses)</p>
+                                        <p className="text-xs text-muted-foreground">(Total Sales - Misc. Expenses - Unpaid)</p>
                                         {stats.changeOwed > 0 && (
                                             <p className="text-xs text-red-500 font-semibold mt-1">Remember to keep {formatCurrency(stats.changeOwed)} for change.</p>
                                         )}
@@ -502,13 +512,13 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             <CardContent>
                                 <ScrollArea className="h-[350px] md:h-[400px] pr-4">
                                     <div className="space-y-3">
-                                        {sortedItemStats.length > 0 ? sortedItemStats.map(([name, stats]) => (
+                                        {sortedItemStats.length > 0 ? sortedItemStats.map(([name, itemStats]) => (
                                             <div key={name} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
                                                 <div>
                                                     <p className="font-medium">{name}</p>
-                                                    <p className="text-xs text-muted-foreground">{stats.count} sold</p>
+                                                    <p className="text-xs text-muted-foreground">{itemStats.count} sold</p>
                                                 </div>
-                                                <Badge variant="default" className="bg-primary/80">{formatCurrency(stats.totalValue)}</Badge>
+                                                <Badge variant="default" className="bg-primary/80">{formatCurrency(itemStats.totalValue)}</Badge>
                                             </div>
                                         )) : (
                                             <p className="text-muted-foreground text-center italic py-4">No items sold in this period.</p>
@@ -567,7 +577,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         <AlertDialogHeader>
                             <AlertDialogTitle>Confirm Report Submission</AlertDialogTitle>
                             <AlertDialogDescription>
-                                Are you sure you want to save this reconciliation report? This action cannot be undone and will be permanently recorded.
+                                Are you sure you want to save this reconciliation report? This action is final for the day and cannot be undone.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -582,3 +592,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+
+      
