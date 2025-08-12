@@ -289,6 +289,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             
             resetForm();
             setIsCloseOutOpen(false);
+            fetchPeriodData(); // Refetch data to prevent stale state error
 
         } catch (e) {
             console.error(e);
@@ -648,3 +649,5 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+    

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -33,14 +34,8 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
     const { toast } = useToast();
 
     useEffect(() => {
-        if (!sourceOrder.tag) {
-            setLoading(false);
-            return;
-        }
-
         const q = query(
             collection(db, "orders"),
-            where("tag", "==", sourceOrder.tag),
             where("paymentStatus", "in", ["Unpaid", "Partially Paid"])
         );
 
@@ -53,7 +48,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
         });
 
         return () => unsubscribe();
-    }, [sourceOrder.tag, sourceOrder.id]);
+    }, [sourceOrder.id]);
 
     const handleCheckChange = (orderId: string, isChecked: boolean) => {
         setSelectedOrderIds(prev => {
@@ -77,7 +72,8 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
     
     const filteredOrders = useMemo(() => {
         return unpaidOrders.filter(order => 
-            order.simplifiedId.toLowerCase().includes(searchQuery.toLowerCase())
+            order.simplifiedId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            order.tag?.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [unpaidOrders, searchQuery]);
 
@@ -103,7 +99,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
                 <DialogHeader>
                     <DialogTitle>Apply Credit to Another Order</DialogTitle>
                     <DialogDescription>
-                        Use the <span className="font-bold text-primary">{formatCurrency(sourceOrder.balanceDue)}</span> credit from order #{sourceOrder.simplifiedId} to pay for other unpaid orders for <span className="font-bold">{sourceOrder.tag}</span>.
+                        Use the <span className="font-bold text-primary">{formatCurrency(sourceOrder.balanceDue)}</span> credit from order #{sourceOrder.simplifiedId} to pay for other unpaid orders.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -111,7 +107,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search by Order ID..."
+                            placeholder="Search by Order ID or Tag..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-10"
@@ -130,7 +126,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
                                         <Label htmlFor={`check-${order.id}`} className="flex-1 flex justify-between items-center cursor-pointer">
                                             <div>
                                                 <span className="font-semibold">{order.simplifiedId}</span>
-                                                <p className="text-xs text-muted-foreground">{formatTimestamp(order.timestamp)}</p>
+                                                <p className="text-xs text-muted-foreground">{order.tag || 'No Tag'}</p>
                                             </div>
                                             <p className="font-bold text-amber-600">{formatCurrency(order.balanceDue)}</p>
                                         </Label>
@@ -138,7 +134,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-center text-muted-foreground py-10">No other unpaid orders found for {sourceOrder.tag}.</p>
+                            <p className="text-center text-muted-foreground py-10">No other unpaid orders found.</p>
                         )}
                     </ScrollArea>
                     
@@ -165,3 +161,5 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
 };
 
 export default ApplyCreditModal;
+
+    
