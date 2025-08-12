@@ -160,9 +160,14 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
         const initializeMenu = async () => {
             try {
                 const existingSnapshot = await getDocs(menuRef);
-                if (existingSnapshot.empty) {
+                const existingNames = new Set(existingSnapshot.docs.map(doc => doc.data().name));
+                
+                const itemsToAdd = initialMenuData.filter(item => !existingNames.has(item.name));
+
+                if (itemsToAdd.length > 0) {
+                    console.log(`Adding ${itemsToAdd.length} new items to the menu.`);
                     const batch = writeBatch(db);
-                    for (const item of initialMenuData) {
+                    for (const item of itemsToAdd) {
                         const newItemRef = doc(menuRef);
                         batch.set(newItemRef, item);
                     }
@@ -175,7 +180,7 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
         };
 
         const unsubscribe = onSnapshot(menuRef, async (snapshot) => {
-            if (snapshot.empty) {
+            if (snapshot.empty && initialMenuData.length > 0) {
                 await initializeMenu();
             }
             const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem));
@@ -204,11 +209,12 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
             return;
         }
         setCurrentOrder(prev => {
-            const existingItem = prev[item.id];
+            const existingItem = Object.values(prev).find(i => i.name === item.name);
             if (existingItem) {
-                return { ...prev, [item.id]: { ...existingItem, quantity: existingItem.quantity + 1 } };
+                return { ...prev, [existingItem.id]: { ...existingItem, quantity: existingItem.quantity + 1 } };
             } else {
-                return { ...prev, [item.id]: { ...item, quantity: 1 } };
+                 const newItemId = item.id || crypto.randomUUID();
+                return { ...prev, [newItemId]: { ...item, id: newItemId, quantity: 1 } };
             }
         });
     }, []);

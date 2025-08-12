@@ -2,7 +2,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { isToday, isYesterday, format, formatDistanceToNowStrict } from 'date-fns';
-import type { Order } from './types';
+import type { Order, MiscExpense } from './types';
 
 
 export function cn(...inputs: ClassValue[]) {
@@ -16,22 +16,27 @@ export const formatCurrency = (amount: number) => {
     return `GH₵${(amount || 0).toFixed(2)}`;
 };
 
-export const formatTimestamp = (timestamp: any): string => {
+export const formatTimestamp = (timestamp: any, timeOnly: boolean = false): string => {
   if (!timestamp || !timestamp.toDate) return 'N/A';
   
-  const orderDate = timestamp.toDate();
+  const date = timestamp.toDate();
+  
+  if (timeOnly) {
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  }
+
   const now = new Date();
   
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 
-  if (orderDate >= startOfToday) {
-    return `Today, ${orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+  if (date >= startOfToday) {
+    return `Today, ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
   }
-  if (orderDate >= startOfYesterday) {
-    return `Yesterday, ${orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+  if (date >= startOfYesterday) {
+    return `Yesterday, ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
   }
-  return orderDate.toLocaleString('en-US', {
+  return date.toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true
   });
 };
@@ -45,30 +50,31 @@ export const generateSimpleOrderId = (count: number): string => {
   return `NFZ-${month}${day}-${num}`;
 };
 
-export const groupOrdersByDate = (orders: Order[]): Record<string, Order[]> => {
-    const grouped: Record<string, Order[]> = {};
+export const groupOrdersByDate = <T extends Order | MiscExpense>(items: T[]): Record<string, T[]> => {
+    const grouped: Record<string, T[]> = {};
 
-    orders.forEach(order => {
-        const orderDate = order.timestamp.toDate();
+    items.forEach(item => {
+        if (!item.timestamp) return;
+        const itemDate = item.timestamp.toDate();
         let key: string;
 
-        if (isToday(orderDate)) {
+        if (isToday(itemDate)) {
             key = 'Today';
-        } else if (isYesterday(orderDate)) {
+        } else if (isYesterday(itemDate)) {
             key = 'Yesterday';
         } else {
-            const distance = formatDistanceToNowStrict(orderDate, { addSuffix: true });
-            if (distance.includes('day')) {
-                 key = format(orderDate, 'EEEE, LLL d'); // E.g., Wednesday, Aug 7
+            const distance = formatDistanceToNowStrict(itemDate, { addSuffix: true });
+             if (distance.includes('day') && (parseInt(distance.split(' ')[0]) <= 6)) {
+                 key = format(itemDate, 'EEEE, LLL d'); // E.g., Wednesday, Aug 7
             } else {
-                key = format(orderDate, 'LLL d, yyyy'); // E.g., Aug 7, 2024
+                key = format(itemDate, 'LLL d, yyyy'); // E.g., Aug 7, 2024
             }
         }
         
         if (!grouped[key]) {
             grouped[key] = [];
         }
-        grouped[key].push(order);
+        grouped[key].push(item);
     });
 
     return grouped;

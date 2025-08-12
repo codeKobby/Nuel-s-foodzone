@@ -129,11 +129,17 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const startDateTimestamp = Timestamp.fromDate(startDate);
             const endDateTimestamp = Timestamp.fromDate(endDate);
 
-            // Fetch all orders and misc expenses
-            const allOrdersQuery = query(collection(db, "orders"));
+            // Fetch all orders and misc expenses for the period
+            const ordersQuery = query(collection(db, "orders"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
             const miscQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
+            const allOrdersQuery = query(collection(db, "orders"));
+
             
-            const [allOrdersSnapshot, miscSnapshot] = await Promise.all([getDocs(allOrdersQuery), getDocs(miscQuery)]);
+            const [periodOrdersSnapshot, miscSnapshot, allOrdersSnapshot] = await Promise.all([
+                getDocs(ordersQuery),
+                getDocs(miscSnapshot),
+                getDocs(allOrdersQuery)
+            ]);
 
             let cashSales = 0, momoSales = 0, totalChangeOwed = 0, totalSalesToday = 0;
             const periodOrders: Order[] = [];
@@ -141,48 +147,51 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             let unpaidOrdersValue = 0;
 
             allOrdersSnapshot.docs.forEach(doc => {
-                const order = { id: doc.id, ...doc.data() } as Order;
-                
-                // Calculate all-time unpaid balance
+                 const order = { id: doc.id, ...doc.data() } as Order;
+                // Calculate all-time unpaid balance from all orders
                 if (order.status === 'Pending') {
                     unpaidOrdersValue += order.total;
                 }
+            });
+            
+            periodOrdersSnapshot.docs.forEach(doc => {
+                const order = { id: doc.id, ...doc.data() } as Order;
+                periodOrders.push(order);
 
-                // Check if the order was created within the selected date range
-                const orderDate = order.timestamp.toDate();
-                if (orderDate >= startDate && orderDate <= endDate) {
-                    periodOrders.push(order);
+                if (order.status === 'Completed') {
+                    totalSalesToday += order.total;
+                    if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
+                    if(order.paymentMethod === 'momo') momoSales += order.total;
 
-                    if (order.status === 'Completed') {
-                        totalSalesToday += order.total;
-
-                        if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
-                        if(order.paymentMethod === 'momo') momoSales += order.total;
-
-                        if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
-                            totalChangeOwed += order.balanceDue;
-                        }
-                    
-                        order.items.forEach(item => {
-                            const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
-                            itemStats[item.name] = {
-                                count: currentStats.count + item.quantity,
-                                totalValue: currentStats.totalValue + (item.quantity * item.price)
-                            };
-                        });
+                    if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
+                        totalChangeOwed += order.balanceDue;
                     }
-                }
                 
-                // Account for payments made today for orders from previous days
-                if (order.lastPaymentTimestamp && order.status === 'Completed') {
+                    order.items.forEach(item => {
+                        const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                        itemStats[item.name] = {
+                            count: currentStats.count + item.quantity,
+                            totalValue: currentStats.totalValue + (item.quantity * item.price)
+                        };
+                    });
+                }
+            });
+                
+            // Account for payments made today for orders from previous days
+            const allCompletedOrdersSnapshot = await getDocs(query(collection(db, "orders"), where("status", "==", "Completed")));
+            allCompletedOrdersSnapshot.forEach(doc => {
+                const order = doc.data() as Order;
+                const orderDate = order.timestamp.toDate();
+                if (order.lastPaymentTimestamp && orderDate < startDate) {
                     const lastPaymentDate = order.lastPaymentTimestamp.toDate();
-                    if (lastPaymentDate >= startDate && lastPaymentDate <= endDate && orderDate < startDate) {
+                    if (lastPaymentDate >= startDate && lastPaymentDate <= endDate) {
                         const paidAmount = order.lastPaymentAmount || 0;
-                         if (order.paymentMethod === 'cash') cashSales += paidAmount;
+                        if (order.paymentMethod === 'cash') cashSales += paidAmount;
                         if (order.paymentMethod === 'momo') momoSales += paidAmount;
                     }
                 }
             });
+
 
             let miscCashExpenses = 0, miscMomoExpenses = 0;
             miscSnapshot.forEach(doc => {
@@ -448,7 +457,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         <AlertDialogHeader>
                             <AlertDialogTitle>Unpaid Orders Found</AlertDialogTitle>
                             <AlertDialogDescription>
-                                There are {stats.orders.filter(o => o.status !== 'Completed' || o.paymentStatus !== 'Paid').length} unpaid or partially paid orders totaling {formatCurrency(stats.unpaidOrdersValue)}.
+                                There are {stats.orders.filter(o => o.status === 'Pending').length} unpaid orders totaling {formatCurrency(stats.unpaidOrdersValue)}.
                                 It's recommended to resolve these before closing the day.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
@@ -601,3 +610,5 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+    

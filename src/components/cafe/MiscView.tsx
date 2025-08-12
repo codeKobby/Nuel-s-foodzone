@@ -1,11 +1,11 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { MiscExpense } from '@/lib/types';
-import { formatCurrency, formatTimestamp } from '@/lib/utils';
+import { formatCurrency, formatTimestamp, groupOrdersByDate } from '@/lib/utils';
 import { Trash2, Check, PlusCircle, Coins, CreditCard } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { Separator } from '../ui/separator';
 
 const MiscExpenseForm = ({
     formState,
@@ -74,6 +75,8 @@ const MiscView: React.FC = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<MiscExpense | null>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const isMobile = useIsMobile();
+    
+    const groupedExpenses = useMemo(() => groupOrdersByDate(expenses), [expenses]);
 
 
     useEffect(() => {
@@ -152,26 +155,36 @@ const MiscView: React.FC = () => {
                     <Card>
                         <CardHeader>
                             <CardTitle>Expense Log</CardTitle>
-                            <CardDescription>A list of all miscellaneous expenses recorded.</CardDescription>
+                            <CardDescription>A list of all miscellaneous expenses recorded, grouped by date.</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                            {expenses.length === 0 && <p className="text-muted-foreground italic text-center py-4">No expenses recorded yet.</p>}
-                            {expenses.map(item => (
-                                <div key={item.id} className={cn('p-3 rounded-lg flex justify-between items-center', item.settled ? 'bg-green-100 dark:bg-green-900/20' : 'bg-secondary')}>
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant={item.source === 'cash' ? 'outline' : 'secondary'} className="capitalize">{item.source}</Badge>
-                                            <p className="font-semibold">{item.purpose}</p>
-                                        </div>
-                                        <p className="text-sm text-muted-foreground mt-1">{formatCurrency(item.amount)} - {formatTimestamp(item.timestamp)}</p>
+                        <CardContent className="space-y-6">
+                            {Object.keys(groupedExpenses).length === 0 && <p className="text-muted-foreground italic text-center py-4">No expenses recorded yet.</p>}
+                            {Object.entries(groupedExpenses).map(([date, expensesOnDate]) => (
+                                <div key={date}>
+                                     <div className="flex items-center gap-3 mb-3">
+                                        <h3 className="text-lg font-semibold">{date}</h3>
+                                        <Separator className="flex-1" />
                                     </div>
-                                    <div className="flex items-center space-x-1">
-                                        {item.settled ? (
-                                            <Badge variant="default" className="bg-green-500 hover:bg-green-500">Settled</Badge>
-                                        ) : (
-                                            <Button variant="ghost" size="icon" onClick={() => handleSettle(item.id)}><Check className="h-4 w-4 text-green-500" /></Button>
-                                        )}
-                                        <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                    <div className="space-y-3">
+                                        {expensesOnDate.map(item => (
+                                            <div key={item.id} className={cn('p-3 rounded-lg flex justify-between items-center', item.settled ? 'bg-green-100 dark:bg-green-900/20' : 'bg-secondary')}>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant={item.source === 'cash' ? 'outline' : 'secondary'} className="capitalize">{item.source}</Badge>
+                                                        <p className="font-semibold">{item.purpose}</p>
+                                                    </div>
+                                                    <p className="text-sm text-muted-foreground mt-1">{formatCurrency(item.amount)} - {formatTimestamp(item.timestamp, true)}</p>
+                                                </div>
+                                                <div className="flex items-center space-x-1">
+                                                    {item.settled ? (
+                                                        <Badge variant="default" className="bg-green-500 hover:bg-green-500">Settled</Badge>
+                                                    ) : (
+                                                        <Button variant="ghost" size="icon" onClick={() => handleSettle(item.id)}><Check className="h-4 w-4 text-green-500" /></Button>
+                                                    )}
+                                                    <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             ))}
@@ -217,3 +230,5 @@ const MiscView: React.FC = () => {
 };
 
 export default MiscView;
+
+    
