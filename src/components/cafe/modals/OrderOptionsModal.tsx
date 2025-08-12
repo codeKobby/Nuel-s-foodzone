@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, doc, addDoc, getDoc, setDoc, serverTimestamp, runTransaction, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
-import type { OrderItem, Order, Customer } from '@/lib/types';
+import type { OrderItem, Order } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,11 +32,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Customer Credit State
-    const [customerCredit, setCustomerCredit] = useState<number>(0);
-    const [isCreditLoading, setIsCreditLoading] = useState(false);
-    const [creditApplied, setCreditApplied] = useState(0);
-
     useEffect(() => {
         if (editingOrder) {
             setOrderType(editingOrder.orderType);
@@ -44,50 +39,24 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         }
     }, [editingOrder]);
 
-    // Fetch customer credit when tag is available
-    useEffect(() => {
-        const fetchCredit = async () => {
-            if (orderTag) {
-                setIsCreditLoading(true);
-                const customerRef = doc(db, "customers", orderTag);
-                const customerSnap = await getDoc(customerRef);
-                if (customerSnap.exists()) {
-                    setCustomerCredit(customerSnap.data().credit || 0);
-                } else {
-                    setCustomerCredit(0);
-                }
-                setIsCreditLoading(false);
-            } else {
-                setCustomerCredit(0);
-            }
-        };
-        fetchCredit();
-    }, [orderTag]);
-    
-    const totalAfterCredit = Math.max(0, total - creditApplied);
     const amountPaidNum = parseFloat(cashPaid || '0');
-    const calculatedChange = paymentMethod === 'cash' && amountPaidNum > totalAfterCredit ? amountPaidNum - totalAfterCredit : 0;
+    const calculatedChange = paymentMethod === 'cash' && amountPaidNum > total ? amountPaidNum - total : 0;
     
     useEffect(() => {
-        if (paymentMethod === 'cash' && amountPaidNum >= totalAfterCredit) {
+        if (paymentMethod === 'cash' && amountPaidNum >= total) {
              setCashPaid(amountPaidNum.toString()); 
              setChangeGiven(calculatedChange.toFixed(2));
         } else {
             setChangeGiven('');
         }
-    }, [cashPaid, totalAfterCredit, paymentMethod, calculatedChange, amountPaidNum]);
+    }, [cashPaid, total, paymentMethod, calculatedChange, amountPaidNum]);
 
 
     const changeGivenNum = parseFloat(changeGiven || '0');
     const finalBalanceDue = paymentMethod === 'cash' 
-        ? (totalAfterCredit > amountPaidNum ? totalAfterCredit - amountPaidNum : calculatedChange - changeGivenNum)
+        ? (total > amountPaidNum ? total - amountPaidNum : calculatedChange - changeGivenNum)
         : 0;
         
-    const handleApplyCredit = () => {
-        const creditToApply = Math.min(customerCredit, total);
-        setCreditApplied(creditToApply);
-    }
-
     const processOrder = async (isPaid: boolean) => {
         setIsProcessing(true);
         setError(null);
@@ -95,16 +64,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             const batch = writeBatch(db);
             const now = serverTimestamp();
 
-            // Deduct applied credit from customer's balance
-            if (creditApplied > 0 && orderTag) {
-                const customerRef = doc(db, "customers", orderTag);
-                const newCreditBalance = customerCredit - creditApplied;
-                batch.update(customerRef, { credit: newCreditBalance });
-            }
-
-            const finalAmountPaid = isPaid ? (paymentMethod === 'cash' ? amountPaidNum : totalAfterCredit) : 0;
+            const finalAmountPaid = isPaid ? (paymentMethod === 'cash' ? amountPaidNum : total) : 0;
             const paymentStatus = isPaid 
-                ? (finalAmountPaid < totalAfterCredit ? 'Partially Paid' : 'Paid')
+                ? (finalAmountPaid < total ? 'Partially Paid' : 'Paid')
                 : 'Unpaid';
             
             const orderData: any = {
@@ -114,7 +76,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 total,
                 paymentMethod: isPaid ? paymentMethod : 'Unpaid',
                 paymentStatus,
-                amountPaid: finalAmountPaid + creditApplied, // Total value settled
+                amountPaid: finalAmountPaid,
                 changeGiven: isPaid && paymentMethod === 'cash' ? changeGivenNum : 0,
                 balanceDue: isPaid ? Math.max(0, finalBalanceDue) : total,
             };
@@ -197,24 +159,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                             <div className="text-center text-4xl font-bold text-primary pt-4">{formatCurrency(total)}</div>
                         </DialogHeader>
                         <div className="space-y-4">
-                            {isCreditLoading ? <LoadingSpinner/> : customerCredit > 0 && creditApplied === 0 && (
-                                <Alert variant="default" className="bg-green-50 dark:bg-green-900/20">
-                                    <AlertDescription className="flex justify-between items-center">
-                                        <p className="font-semibold">Available Credit: {formatCurrency(customerCredit)}</p>
-                                        <Button size="sm" onClick={handleApplyCredit}>Apply Credit</Button>
-                                    </AlertDescription>
-                                </Alert>
-                            )}
-
-                             {creditApplied > 0 && (
-                                <Alert variant="default" className="bg-green-100 dark:bg-green-900/20 border-green-500 text-center">
-                                    <AlertDescription>
-                                        <p className="font-bold">{formatCurrency(creditApplied)} credit applied</p>
-                                        <p className="font-bold text-2xl">New Total: {formatCurrency(totalAfterCredit)}</p>
-                                    </AlertDescription>
-                                </Alert>
-                            )}
-                            
                             <div className="flex justify-center space-x-4">
                                 <Button onClick={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'secondary'}>Cash</Button>
                                 <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'secondary'}>Momo/Card</Button>
@@ -232,8 +176,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                             <p className="text-sm text-muted-foreground mt-1">Calculated change: {formatCurrency(calculatedChange)}</p>
                                         </div>
                                     )}
-                                    {cashPaid && totalAfterCredit > amountPaidNum && <p className="font-semibold text-yellow-500">Balance Owed by Customer: {formatCurrency(totalAfterCredit - amountPaidNum)}</p>}
-                                    {cashPaid && finalBalanceDue > 0 && amountPaidNum >= totalAfterCredit && <p className="font-semibold text-red-500">Change Owed to Customer: {formatCurrency(finalBalanceDue)}</p>}
+                                    {cashPaid && total > amountPaidNum && <p className="font-semibold text-yellow-500">Balance Owed by Customer: {formatCurrency(total - amountPaidNum)}</p>}
+                                    {cashPaid && finalBalanceDue > 0 && amountPaidNum >= total && <p className="font-semibold text-red-500">Change Owed to Customer: {formatCurrency(finalBalanceDue)}</p>}
                                 </div>
                             )}
                              {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}

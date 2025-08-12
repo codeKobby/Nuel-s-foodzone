@@ -28,13 +28,8 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     const [changeGiven, setChangeGiven] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    
-    // Customer Credit State
-    const [customerCredit, setCustomerCredit] = useState<number>(0);
-    const [isCreditLoading, setIsCreditLoading] = useState(false);
-    const [creditApplied, setCreditApplied] = useState(0);
 
-    const totalToPayBeforeCredit = useMemo(() => {
+    const totalToPay = useMemo(() => {
         return orders.reduce((acc, order) => {
             if ((order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') && order.balanceDue > 0) {
                 return acc + order.balanceDue;
@@ -43,37 +38,6 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         }, 0);
     }, [orders]);
     
-    // Use the first tag as the customer identifier for credit purposes
-    const customerTag = useMemo(() => {
-        const tags = [...new Set(orders.map(o => o.tag).filter(Boolean))];
-        return tags.length > 0 ? tags[0] : null;
-    }, [orders]);
-
-    useEffect(() => {
-        const fetchCredit = async () => {
-            if (customerTag) {
-                setIsCreditLoading(true);
-                const customerRef = doc(db, "customers", customerTag);
-                const customerSnap = await getDoc(customerRef);
-                if (customerSnap.exists()) {
-                    setCustomerCredit(customerSnap.data().credit || 0);
-                } else {
-                    setCustomerCredit(0);
-                }
-                setIsCreditLoading(false);
-            } else {
-                setCustomerCredit(0);
-            }
-        };
-        fetchCredit();
-    }, [customerTag]);
-
-    const handleApplyCredit = () => {
-        const creditToApply = Math.min(customerCredit, totalToPayBeforeCredit);
-        setCreditApplied(creditToApply);
-    };
-
-    const totalToPay = Math.max(0, totalToPayBeforeCredit - creditApplied);
     const amountPaidNum = parseFloat(cashPaid || '0');
     const calculatedChange = paymentMethod === 'cash' && amountPaidNum > totalToPay ? amountPaidNum - totalToPay : 0;
     
@@ -99,16 +63,8 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             const batch = writeBatch(db);
             const now = serverTimestamp();
 
-            if (creditApplied > 0 && customerTag) {
-                const customerRef = doc(db, "customers", customerTag);
-                const newCreditBalance = customerCredit - creditApplied;
-                batch.update(customerRef, { credit: newCreditBalance });
-            }
-
             let paidAmountForOrders = paymentMethod === 'cash' ? amountPaidNum : totalToPay;
-            
-            // Apply credit first
-            let remainingPaid = paidAmountForOrders + creditApplied;
+            let remainingPaid = paidAmountForOrders;
             
             const ordersToPay = orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0).sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
 
@@ -183,25 +139,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     </div>
                 </ScrollArea>
                 
-                 <div className="text-center text-4xl font-bold text-primary py-2">{formatCurrency(totalToPayBeforeCredit)}</div>
-                
-                 {isCreditLoading ? <LoadingSpinner/> : customerCredit > 0 && creditApplied === 0 && (
-                    <Alert variant="default" className="bg-green-50 dark:bg-green-900/20">
-                         <AlertDescription className="flex justify-between items-center">
-                            <p className="font-semibold">Available Credit: {formatCurrency(customerCredit)}</p>
-                            <Button size="sm" onClick={handleApplyCredit}>Apply Credit</Button>
-                        </AlertDescription>
-                    </Alert>
-                )}
-
-                 {creditApplied > 0 && (
-                    <Alert variant="default" className="bg-green-100 dark:bg-green-900/20 border-green-500 text-center">
-                        <AlertDescription>
-                        <p className="font-bold">{formatCurrency(creditApplied)} credit applied</p>
-                        <p className="font-bold text-2xl">New Total: {formatCurrency(totalToPay)}</p>
-                        </AlertDescription>
-                    </Alert>
-                )}
+                 <div className="text-center text-4xl font-bold text-primary py-2">{formatCurrency(totalToPay)}</div>
                 
                 <div className="space-y-4 pt-2">
                     <div className="flex justify-center space-x-4">
@@ -239,5 +177,3 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 };
 
 export default CombinedPaymentModal;
-
-    
