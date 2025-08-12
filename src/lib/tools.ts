@@ -19,7 +19,6 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         const endDateTimestamp = Timestamp.fromDate(endDate);
 
         const ordersRef = collection(db, "orders");
-        const ordersQuery = query(ordersRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
         
         const miscExpensesRef = collection(db, "miscExpenses");
         const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<", endDateTimestamp));
@@ -27,8 +26,10 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         const reconciliationReportsRef = collection(db, "reconciliationReports");
         const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<", endDateTimestamp));
 
-        const [ordersSnapshot, miscSnapshot, reportsSnapshot] = await Promise.all([
-            getDocs(ordersQuery),
+        // Get all orders first to correctly calculate payments vs sales
+        const allOrdersSnapshot = await getDocs(query(ordersRef));
+
+        const [miscSnapshot, reportsSnapshot] = await Promise.all([
             getDocs(miscQuery),
             getDocs(reportsQuery),
         ]);
@@ -37,46 +38,40 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         let momoSales = 0;
         let changeOwed = 0;
         let totalOrders = 0;
+        let totalSales = 0;
         const itemCounts: Record<string, number> = {};
 
-        ordersSnapshot.forEach(doc => {
+        allOrdersSnapshot.forEach(doc => {
             const order = doc.data() as Order;
-            if (order.status === 'Completed') {
-                totalOrders++;
-                if (order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
-                if (order.paymentMethod === 'momo') momoSales += order.total;
+            const orderDate = order.timestamp.toDate();
 
-                // Calculate change owed to customer
-                if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
-                    changeOwed += order.balanceDue;
-                }
+            // 1. Total Sales (from completed orders created in range)
+            if (order.status === 'Completed' && orderDate >= startDate && orderDate <= endDate) {
+                totalOrders++;
+                totalSales += order.total;
 
                 order.items.forEach(item => {
                     itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
                 });
             }
-        });
-        
-        // Find payments for old orders made today
-        const allCompletedOrdersQuery = query(collection(db, "orders"), where("status", "==", "Completed"));
-        const allCompletedOrdersSnapshot = await getDocs(allCompletedOrdersQuery);
-        allCompletedOrdersSnapshot.forEach(doc => {
-            const order = doc.data() as Order;
-            const orderDate = order.timestamp.toDate();
-             if (order.lastPaymentTimestamp && orderDate < startDate) {
-                const lastPaymentDate = order.lastPaymentTimestamp.toDate();
-                if (lastPaymentDate >= startDate && lastPaymentDate <= endDate) {
-                    const paidAmount = order.lastPaymentAmount || 0;
+
+            // 2. Paid Revenue (from any payment made in range)
+            const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
+            if (paymentDate >= startDate && paymentDate <= endDate) {
+                 if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
+                    const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
                     if (order.paymentMethod === 'cash') cashSales += paidAmount;
                     if (order.paymentMethod === 'momo') momoSales += paidAmount;
                 }
             }
-        });
 
-        const totalSales = ordersSnapshot.docs
-            .map(doc => doc.data() as Order)
-            .filter(o => o.status === 'Completed')
-            .reduce((acc, order) => acc + order.total, 0);
+            // 3. Change owed to customer (from any order completed in range)
+            if (order.status === 'Completed' && orderDate >= startDate && orderDate <= endDate) {
+                if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
+                    changeOwed += order.balanceDue;
+                }
+            }
+        });
         
         let totalMiscExpenses = 0;
         miscSnapshot.forEach(doc => {

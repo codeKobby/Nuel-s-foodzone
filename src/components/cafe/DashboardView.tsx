@@ -139,6 +139,7 @@ const DashboardView: React.FC = () => {
             const endDateTimestamp = Timestamp.fromDate(endDate);
 
             const ordersRef = collection(db, "orders");
+            // Query for orders created or paid within the date range
             const allOrdersQuery = query(ordersRef);
 
             const reconciliationReportsRef = collection(db, "reconciliationReports");
@@ -161,44 +162,43 @@ const DashboardView: React.FC = () => {
             
             allOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
-                
-                // Unpaid balance for all time
-                if (order.status === 'Pending') {
-                    unpaidOrdersValue += order.total;
-                }
-                
-                // Filter orders for the selected date range for other stats
                 const orderDate = order.timestamp.toDate();
-                if (orderDate >= startDate && orderDate <= endDate) {
-                    if (order.status === 'Completed') {
-                        totalOrders++;
-                        totalSales += order.total;
 
-                        // Sales trend chart
-                        const dayKey = format(orderDate, 'MMM d');
-                        salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.total;
+                // Unpaid balance for all time, regardless of date range
+                if (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') {
+                    unpaidOrdersValue += order.balanceDue;
+                }
 
-                        // Item performance
-                        order.items.forEach(item => {
-                            const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
-                            itemStats[item.name] = {
-                                count: currentStats.count + item.quantity,
-                                totalValue: currentStats.totalValue + (item.quantity * item.price)
-                            };
-                        });
-                    }
+                // --- Calculations for selected date range ---
+                
+                // 1. Total Sales (from completed orders created in range)
+                if (order.status === 'Completed' && orderDate >= startDate && orderDate <= endDate) {
+                    totalSales += order.total;
+                    totalOrders++;
+                    
+                    const dayKey = format(orderDate, 'MMM d');
+                    salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.total;
+
+                    order.items.forEach(item => {
+                        const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                        itemStats[item.name] = {
+                            count: currentStats.count + item.quantity,
+                            totalValue: currentStats.totalValue + (item.quantity * item.price)
+                        };
+                    });
                 }
                 
-                // Accumulate payments received within the date range, even for older orders
-                if(order.paymentStatus !== 'Unpaid' && order.status === 'Completed') {
-                    const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
-                    if(paymentDate >= startDate && paymentDate <= endDate) {
+                // 2. Paid Revenue (from any payment made in range)
+                const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
+                if (paymentDate >= startDate && paymentDate <= endDate) {
+                    if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
                         const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
-                        if(order.paymentMethod === 'cash') cashSales += paidAmount;
-                        if(order.paymentMethod === 'momo') momoSales += paidAmount;
+                        if (order.paymentMethod === 'cash') cashSales += paidAmount;
+                        if (order.paymentMethod === 'momo') momoSales += paidAmount;
                     }
                 }
             });
+
 
             // Process reconciliations
             let totalDiscrepancy = 0;

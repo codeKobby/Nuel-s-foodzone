@@ -180,11 +180,15 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const order = { id: doc.id, ...doc.data() } as Order;
                 periodOrders.push(order);
 
+                // Add to revenue if order is Completed or Partially Paid within the period
+                if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
+                    if (order.paymentMethod === 'cash') cashSales += order.amountPaid;
+                    if (order.paymentMethod === 'momo') momoSales += order.amountPaid;
+                }
+
+                // Add to total sales and item performance only if completed within the period
                 if (order.status === 'Completed') {
                     totalSalesToday += order.total;
-                    if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
-                    if(order.paymentMethod === 'momo') momoSales += order.total;
-                
                     order.items.forEach(item => {
                         const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
                         itemStats[item.name] = {
@@ -650,3 +654,4 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
