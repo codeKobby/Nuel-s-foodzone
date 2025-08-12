@@ -45,7 +45,7 @@ import { addDays, format, isToday } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 
 
 interface PeriodStats {
@@ -137,7 +137,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             
             const [periodOrdersSnapshot, miscSnapshot, allOrdersSnapshot] = await Promise.all([
                 getDocs(ordersQuery),
-                getDocs(miscSnapshot),
+                getDocs(miscQuery),
                 getDocs(allOrdersQuery)
             ]);
 
@@ -194,7 +194,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
 
             let miscCashExpenses = 0, miscMomoExpenses = 0;
-            miscSnapshot.forEach(doc => {
+            const miscSnapshotResult = await getDocs(miscQuery);
+            miscSnapshotResult.forEach(doc => {
                 const expense = doc.data() as MiscExpense;
                 if (expense.source === 'cash') {
                     miscCashExpenses += expense.amount;
@@ -610,5 +611,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+    
 
     
