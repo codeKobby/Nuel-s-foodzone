@@ -1,5 +1,5 @@
 
-import { collection, query, where, getDocs, doc, writeBatch, runTransaction, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, writeBatch, runTransaction, serverTimestamp, getDoc, DocumentReference } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Order } from './types';
 
@@ -13,37 +13,43 @@ export async function applyChangeAsCreditToOrders(sourceOrderId: string, targetO
         return { success: false, message: "Source or target orders are missing." };
     }
 
-    const sourceOrderRef = doc(db, "orders", sourceOrderId);
-
     try {
         await runTransaction(db, async (transaction) => {
+            const sourceOrderRef = doc(db, "orders", sourceOrderId);
+            const targetOrderRefs = targetOrderIds.map(id => doc(db, "orders", id));
+
+            // 1. READ all documents first.
             const sourceOrderDoc = await transaction.get(sourceOrderRef);
+            const targetOrderDocs = await Promise.all(targetOrderRefs.map(ref => transaction.get(ref)));
+
             if (!sourceOrderDoc.exists() || sourceOrderDoc.data().balanceDue <= 0) {
                 throw new Error("Source order not found or has no credit to apply.");
             }
 
             let availableCredit = sourceOrderDoc.data().balanceDue;
 
-            // Mark the source order's change as settled
+            // 2. Now, perform all WRITE operations.
+            
+            // First, update the source order
             transaction.update(sourceOrderRef, {
                 balanceDue: 0,
-                changeGiven: sourceOrderDoc.data().balanceDue, // Reflect that the 'change' was handled
-                creditSource: [`Applied to other orders on ${new Date().toLocaleDateString()}`]
+                changeGiven: sourceOrderDoc.data().balanceDue,
+                creditSource: [...(sourceOrderDoc.data().creditSource || []), `Applied to other orders on ${new Date().toLocaleDateString()}`]
             });
 
-            for (const targetId of targetOrderIds) {
+            // Then, iterate and update target orders
+            for (const targetDoc of targetOrderDocs) {
                 if (availableCredit <= 0) break;
 
-                const targetOrderRef = doc(db, "orders", targetId);
-                const targetOrderDoc = await transaction.get(targetOrderRef);
-
-                if (!targetOrderDoc.exists()) {
-                    console.warn(`Target order ${targetId} not found, skipping.`);
+                if (!targetDoc.exists()) {
+                    console.warn(`Target order ${targetDoc.id} not found, skipping.`);
                     continue;
                 }
 
-                const targetOrderData = targetOrderDoc.data() as Order;
+                const targetOrderData = targetDoc.data() as Order;
                 const balanceToPay = targetOrderData.balanceDue;
+                if (balanceToPay <= 0) continue; // Skip already paid orders
+
                 const creditToApply = Math.min(availableCredit, balanceToPay);
 
                 const newAmountPaid = targetOrderData.amountPaid + creditToApply;
@@ -52,7 +58,7 @@ export async function applyChangeAsCreditToOrders(sourceOrderId: string, targetO
                 const newStatus = newBalanceDue <= 0 ? 'Completed' : targetOrderData.status;
 
 
-                transaction.update(targetOrderRef, {
+                transaction.update(targetDoc.ref, {
                     amountPaid: newAmountPaid,
                     balanceDue: newBalanceDue,
                     paymentStatus: newPaymentStatus,
