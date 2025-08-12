@@ -17,7 +17,7 @@ interface OrderDetailsModalProps {
 }
 
 const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, ref) => {
-    const isBalanceOwedByCustomer = order.paymentStatus === 'Partially Paid' && order.total > order.amountPaid;
+    const isBalanceOwedByCustomer = order.paymentStatus !== 'Paid' && order.balanceDue > 0;
     const isChangeOwedToCustomer = order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total;
 
     return (

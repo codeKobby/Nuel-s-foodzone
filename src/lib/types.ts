@@ -34,7 +34,7 @@ export interface Order {
   balanceDue: number; // For amount owed by customer OR change owed to customer
   status: 'Pending' | 'Completed';
   timestamp: Timestamp;
-  creditSource?: string[]; // Array of simplifiedOrderIds from which credit was used
+  creditSource?: string[]; // Note for traceability, e.g., "Converted to credit for [customerTag]"
   lastPaymentTimestamp?: Timestamp;
   lastPaymentAmount?: number;
 }
@@ -90,5 +90,3 @@ export interface Customer {
     id: string; // Corresponds to the tag
     credit: number;
 }
-
-    

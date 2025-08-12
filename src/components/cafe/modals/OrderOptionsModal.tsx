@@ -251,5 +251,3 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 };
 
 export default OrderOptionsModal;
-
-    

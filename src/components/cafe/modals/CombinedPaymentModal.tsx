@@ -230,5 +230,3 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 };
 
 export default CombinedPaymentModal;
-
-    
