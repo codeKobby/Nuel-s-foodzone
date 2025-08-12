@@ -84,10 +84,10 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             totalMiscExpenses += expense.amount;
         });
 
-        let cashDiscrepancy = 0;
+        let totalDiscrepancy = 0;
         reportsSnapshot.forEach(doc => {
             const report = doc.data() as ReconciliationReport;
-            cashDiscrepancy += report.cashDifference;
+            totalDiscrepancy += report.totalDiscrepancy;
         });
 
         const netSales = (cashSales + momoSales) - totalMiscExpenses;
@@ -100,7 +100,7 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             netSales,
             totalOrders,
             itemPerformance,
-            cashDiscrepancy,
+            cashDiscrepancy: totalDiscrepancy,
             cashSales,
             momoSales,
             miscExpenses: totalMiscExpenses,
@@ -123,5 +123,3 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         };
     }
 }
-
-    

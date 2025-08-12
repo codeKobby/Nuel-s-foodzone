@@ -7,7 +7,7 @@ import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serve
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass, ShoppingCart, Lock } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass, ShoppingCart, Lock, X } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -76,11 +76,11 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
     </Card>
 );
 
+const cashDenominations = [200, 100, 50, 20, 10, 5, 2, 1];
+const initialDenominations: Record<string, string> = cashDenominations.reduce((acc, val) => ({ ...acc, [val]: '' }), {});
 
 const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setActiveView}) => {
     const [stats, setStats] = useState<PeriodStats | null>(null);
-    const [countedCash, setCountedCash] = useState('');
-    const [countedMomo, setCountedMomo] = useState('');
     const [notes, setNotes] = useState('');
     const [reports, setReports] = useState<ReconciliationReport[]>([]);
     const [loading, setLoading] = useState(true);
@@ -92,15 +92,52 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     const [showUnpaidOrdersWarning, setShowUnpaidOrdersWarning] = useState(false);
     const [date, setDate] = useState<DateRange | undefined>({ from: new Date(), to: new Date() });
     const isMobile = useIsMobile();
+    
+    // State for denomination-based counting
+    const [denominationQuantities, setDenominationQuantities] = useState(initialDenominations);
+    
+    // State for MoMo pill input
+    const [momoTransactions, setMomoTransactions] = useState<number[]>([]);
+    const [momoInput, setMomoInput] = useState('');
+
 
     const isTodayClosedOut = useMemo(() => {
         return reports.some(report => isToday(report.timestamp.toDate()));
     }, [reports]);
 
-    const totalCountedCash = useMemo(() => parseFloat(countedCash) || 0, [countedCash]);
-    const totalCountedMomo = useMemo(() => parseFloat(countedMomo) || 0, [countedMomo]);
+    const totalCountedCash = useMemo(() => {
+        return cashDenominations.reduce((total, den) => {
+            const quantity = parseInt(denominationQuantities[den], 10) || 0;
+            return total + (den * quantity);
+        }, 0);
+    }, [denominationQuantities]);
+    
+    const totalCountedMomo = useMemo(() => {
+        return momoTransactions.reduce((total, amount) => total + amount, 0);
+    }, [momoTransactions]);
+
     const totalCountedRevenue = useMemo(() => totalCountedCash + totalCountedMomo, [totalCountedCash, totalCountedMomo]);
     const totalDiscrepancy = useMemo(() => totalCountedRevenue - (stats?.totalExpectedRevenue || 0), [totalCountedRevenue, stats]);
+    
+    const handleDenominationChange = (value: string, denomination: string) => {
+        setDenominationQuantities(prev => ({ ...prev, [denomination]: value }));
+    };
+
+    const handleMomoInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if ((e.key === 'Enter' || e.key === ' ') && momoInput.trim() !== '') {
+            e.preventDefault();
+            const amount = parseFloat(momoInput);
+            if (!isNaN(amount) && amount > 0) {
+                setMomoTransactions([...momoTransactions, amount]);
+                setMomoInput('');
+            }
+        }
+    };
+    
+    const removeMomoTransaction = (indexToRemove: number) => {
+        setMomoTransactions(momoTransactions.filter((_, index) => index !== indexToRemove));
+    };
+
 
     const fetchPeriodData = useCallback(async () => {
         if (!date?.from) return;
@@ -120,13 +157,13 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             // Fetch all orders and misc expenses for the period
             const ordersQuery = query(collection(db, "orders"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
             const miscQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
-            const allOrdersQuery = query(collection(db, "orders"), where("status", "==", "Pending"));
+            const allUnpaidOrdersQuery = query(collection(db, "orders"), where("status", "==", "Pending"));
 
             
-            const [periodOrdersSnapshot, miscSnapshot, allOrdersSnapshot] = await Promise.all([
+            const [periodOrdersSnapshot, miscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
                 getDocs(ordersQuery),
                 getDocs(miscQuery),
-                getDocs(allOrdersQuery)
+                getDocs(allUnpaidOrdersQuery)
             ]);
 
             let cashSales = 0, momoSales = 0, totalSalesToday = 0;
@@ -134,7 +171,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             let unpaidOrdersValue = 0;
 
-            allOrdersSnapshot.docs.forEach(doc => {
+            allUnpaidOrdersSnapshot.docs.forEach(doc => {
                  const order = { id: doc.id, ...doc.data() } as Order;
                 unpaidOrdersValue += order.total;
             });
@@ -187,7 +224,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const totalSales = totalSalesToday;
             const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses);
             const expectedCash = cashSales - miscCashExpenses;
-            const expectedMomo = momoSales - miscMomoExpenses;
+            const expectedMomo = momoSales;
             const totalExpectedRevenue = expectedCash + expectedMomo;
             
             setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, expectedMomo, totalExpectedRevenue, netRevenue, unpaidOrdersValue, orders: periodOrders, itemStats });
@@ -217,8 +254,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     }, []);
     
     const resetForm = () => {
-        setCountedCash('');
-        setCountedMomo('');
+        setDenominationQuantities(initialDenominations);
+        setMomoTransactions([]);
+        setMomoInput('');
         setNotes('');
     }
 
@@ -290,25 +328,59 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     const CloseOutDialog = (
         <Dialog open={isCloseOutOpen} onOpenChange={setIsCloseOutOpen}>
             <DialogContent className="max-w-4xl">
-                <DialogHeader>
+                 <DialogHeader>
                     <DialogTitle>End-of-Day Reconciliation</DialogTitle>
                     <DialogDescription>
                         Count physical cash and reconcile accounts for today's sales. This action will save a permanent report.
                     </DialogDescription>
                 </DialogHeader>
-                
-                {!stats ? <LoadingSpinner /> : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                 {!stats ? <LoadingSpinner /> : (
+                <ScrollArea className="max-h-[70vh] p-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 pr-4">
                      <div className="space-y-4">
                         <Label className="text-lg font-semibold">Counted Totals</Label>
-                        <div className="space-y-4 p-3 border rounded-md bg-secondary">
+                        <div className="space-y-4 p-4 border rounded-md bg-secondary">
                              <div>
-                                <Label htmlFor="counted-cash">Counted Cash Total</Label>
-                                <Input id="counted-cash" type="number" value={countedCash} onChange={e => setCountedCash(e.target.value)} placeholder="Total cash in drawer" className="h-10 mt-2"/>
+                                <Label className="text-base font-medium">Cash by Denomination</Label>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2">
+                                    {cashDenominations.map(den => (
+                                        <div key={den} className="flex items-center gap-2">
+                                            <Label htmlFor={`den-${den}`} className="w-16 text-right">{`GH₵${den}`}</Label>
+                                            <span className="text-muted-foreground">x</span>
+                                            <Input 
+                                                id={`den-${den}`} 
+                                                type="number" 
+                                                value={denominationQuantities[den]} 
+                                                onChange={e => handleDenominationChange(e.target.value, String(den))} 
+                                                placeholder="0"
+                                                className="h-9 w-full"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                             <div>
-                                <Label htmlFor="counted-momo">Counted Momo/Card Total</Label>
-                                <Input id="counted-momo" type="number" value={countedMomo} onChange={e => setCountedMomo(e.target.value)} placeholder="Total from payment device" className="h-10 mt-2"/>
+                                <Label className="text-base font-medium">Momo/Card Transactions</Label>
+                                <div className="mt-2">
+                                     <Input 
+                                        type="number" 
+                                        value={momoInput} 
+                                        onChange={e => setMomoInput(e.target.value)} 
+                                        onKeyDown={handleMomoInputKeyDown}
+                                        placeholder="Enter amount and press Space/Enter"
+                                        className="h-10"
+                                    />
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        {momoTransactions.map((amount, index) => (
+                                            <Badge key={index} variant="secondary" className="text-base">
+                                                {formatCurrency(amount)}
+                                                <button onClick={() => removeMomoTransaction(index)} className="ml-2 rounded-full hover:bg-muted-foreground/20 p-0.5">
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div>
@@ -334,7 +406,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                 <div className="flex justify-between font-bold border-t pt-1"><span>Expected Cash:</span> <span>{formatCurrency(stats.expectedCash)}</span></div>
                                 <Separator className="my-2"/>
                                 <div className="flex justify-between"><span>MoMo Sales:</span> <span>{formatCurrency(stats.momoSales)}</span></div>
-                                <div className="flex justify-between"><span>(-) MoMo Expenses:</span> <span className="text-orange-500">{formatCurrency(stats.miscMomoExpenses)}</span></div>
                                 <div className="flex justify-between font-bold border-t pt-1"><span>Expected MoMo:</span> <span>{formatCurrency(stats.expectedMomo)}</span></div>
                             </CardContent>
                             <CardFooter className="bg-primary/10 p-3">
@@ -367,11 +438,12 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         </div>
                      </div>
                 </div>
+                </ScrollArea>
                 )}
                 
                 {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
 
-                <DialogFooter>
+                <DialogFooter className="pt-4 border-t">
                     <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting || !stats} className="w-full h-12 text-lg font-bold">
                         {isSubmitting ? 'Saving...' : 'Save Report'}
                     </Button>
@@ -528,10 +600,11 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                           <CardTitle>Reconciliation History</CardTitle>
                           <CardDescription>Review past end-of-day reports.</CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-3 max-h-[500px] overflow-y-auto pr-4">
+                      <CardContent>
+                        <ScrollArea className="max-h-[500px] overflow-y-auto pr-4">
                         {reports.length === 0 && <p className="text-muted-foreground italic text-center py-4">No reports saved yet.</p>}
                         {reports.map(report => (
-                            <div key={report.id} className="p-3 rounded-lg bg-secondary">
+                            <div key={report.id} className="p-3 rounded-lg bg-secondary space-y-2">
                                 <div className="flex justify-between items-center">
                                     <div>
                                         <p className="font-semibold">{report.period}</p>
@@ -539,17 +612,18 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     </div>
                                     {renderDifferenceBadge(report.totalDiscrepancy)}
                                 </div>
-                                <div className="text-xs grid grid-cols-2 gap-x-4 gap-y-1 mt-2 border-t pt-2">
-                                    <span>Expected Revenue: <span className="font-medium">{formatCurrency(report.totalExpectedRevenue)}</span></span>
-                                    <span>Counted Revenue: <span className="font-medium">{formatCurrency(report.totalCountedRevenue)}</span></span>
-                                    <span>Expected Cash: <span className="font-medium">{formatCurrency(report.expectedCash)}</span></span>
-                                    <span>Counted Cash: <span className="font-medium">{formatCurrency(report.countedCash)}</span></span>
-                                    <span>Expected Momo: <span className="font-medium">{formatCurrency(report.expectedMomo)}</span></span>
-                                    <span>Counted Momo: <span className="font-medium">{formatCurrency(report.countedMomo)}</span></span>
+                                <div className="text-xs grid grid-cols-2 gap-x-4 gap-y-1 border-t pt-2">
+                                    <span>Expected Revenue:</span><span className="font-medium text-right">{formatCurrency(report.totalExpectedRevenue)}</span>
+                                    <span>Counted Revenue:</span><span className="font-medium text-right">{formatCurrency(report.totalCountedRevenue)}</span>
+                                    <span>Expected Cash:</span><span className="font-medium text-right">{formatCurrency(report.expectedCash)}</span>
+                                    <span>Counted Cash:</span><span className="font-medium text-right">{formatCurrency(report.countedCash)}</span>
+                                    <span>Expected Momo:</span><span className="font-medium text-right">{formatCurrency(report.expectedMomo)}</span>
+                                    <span>Counted Momo:</span><span className="font-medium text-right">{formatCurrency(report.countedMomo)}</span>
                                 </div>
                                 {report.notes && <p className="text-xs italic mt-2 border-t pt-2">Notes: {report.notes}</p>}
                             </div>
                         ))}
+                        </ScrollArea>
                       </CardContent>
                   </Card>
               </TabsContent>
@@ -576,5 +650,3 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-    

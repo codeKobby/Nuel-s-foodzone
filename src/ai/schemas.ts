@@ -26,7 +26,6 @@ export type AnalyzeBusinessInput = z.infer<typeof AnalyzeBusinessInputSchema>;
 
 export const AnalyzeBusinessOutputSchema = z.object({
   analysis: z.string().describe("A detailed analysis of the business's performance for the period, formatted in Markdown. Include an executive summary, a KPI table, item performance analysis, and actionable suggestions. Use bolding for key figures."),
-  suggestions: z.string().describe("A summary of the actionable suggestions provided in the main analysis. This can be a simple bulleted list in plain text."),
 });
 export type AnalyzeBusinessOutput = z.infer<typeof AnalyzeBusinessOutputSchema>;
 
