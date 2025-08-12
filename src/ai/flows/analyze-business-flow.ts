@@ -16,7 +16,7 @@ const analysisPrompt = ai.definePrompt({
     output: { schema: AnalyzeBusinessOutputSchema },
     model: 'googleai/gemini-2.5-pro',
     prompt: `
-        You are a professional business consultant for a cafe called "Nuel's Food Zone".
+        You are a professional business consultant for a cafe called "Nuel's Foodzone Cafe".
         Your task is to analyze the provided sales data and generate a detailed, professional performance report with actionable suggestions.
         The output should be formatted in clear Markdown. Use tables for data and bolding for key figures.
 

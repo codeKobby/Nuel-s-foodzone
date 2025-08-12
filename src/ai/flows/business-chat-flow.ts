@@ -97,7 +97,7 @@ const businessChatFlow = ai.defineFlow(
             output: { format: 'text' },
             tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
             model,
-            system: `You are an expert business analyst and friendly assistant for a cafe called "Nuel's Food Zone".
+            system: `You are an expert business analyst and friendly assistant for a cafe called "Nuel's Foodzone Cafe".
 Your role is to answer questions from the business owner or manager based on sales data, and to help them manage the menu.
 You have access to several tools to help you.
 

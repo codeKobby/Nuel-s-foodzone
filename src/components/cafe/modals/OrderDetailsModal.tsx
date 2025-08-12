@@ -24,7 +24,7 @@ const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, r
         <div ref={ref} className="receipt p-4 bg-white text-black font-mono">
             <div className="text-center">
                 <Image src={logo} alt="Logo" width={60} height={60} className="mx-auto rounded-md" />
-                <h3 className="font-bold">Nuel's Food Zone</h3>
+                <h3 className="font-bold">Nuel's Foodzone Cafe</h3>
             </div>
             <hr className="my-2 border-dashed border-black" />
             <p><strong>Order:</strong> {order.simplifiedId}</p>

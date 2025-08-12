@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: "Nuel's Cafe",
+  title: "Nuel's Foodzone Cafe",
   description: "Point of Sale system for Nuel's Food Zone",
   icons: null,
 };

@@ -74,7 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
                             </div>
                         </TooltipTrigger>
                         <TooltipContent side="right">
-                            <p className="capitalize">{role} View</p>
+                            <p className="capitalize">Nuel's Foodzone Cafe - {role} View</p>
                         </TooltipContent>
                     </Tooltip>
                     

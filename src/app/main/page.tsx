@@ -72,7 +72,7 @@ const MobileNav = ({
             <div className="md:hidden flex justify-between items-center p-4 bg-card border-b">
                  <div className="flex items-center space-x-2">
                     <Image src={logo} alt="Nuel's Food Zone Logo" width={32} height={32} className="rounded-md" />
-                    <h1 className="font-bold text-lg">Nuel's Cafe</h1>
+                    <h1 className="font-bold text-lg">Nuel's Foodzone Cafe</h1>
                 </div>
                 <SheetTrigger asChild>
                     <Button variant="ghost" size="icon"><Menu /></Button>
@@ -83,7 +83,7 @@ const MobileNav = ({
                     <SheetTitle className="flex items-center gap-2">
                         <Image src={logo} alt="Nuel's Food Zone Logo" width={32} height={32} className="rounded-md" />
                         <div>
-                            <p>Nuel's Cafe</p>
+                            <p>Nuel's Foodzone Cafe</p>
                             <p className="text-sm font-normal text-muted-foreground capitalize">{role} View</p>
                         </div>
                     </SheetTitle>
@@ -230,7 +230,7 @@ function CafePage() {
         return (
             <div className="h-screen w-screen bg-background flex flex-col items-center justify-center">
                 <LoadingSpinner />
-                <p className="mt-4 text-lg text-muted-foreground">Initializing Nuel's Cafe POS...</p>
+                <p className="mt-4 text-lg text-muted-foreground">Initializing Nuel's Foodzone Cafe POS...</p>
             </div>
         );
     }

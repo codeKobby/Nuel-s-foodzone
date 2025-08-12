@@ -7,7 +7,7 @@ import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, add
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport, ChatSession, AnalyzeBusinessOutput } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, ArrowDownUp, SortAsc, SortDesc } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -77,6 +77,9 @@ interface ChatMessage {
     content: string;
 }
 
+type ItemSortKey = 'count' | 'totalValue';
+type ItemSortDirection = 'asc' | 'desc';
+
 
 const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, description?: string, onClick?: () => void }> = ({ icon, title, value, description, onClick }) => (
     <Card onClick={onClick} className={onClick ? 'cursor-pointer hover:bg-secondary' : ''}>
@@ -120,6 +123,10 @@ const DashboardView: React.FC = () => {
     const [itemSearchQuery, setItemSearchQuery] = useState('');
     const [miscExpenses, setMiscExpenses] = useState<MiscExpense[]>([]);
     const [isDiscrepancyModalOpen, setIsDiscrepancyModalOpen] = useState(false);
+    
+    // Sorting state
+    const [itemSortKey, setItemSortKey] = useState<ItemSortKey>('count');
+    const [itemSortDirection, setItemSortDirection] = useState<ItemSortDirection>('desc');
 
 
     const fetchDashboardData = useCallback(async () => {
@@ -222,8 +229,7 @@ const DashboardView: React.FC = () => {
             
             const salesData = Object.entries(salesByDay).map(([date, sales]) => ({ date, sales })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             const itemPerformance = Object.entries(itemStats)
-                .map(([name, data]) => ({name, ...data}))
-                .sort((a, b) => b.totalValue - a.count);
+                .map(([name, data]) => ({name, ...data}));
 
 
             setStats({
@@ -392,15 +398,47 @@ const DashboardView: React.FC = () => {
             console.error("Error deleting chat session:", e);
         }
     };
-
-    const topItems = useMemo(() => stats?.itemPerformance.slice(0, 5) || [], [stats]);
-    const bottomItems = useMemo(() => stats && stats.itemPerformance.length > 5 ? stats.itemPerformance.slice(-5).reverse() : [], [stats]);
     
-    const filteredItemSales = useMemo(() => {
+    const sortedItemSales = useMemo(() => {
         if (!stats) return [];
-        if (!itemSearchQuery) return stats.itemPerformance;
-        return stats.itemPerformance.filter(item => item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
-    }, [stats, itemSearchQuery]);
+        const filtered = stats.itemPerformance.filter(item => item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
+        return filtered.sort((a, b) => {
+            if (itemSortDirection === 'asc') {
+                return a[itemSortKey] - b[itemSortKey];
+            } else {
+                return b[itemSortKey] - a[itemSortKey];
+            }
+        });
+    }, [stats, itemSearchQuery, itemSortKey, itemSortDirection]);
+
+    const handleSortChange = (key: ItemSortKey) => {
+        if (itemSortKey === key) {
+            setItemSortDirection(itemSortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setItemSortKey(key);
+            setItemSortDirection('desc');
+        }
+    };
+    
+    const SortButton = ({ sortKey, label }: { sortKey: ItemSortKey; label: string; }) => (
+        <Button variant="ghost" size="sm" onClick={() => handleSortChange(sortKey)}>
+            {label}
+            {itemSortKey === sortKey && (
+                itemSortDirection === 'desc' ? <SortDesc className="ml-2 h-4 w-4" /> : <SortAsc className="ml-2 h-4 w-4" />
+            )}
+        </Button>
+    );
+
+    const topItems = useMemo(() => {
+        if (!stats) return [];
+        return [...stats.itemPerformance].sort((a,b) => b.count - a.count).slice(0, 5);
+    }, [stats]);
+    
+    const bottomItems = useMemo(() => {
+        if (!stats) return [];
+        if (stats.itemPerformance.length <= 5) return [];
+        return [...stats.itemPerformance].sort((a,b) => a.count - b.count).slice(0, 5);
+    }, [stats]);
 
 
     const renderChatContent = () => (
@@ -692,22 +730,26 @@ const DashboardView: React.FC = () => {
                                     <CardTitle>Complete Item Sales List</CardTitle>
                                     <CardDescription>All items from completed orders in the period.</CardDescription>
                                 </div>
-                                <div className="relative w-48">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <Input 
-                                        placeholder="Search items..." 
-                                        className="pl-10 h-9" 
-                                        value={itemSearchQuery} 
-                                        onChange={(e) => setItemSearchQuery(e.target.value)}
-                                    />
+                                <div className="flex items-center gap-2">
+                                     <SortButton sortKey="count" label="Qty" />
+                                     <SortButton sortKey="totalValue" label="Value" />
                                 </div>
+                            </div>
+                            <div className="relative mt-2">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input 
+                                    placeholder="Search items..." 
+                                    className="pl-10 h-9" 
+                                    value={itemSearchQuery} 
+                                    onChange={(e) => setItemSearchQuery(e.target.value)}
+                                />
                             </div>
                         </CardHeader>
                         <CardContent>
                              <ScrollArea className="h-64 pr-4">
-                                {filteredItemSales.length > 0 ? (
+                                {sortedItemSales.length > 0 ? (
                                     <div className="space-y-3">
-                                        {filteredItemSales.map((item, index) => (
+                                        {sortedItemSales.map((item, index) => (
                                             <div key={item.name + index} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
                                                 <div>
                                                     <p className="font-medium">{item.name}</p>
@@ -815,4 +857,5 @@ const DashboardView: React.FC = () => {
 export default DashboardView;
 
     
+
 
