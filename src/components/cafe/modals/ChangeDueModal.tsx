@@ -15,9 +15,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { HandCoins, Wallet } from 'lucide-react';
+import { HandCoins, Wallet, Repeat } from 'lucide-react';
 import PartialSettleModal from './PartialSettleModal';
-import { addCreditToCustomer } from '@/lib/customer-credit';
+import ApplyCreditModal from './ApplyCreditModal';
+
 
 interface ChangeDueModalProps {
     orders: Order[];
@@ -27,19 +28,12 @@ interface ChangeDueModalProps {
 
 const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ orders, onClose, onSettle }) => {
     const [settleOrder, setSettleOrder] = useState<Order | null>(null);
-    const [isCrediting, setIsCrediting] = useState<string | null>(null);
+    const [creditOrder, setCreditOrder] = useState<Order | null>(null);
 
     const handleSettleSubmit = (orderId: string, amount: number) => {
         onSettle(orderId, amount);
         setSettleOrder(null);
     };
-
-    const handleUseAsCredit = async (order: Order) => {
-        if (!order.tag) return;
-        setIsCrediting(order.id);
-        await addCreditToCustomer(order.tag, order.balanceDue, order.id);
-        setIsCrediting(null);
-    }
 
     return (
         <>
@@ -70,11 +64,10 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ orders, onClose, onSett
                                                     <Button 
                                                         size="sm" 
                                                         variant="secondary" 
-                                                        onClick={() => handleUseAsCredit(order)} 
-                                                        disabled={isCrediting === order.id}
+                                                        onClick={() => setCreditOrder(order)} 
                                                     >
-                                                        <Wallet className="h-4 w-4 mr-2" /> 
-                                                        {isCrediting === order.id ? 'Crediting...' : 'Use as Credit'}
+                                                        <Repeat className="h-4 w-4 mr-2" /> 
+                                                        Apply to Order
                                                     </Button>
                                                 )}
                                             </div>
@@ -96,6 +89,16 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ orders, onClose, onSett
                     order={settleOrder}
                     onClose={() => setSettleOrder(null)}
                     onSettle={handleSettleSubmit}
+                />
+            )}
+             {creditOrder && (
+                <ApplyCreditModal
+                    sourceOrder={creditOrder}
+                    onClose={() => setCreditOrder(null)}
+                    onCreditApplied={() => {
+                        setCreditOrder(null);
+                         // Note: The main orders list will auto-update via its snapshot listener
+                    }}
                 />
             )}
         </>
