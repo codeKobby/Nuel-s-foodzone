@@ -16,7 +16,7 @@ import OrderDetailsModal from './modals/OrderDetailsModal';
 import ChangeDueModal from './modals/ChangeDueModal';
 import CombinedPaymentModal from './modals/CombinedPaymentModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import { OrderEditingContext } from '@/context/OrderEditingContext';
 import { Input } from '@/components/ui/input';
@@ -377,5 +377,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 };
 
 export default OrdersView;
+
+    
 
     
