@@ -355,6 +355,11 @@ function getPayloadConfigFromPayload(
     : config[key as keyof typeof config]
 }
 
+const ChartYAxis = RechartsPrimitive.YAxis;
+const ChartXAxis = RechartsPrimitive.XAxis;
+const ChartLine = RechartsPrimitive.Line;
+
+
 export {
   ChartContainer,
   ChartTooltip,
@@ -362,4 +367,7 @@ export {
   ChartLegend,
   ChartLegendContent,
   ChartStyle,
+  ChartYAxis,
+  ChartXAxis,
+  ChartLine
 }
