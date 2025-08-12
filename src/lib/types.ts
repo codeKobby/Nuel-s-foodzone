@@ -1,4 +1,5 @@
 
+
 import type { Timestamp } from 'firebase/firestore';
 import type { AnalyzeBusinessOutputSchema } from '@/ai/schemas';
 import { z } from 'zod';
@@ -52,17 +53,20 @@ export interface ReconciliationReport {
     id: string;
     timestamp: Timestamp;
     period: string;
-    totalSales: number;
-    cashSales: number;
-    momoSales: number;
-    miscExpenses: number;
+    totalSales: number; // For context, but not part of main calculation
+    
+    // Expected figures
     expectedCash: number;
+    expectedMomo: number;
+    totalExpectedRevenue: number;
+
+    // Counted figures
     countedCash: number;
     countedMomo: number;
-    cashDifference: number;
-    changeOwed: number;
-    changeSetAside: boolean;
-    cashForDeposit: number;
+    totalCountedRevenue: number;
+
+    // Final result
+    totalDiscrepancy: number;
     notes: string;
 }
 
@@ -85,3 +89,5 @@ export interface OrderEditingContextType {
     loadOrderForEditing: (order: Order) => void;
     clearEditingOrder: () => void;
 }
+
+    

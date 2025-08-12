@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -15,7 +16,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import AdvancedReconciliationModal from './modals/AdvancedReconciliationModal';
 import {
   Dialog,
@@ -55,8 +55,9 @@ interface PeriodStats {
     miscCashExpenses: number;
     miscMomoExpenses: number;
     expectedCash: number;
+    expectedMomo: number;
+    totalExpectedRevenue: number;
     netRevenue: number;
-    changeOwed: number;
     unpaidOrdersValue: number;
     orders: Order[];
     itemStats: Record<string, { count: number; totalValue: number }>;
@@ -75,20 +76,12 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
     </Card>
 );
 
-const denominations = [
-    { name: '200 GHS', value: 200 }, { name: '100 GHS', value: 100 },
-    { name: '50 GHS', value: 50 }, { name: '20 GHS', value: 20 },
-    { name: '10 GHS', value: 10 }, { name: '5 GHS', value: 5 },
-    { name: '2 GHS', value: 2 }, { name: '1 GHS', value: 1 },
-    { name: '50 Pesewas', value: 0.5 },
-];
 
 const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setActiveView}) => {
     const [stats, setStats] = useState<PeriodStats | null>(null);
-    const [counts, setCounts] = useState<Record<string, string>>(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
+    const [countedCash, setCountedCash] = useState('');
     const [countedMomo, setCountedMomo] = useState('');
     const [notes, setNotes] = useState('');
-    const [changeSetAside, setChangeSetAside] = useState(false);
     const [reports, setReports] = useState<ReconciliationReport[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -104,15 +97,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         return reports.some(report => isToday(report.timestamp.toDate()));
     }, [reports]);
 
-    const totalCountedCash = useMemo(() => {
-        return denominations.reduce((acc, d) => {
-            const count = parseInt(counts[d.name], 10) || 0;
-            return acc + count * d.value;
-        }, 0);
-    }, [counts]);
-    
-    const cashDifference = useMemo(() => totalCountedCash - (stats?.expectedCash || 0), [totalCountedCash, stats?.expectedCash]);
-    const cashForDeposit = useMemo(() => changeSetAside ? totalCountedCash - (stats?.changeOwed || 0) : totalCountedCash, [changeSetAside, totalCountedCash, stats?.changeOwed]);
+    const totalCountedCash = useMemo(() => parseFloat(countedCash) || 0, [countedCash]);
+    const totalCountedMomo = useMemo(() => parseFloat(countedMomo) || 0, [countedMomo]);
+    const totalCountedRevenue = useMemo(() => totalCountedCash + totalCountedMomo, [totalCountedCash, totalCountedMomo]);
+    const totalDiscrepancy = useMemo(() => totalCountedRevenue - (stats?.totalExpectedRevenue || 0), [totalCountedRevenue, stats]);
 
     const fetchPeriodData = useCallback(async () => {
         if (!date?.from) return;
@@ -141,7 +129,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 getDocs(allOrdersQuery)
             ]);
 
-            let cashSales = 0, momoSales = 0, totalChangeOwed = 0, totalSalesToday = 0;
+            let cashSales = 0, momoSales = 0, totalSalesToday = 0;
             const periodOrders: Order[] = [];
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             let unpaidOrdersValue = 0;
@@ -159,10 +147,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     totalSalesToday += order.total;
                     if(order.paymentMethod === 'cash') cashSales += Math.min(order.total, order.amountPaid);
                     if(order.paymentMethod === 'momo') momoSales += order.total;
-
-                    if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
-                        totalChangeOwed += order.balanceDue;
-                    }
                 
                     order.items.forEach(item => {
                         const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
@@ -203,8 +187,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const totalSales = totalSalesToday;
             const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses);
             const expectedCash = cashSales - miscCashExpenses;
+            const expectedMomo = momoSales - miscMomoExpenses;
+            const totalExpectedRevenue = expectedCash + expectedMomo;
             
-            setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, netRevenue, changeOwed: totalChangeOwed, unpaidOrdersValue, orders: periodOrders, itemStats });
+            setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, expectedMomo, totalExpectedRevenue, netRevenue, unpaidOrdersValue, orders: periodOrders, itemStats });
         } catch (e) {
             console.error(e);
             setError("Failed to load financial data for the selected period.");
@@ -229,16 +215,11 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
         return () => unsubscribe();
     }, []);
-
-    const handleCountChange = (name: string, value: string) => {
-        setCounts(prev => ({ ...prev, [name]: value.replace(/[^0-9]/g, '') }));
-    };
     
     const resetForm = () => {
-        setCounts(denominations.reduce((acc, d) => ({ ...acc, [d.name]: '' }), {}));
+        setCountedCash('');
         setCountedMomo('');
         setNotes('');
-        setChangeSetAside(false);
     }
 
     const handleSaveReport = async () => {
@@ -246,7 +227,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             setError("No financial data loaded to create a report.");
             return;
         }
-        if (totalCountedCash <= 0 && !countedMomo) {
+        if (totalCountedCash <= 0 && totalCountedMomo <= 0) {
             setError("Please count either cash or Momo/Card before submitting.");
             return;
         }
@@ -257,16 +238,16 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 timestamp: serverTimestamp(),
                 period: new Date().toDateString(),
                 totalSales: stats.totalSales,
-                cashSales: stats.cashSales,
-                momoSales: stats.momoSales,
-                miscExpenses: stats.miscCashExpenses + stats.miscMomoExpenses,
+                
                 expectedCash: stats.expectedCash,
+                expectedMomo: stats.expectedMomo,
+                totalExpectedRevenue: stats.totalExpectedRevenue,
+                
                 countedCash: totalCountedCash,
-                countedMomo: parseFloat(countedMomo) || 0,
-                cashDifference: cashDifference,
-                changeOwed: stats.changeOwed,
-                changeSetAside: changeSetAside,
-                cashForDeposit: cashForDeposit,
+                countedMomo: totalCountedMomo,
+                totalCountedRevenue: totalCountedRevenue,
+
+                totalDiscrepancy: totalDiscrepancy,
                 notes: notes,
             };
             await addDoc(collection(db, "reconciliationReports"), reportData);
@@ -319,71 +300,70 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 {!stats ? <LoadingSpinner /> : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
                      <div className="space-y-4">
-                        <Label className="text-lg font-semibold">Cash Count</Label>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 p-3 border rounded-md bg-secondary">
-                            {denominations.map(d => (
-                                <div key={d.name} className="flex items-center space-x-2">
-                                    <Label htmlFor={`count-${d.name}`} className="w-24 text-sm">{d.name}</Label>
-                                    <Input id={`count-${d.name}`} type="text" pattern="[0-9]*" value={counts[d.name]} onChange={e => handleCountChange(d.name, e.target.value)} placeholder="Qty" className="h-8"/>
-                                </div>
-                            ))}
-                        </div>
-                        <div>
-                            <Label className="text-lg font-semibold">Momo/Card Sales Count</Label>
-                            <Input id="counted-momo" type="number" value={countedMomo} onChange={e => setCountedMomo(e.target.value)} placeholder="Total from payment device" className="h-10 mt-2"/>
+                        <Label className="text-lg font-semibold">Counted Totals</Label>
+                        <div className="space-y-4 p-3 border rounded-md bg-secondary">
+                             <div>
+                                <Label htmlFor="counted-cash">Counted Cash Total</Label>
+                                <Input id="counted-cash" type="number" value={countedCash} onChange={e => setCountedCash(e.target.value)} placeholder="Total cash in drawer" className="h-10 mt-2"/>
+                            </div>
+                            <div>
+                                <Label htmlFor="counted-momo">Counted Momo/Card Total</Label>
+                                <Input id="counted-momo" type="number" value={countedMomo} onChange={e => setCountedMomo(e.target.value)} placeholder="Total from payment device" className="h-10 mt-2"/>
+                            </div>
                         </div>
                         <div>
                             <Label className="text-lg font-semibold" htmlFor="notes">Notes</Label>
-                            <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g., reason for cash deficit/surplus" className="mt-2"/>
+                            <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g., reason for deficit/surplus" className="mt-2"/>
                         </div>
+                        <Button variant="outline" size="sm" className="w-full mt-1" onClick={() => setIsAdvancedModalOpen(true)}>
+                            <Search className="mr-2 h-4 w-4" />
+                            Advanced Reconciliation (Audit Tool)
+                        </Button>
                      </div>
 
-                     <div className="space-y-4 p-4 border rounded-lg">
+                     <div className="space-y-4 p-4 border rounded-lg bg-card">
                         <h3 className="text-lg font-semibold text-center mb-2">Reconciliation Summary</h3>
-                        <div className="flex justify-between items-center">
-                            <Label>Expected Cash in Drawer</Label>
-                            <p className="font-bold text-lg">{formatCurrency(stats.expectedCash)}</p>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <Label>Counted Cash Total</Label>
-                            <p className="font-bold text-lg">{formatCurrency(totalCountedCash)}</p>
-                        </div>
-                        <Separator />
-                        <div className="flex justify-between items-center">
-                             <Label>Cash Status</Label>
-                             {renderDifferenceBadge(cashDifference)}
-                        </div>
-                        {cashDifference !== 0 && (
-                             <Button variant="outline" size="sm" className="w-full mt-1" onClick={() => setIsAdvancedModalOpen(true)}>
-                                 <Search className="mr-2 h-4 w-4" />
-                                 Advanced Reconciliation (Audit)
-                             </Button>
-                        )}
-                        <Separator />
-                        <div className="space-y-3 pt-2">
-                            <h4 className="font-semibold">Handle Outstanding Change</h4>
-                            <div className="flex justify-between items-center">
-                                <Label className="text-red-500">Change Owed to Customers</Label>
-                                <p className="font-bold text-red-500 text-lg">{formatCurrency(stats.changeOwed)}</p>
-                            </div>
-                            <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                                <div className="space-y-0.5">
-                                    <Label htmlFor="change-set-aside" className="font-semibold">Set aside cash?</Label>
-                                    <p className="text-xs text-muted-foreground">Separate cash for owed change.</p>
+                        
+                        <Card className="bg-secondary">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base">Expected Revenue</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-1 text-sm">
+                                <div className="flex justify-between"><span>Cash Sales:</span> <span>{formatCurrency(stats.cashSales)}</span></div>
+                                <div className="flex justify-between"><span>(-) Cash Expenses:</span> <span className="text-orange-500">{formatCurrency(stats.miscCashExpenses)}</span></div>
+                                <div className="flex justify-between font-bold border-t pt-1"><span>Expected Cash:</span> <span>{formatCurrency(stats.expectedCash)}</span></div>
+                                <Separator className="my-2"/>
+                                <div className="flex justify-between"><span>MoMo Sales:</span> <span>{formatCurrency(stats.momoSales)}</span></div>
+                                <div className="flex justify-between"><span>(-) MoMo Expenses:</span> <span className="text-orange-500">{formatCurrency(stats.miscMomoExpenses)}</span></div>
+                                <div className="flex justify-between font-bold border-t pt-1"><span>Expected MoMo:</span> <span>{formatCurrency(stats.expectedMomo)}</span></div>
+                            </CardContent>
+                            <CardFooter className="bg-primary/10 p-3">
+                                <div className="w-full flex justify-between items-center">
+                                    <span className="font-bold text-primary text-lg">Total Expected:</span>
+                                    <span className="font-extrabold text-primary text-xl">{formatCurrency(stats.totalExpectedRevenue)}</span>
                                 </div>
-                                <Switch
-                                    id="change-set-aside"
-                                    checked={changeSetAside}
-                                    onCheckedChange={setChangeSetAside}
-                                    disabled={stats.changeOwed === 0}
-                                />
-                            </div>
-                        </div>
-                        <Separator />
-                        <div className="pt-2 text-center bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                             <Label className="text-xl font-bold text-green-700 dark:text-green-300">Cash for Deposit</Label>
-                             <p className="text-3xl md:text-4xl font-extrabold text-green-600 dark:text-green-400">{formatCurrency(cashForDeposit)}</p>
-                              {changeSetAside && stats.changeOwed > 0 && <p className="text-xs text-muted-foreground mt-1">({formatCurrency(totalCountedCash)} - {formatCurrency(stats.changeOwed)} set aside)</p>}
+                            </CardFooter>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base">Counted Revenue</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-1 text-sm">
+                                <div className="flex justify-between"><span>Counted Cash:</span> <span className="font-bold">{formatCurrency(totalCountedCash)}</span></div>
+                                <div className="flex justify-between"><span>Counted MoMo:</span> <span className="font-bold">{formatCurrency(totalCountedMomo)}</span></div>
+                            </CardContent>
+                             <CardFooter className="bg-green-50 dark:bg-green-900/20 p-3">
+                                <div className="w-full flex justify-between items-center">
+                                    <span className="font-bold text-green-700 dark:text-green-300 text-lg">Total Counted:</span>
+                                    <span className="font-extrabold text-green-600 dark:text-green-400 text-xl">{formatCurrency(totalCountedRevenue)}</span>
+                                </div>
+                            </CardFooter>
+                        </Card>
+                        
+                        <div className="pt-2 flex justify-between items-center">
+                             <Label className="text-lg font-semibold">Final Status</Label>
+                             {renderDifferenceBadge(totalDiscrepancy)}
                         </div>
                      </div>
                 </div>
@@ -504,17 +484,14 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
                                     <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
                                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Orders (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
-                                    <StatCard icon={<Coins className="text-red-500"/>} title="Change Owed" value={formatCurrency(stats.changeOwed)} description="Outstanding change" />
-                                    <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} />
+                                    <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses (Cash)" value={formatCurrency(stats.miscCashExpenses)} />
+                                     <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses (MoMo)" value={formatCurrency(stats.miscMomoExpenses)} />
                                 </CardContent>
                                 <CardFooter>
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
                                         <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Net Revenue</Label>
                                         <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.netRevenue)}</p>
                                         <p className="text-xs text-muted-foreground">(Paid Sales - Misc. Expenses)</p>
-                                        {stats.changeOwed > 0 && (
-                                            <p className="text-xs text-red-500 font-semibold mt-1">Remember to keep {formatCurrency(stats.changeOwed)} for change.</p>
-                                        )}
                                     </div>
                                 </CardFooter>
                             </Card>
@@ -560,24 +537,16 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                         <p className="font-semibold">{report.period}</p>
                                         <p className="text-sm text-muted-foreground">{formatTimestamp(report.timestamp)}</p>
                                     </div>
-                                    {renderDifferenceBadge(report.cashDifference)}
+                                    {renderDifferenceBadge(report.totalDiscrepancy)}
                                 </div>
                                 <div className="text-xs grid grid-cols-2 gap-x-4 gap-y-1 mt-2 border-t pt-2">
+                                    <span>Expected Revenue: <span className="font-medium">{formatCurrency(report.totalExpectedRevenue)}</span></span>
+                                    <span>Counted Revenue: <span className="font-medium">{formatCurrency(report.totalCountedRevenue)}</span></span>
                                     <span>Expected Cash: <span className="font-medium">{formatCurrency(report.expectedCash)}</span></span>
                                     <span>Counted Cash: <span className="font-medium">{formatCurrency(report.countedCash)}</span></span>
-                                    <span>Expected Momo: <span className="font-medium">{formatCurrency(report.momoSales)}</span></span>
+                                    <span>Expected Momo: <span className="font-medium">{formatCurrency(report.expectedMomo)}</span></span>
                                     <span>Counted Momo: <span className="font-medium">{formatCurrency(report.countedMomo)}</span></span>
-                                    <span className="col-span-2">Cash for Deposit: <span className="font-bold">{formatCurrency(report.cashForDeposit)}</span></span>
                                 </div>
-                                 {report.changeOwed > 0 && (
-                                    <div className={`mt-2 text-xs flex items-center gap-2 p-2 rounded-md ${report.changeSetAside ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
-                                        <AlertCircle className="h-4 w-4"/>
-                                        <div>
-                                            {formatCurrency(report.changeOwed)} in change was owed. Cashier reported it was
-                                            <span className="font-bold"> {report.changeSetAside ? 'SET ASIDE' : 'NOT SET ASIDE'}</span>.
-                                        </div>
-                                    </div>
-                                )}
                                 {report.notes && <p className="text-xs italic mt-2 border-t pt-2">Notes: {report.notes}</p>}
                             </div>
                         ))}
@@ -607,7 +576,5 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-    
 
     

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -62,7 +63,7 @@ interface DashboardStats {
     netRevenue: number;
     unpaidOrdersValue: number;
     totalMiscExpenses: number;
-    cashDiscrepancy: number;
+    totalDiscrepancy: number;
     salesData: { date: string; sales: number }[];
     itemPerformance: { name: string; count: number; totalValue: number }[];
     discrepancyReports: ReconciliationReport[];
@@ -200,12 +201,12 @@ const DashboardView: React.FC = () => {
             });
 
             // Process reconciliations
-            let cashDiscrepancy = 0;
+            let totalDiscrepancy = 0;
             const discrepancyReports: ReconciliationReport[] = [];
             reportsSnapshot.forEach(doc => {
                 const report = {id: doc.id, ...doc.data()} as ReconciliationReport;
-                cashDiscrepancy += report.cashDifference;
-                if(report.cashDifference !== 0) {
+                totalDiscrepancy += report.totalDiscrepancy;
+                if(report.totalDiscrepancy !== 0) {
                     discrepancyReports.push(report);
                 }
             });
@@ -233,7 +234,7 @@ const DashboardView: React.FC = () => {
                 momoSales,
                 unpaidOrdersValue,
                 totalMiscExpenses,
-                cashDiscrepancy,
+                totalDiscrepancy,
                 salesData,
                 itemPerformance,
                 discrepancyReports
@@ -301,7 +302,7 @@ const DashboardView: React.FC = () => {
                 totalOrders: stats.totalOrders,
                 avgOrderValue: stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0,
                 itemPerformance: stats.itemPerformance.slice(0, 10), // Send top 10 items
-                cashDiscrepancy: stats.cashDiscrepancy,
+                cashDiscrepancy: stats.totalDiscrepancy,
                 miscExpenses: stats.totalMiscExpenses,
             };
             const result = await analyzeBusiness(input);
@@ -558,8 +559,8 @@ const DashboardView: React.FC = () => {
                     <Dialog open onOpenChange={setIsDiscrepancyModalOpen}>
                         <DialogContent>
                              <DialogHeader>
-                                <DialogTitle>Cash Discrepancy Report</DialogTitle>
-                                <DialogDescription>Breakdown of cash surplus/deficit reports for the selected period.</DialogDescription>
+                                <DialogTitle>Reconciliation Report Details</DialogTitle>
+                                <DialogDescription>Breakdown of submitted reports for the selected period.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="h-72 my-4">
                                <div className="space-y-3 pr-4">
@@ -570,9 +571,13 @@ const DashboardView: React.FC = () => {
                                                 <p className="font-semibold">{report.period}</p>
                                                 <p className="text-sm text-muted-foreground">{formatTimestamp(report.timestamp)}</p>
                                             </div>
-                                             <Badge variant="default" className={report.cashDifference > 0 ? 'bg-blue-500' : 'bg-red-500'}>
-                                                {formatCurrency(report.cashDifference)}
+                                             <Badge variant="default" className={report.totalDiscrepancy > 0 ? 'bg-blue-500' : report.totalDiscrepancy < 0 ? 'bg-red-500' : 'bg-green-500'}>
+                                                {formatCurrency(report.totalDiscrepancy)}
                                             </Badge>
+                                        </div>
+                                         <div className="text-xs grid grid-cols-2 gap-x-4 gap-y-1 mt-2 border-t pt-2">
+                                            <span>Expected: <span className="font-medium">{formatCurrency(report.totalExpectedRevenue)}</span></span>
+                                            <span>Counted: <span className="font-medium">{formatCurrency(report.totalCountedRevenue)}</span></span>
                                         </div>
                                          {report.notes && <p className="text-xs italic mt-2 border-t pt-2">Notes: {report.notes}</p>}
                                     </div>
@@ -588,9 +593,9 @@ const DashboardView: React.FC = () => {
                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - Misc. Expenses"/>
                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} />
                     <StatCard 
-                        icon={<FileWarning className={stats.cashDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
-                        title="Cash Discrepancy" 
-                        value={formatCurrency(stats.cashDiscrepancy)} 
+                        icon={<FileWarning className={stats.totalDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
+                        title="Total Discrepancy" 
+                        value={formatCurrency(stats.totalDiscrepancy)} 
                         description="Click to view details"
                         onClick={() => setIsDiscrepancyModalOpen(true)}
                     />
