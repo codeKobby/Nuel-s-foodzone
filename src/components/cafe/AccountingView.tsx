@@ -181,7 +181,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const [allOrdersSnapshot, miscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
                 getDocs(allOrdersQuery),
                 getDocs(miscQuery),
-                getDocs(allUnpaidOrdersQuery)
+                getDocs(allUnpaidOrdersSnapshot)
             ]);
 
             let cashSales = 0, momoSales = 0, totalSalesToday = 0;
@@ -292,7 +292,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     }
 
     const handleSaveReport = async () => {
-        if (!stats) {
+        if (!stats || !date?.from) {
             setError("No financial data loaded to create a report.");
             return;
         }
@@ -305,7 +305,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         try {
             const reportData: Omit<ReconciliationReport, 'id'> = {
                 timestamp: serverTimestamp(),
-                period: new Date().toDateString(),
+                period: `${format(date.from, 'yyyy-MM-dd')} to ${format(date.to || date.from, 'yyyy-MM-dd')}`,
                 totalSales: stats.totalSales,
                 
                 expectedCash: reconciliationExpectedCash, // Use the adjusted expected cash
