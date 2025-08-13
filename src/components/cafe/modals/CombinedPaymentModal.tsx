@@ -39,51 +39,60 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     
     const amountPaidNum = parseFloat(amountPaidInput);
     const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
-    const finalAmountPaid = isAmountPaidEntered ? amountPaidNum : totalToPay;
+    const finalAmountPaid = isAmountPaidEntered ? amountPaidNum : 0;
+    
+    const deficit = isAmountPaidEntered && finalAmountPaid < totalToPay ? totalToPay - finalAmountPaid : 0;
+    const change = isAmountPaidEntered && finalAmountPaid > totalToPay ? finalAmountPaid - totalToPay : 0;
 
 
-    const processCombinedPayment = async () => {
+    const processCombinedPayment = async ({ pardonDeficit = false }) => {
         setIsProcessing(true);
         setError(null);
-
-        const pardonedAmount = finalAmountPaid < totalToPay ? totalToPay - finalAmountPaid : 0;
+        
+        const effectiveAmountPaid = isAmountPaidEntered ? finalAmountPaid : totalToPay;
 
         try {
             const batch = writeBatch(db);
             const now = serverTimestamp();
 
-            let amountToDistribute = finalAmountPaid;
+            let amountToDistribute = effectiveAmountPaid;
             
             const ordersToPay = orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0).sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
 
             for (const order of ordersToPay) {
-                if (amountToDistribute <= 0 && pardonedAmount === 0) break;
+                if (amountToDistribute <= 0 && !pardonDeficit) break;
 
                 const orderRef = doc(db, "orders", order.id);
                 const orderBalance = order.balanceDue;
                 const amountToPayForOrder = Math.min(amountToDistribute, orderBalance);
                 
                 const newAmountPaid = order.amountPaid + amountToPayForOrder;
-                const newBalanceDue = orderBalance - amountToPayForOrder;
+                let newBalanceDue = orderBalance - amountToPayForOrder;
                 
                 const updateData: any = {
                     paymentMethod: paymentMethod,
-                    paymentStatus: newBalanceDue <= 0 ? 'Paid' : 'Partially Paid',
                     amountPaid: newAmountPaid,
-                    balanceDue: newBalanceDue,
                     lastPaymentTimestamp: now,
                     lastPaymentAmount: amountToPayForOrder,
                     pardonedAmount: 0 // Reset pardoned amount for this order initially
                 };
-
+                
                 if (newBalanceDue <= 0) {
+                    updateData.paymentStatus = 'Paid';
                     updateData.status = 'Completed';
+                } else {
+                    updateData.paymentStatus = 'Partially Paid';
+                    updateData.status = 'Pending';
                 }
+                
+                updateData.balanceDue = newBalanceDue;
 
                 batch.update(orderRef, updateData);
                 amountToDistribute -= amountToPayForOrder;
             }
             
+            const remainingDeficit = totalToPay - effectiveAmountPaid;
+
             // Distribute change or pardoned amounts
             if (ordersToPay.length > 0) {
                  const lastOrder = ordersToPay[ordersToPay.length - 1];
@@ -93,12 +102,15 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                  if(amountToDistribute > 0) {
                     batch.update(lastOrderRef, { balanceDue: -amountToDistribute }); // Negative balance due is change
                  } 
-                 // If there was a deficit
-                 else if (pardonedAmount > 0) {
+                 // If there was a deficit and it's being pardoned
+                 else if (pardonDeficit && remainingDeficit > 0) {
                     const lastOrderData = (await getDoc(lastOrderRef)).data() as Order;
                     batch.update(lastOrderRef, {
-                        pardonedAmount: (lastOrderData.pardonedAmount || 0) + pardonedAmount,
-                        notes: `Combined payment deficit of ${formatCurrency(pardonedAmount)} pardoned.`
+                        pardonedAmount: (lastOrderData.pardonedAmount || 0) + remainingDeficit,
+                        notes: `Combined payment deficit of ${formatCurrency(remainingDeficit)} pardoned.`,
+                        balanceDue: 0,
+                        paymentStatus: 'Paid',
+                        status: 'Completed',
                     });
                  }
             }
@@ -113,8 +125,6 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             setIsProcessing(false);
         }
     };
-    
-    const balance = isAmountPaidEntered ? finalAmountPaid - totalToPay : 0;
 
 
     return (
@@ -158,11 +168,11 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                                 </div>
                             </div>
                             
-                            {isAmountPaidEntered && balance > 0 && (
-                                <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(balance)}</p>
+                            {change > 0 && (
+                                <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(change)}</p>
                             )}
-                            {isAmountPaidEntered && balance < 0 && (
-                                <p className="font-semibold text-orange-500 text-center">Deficit (Pardoned): {formatCurrency(Math.abs(balance))}</p>
+                            {deficit > 0 && (
+                                <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>
                             )}
                         </div>
                     )}
@@ -170,9 +180,20 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 </div>
 
                 <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
-                    <Button onClick={processCombinedPayment} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
-                        {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
-                    </Button>
+                    {deficit > 0 ? (
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button onClick={() => processCombinedPayment({ pardonDeficit: true })} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-base">
+                                {isProcessing ? <LoadingSpinner /> : 'Pardon & Complete'}
+                            </Button>
+                            <Button onClick={() => processCombinedPayment({ pardonDeficit: false })} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white h-12 text-base">
+                                {isProcessing ? <LoadingSpinner /> : 'Leave Unpaid'}
+                            </Button>
+                        </div>
+                    ) : (
+                        <Button onClick={() => processCombinedPayment({})} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                            {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

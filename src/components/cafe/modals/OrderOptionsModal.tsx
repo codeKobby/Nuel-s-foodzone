@@ -40,22 +40,51 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 
     const amountPaidNum = parseFloat(amountPaidInput);
     const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
-    const finalAmountPaid = isAmountPaidEntered ? amountPaidNum : total;
+    const finalAmountPaid = isAmountPaidEntered ? amountPaidNum : 0;
+    
+    const deficit = isAmountPaidEntered && finalAmountPaid < total ? total - finalAmountPaid : 0;
+    const change = isAmountPaidEntered && finalAmountPaid > total ? finalAmountPaid - total : 0;
 
-    const processOrder = async (isPaid: boolean) => {
+    const handleProceedToPayment = () => {
+        if (!orderTag) {
+            setError("Please add a tag (e.g., customer name or table number) to the order.");
+            return;
+        }
+        setError(null);
+        setStep(2);
+    }
+    
+    const handlePayLater = () => {
+        if (!orderTag) {
+            setError("Please add a tag before creating a 'Pay Later' order.");
+            return;
+        }
+        setError(null);
+        processOrder({ isPaid: false });
+    }
+
+    const processOrder = async (options: { isPaid: boolean, pardonDeficit?: boolean }) => {
         setIsProcessing(true);
         setError(null);
-        
-        const pardonedAmount = isPaid && finalAmountPaid < total ? total - finalAmountPaid : 0;
 
+        const { isPaid, pardonDeficit = false } = options;
+        const effectiveAmountPaid = isAmountPaidEntered ? finalAmountPaid : (isPaid ? total : 0);
+        
         try {
             const batch = writeBatch(db);
             const now = serverTimestamp();
             
-            const paymentStatus = isPaid 
-                ? (finalAmountPaid < total && pardonedAmount === 0 ? 'Partially Paid' : 'Paid')
-                : 'Unpaid';
-            
+            let paymentStatus: Order['paymentStatus'] = 'Unpaid';
+            if (isPaid) {
+                if (effectiveAmountPaid < total && !pardonDeficit) {
+                    paymentStatus = 'Partially Paid';
+                } else {
+                    paymentStatus = 'Paid';
+                }
+            }
+
+            const pardonedAmount = isPaid && pardonDeficit ? total - effectiveAmountPaid : 0;
+
             const orderData: any = {
                 tag: orderTag,
                 orderType,
@@ -63,10 +92,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 total,
                 paymentMethod: isPaid ? paymentMethod : 'Unpaid',
                 paymentStatus,
-                amountPaid: isPaid ? finalAmountPaid : 0,
-                balanceDue: isPaid ? finalAmountPaid - total : total,
+                amountPaid: effectiveAmountPaid,
+                balanceDue: effectiveAmountPaid - total,
                 pardonedAmount: pardonedAmount,
                 changeGiven: 0, 
+                fulfilledItems: editingOrder?.fulfilledItems || [],
             };
             
             if (pardonedAmount > 0) {
@@ -75,10 +105,13 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 
             if (isPaid) {
                 orderData.lastPaymentTimestamp = now;
-                orderData.lastPaymentAmount = finalAmountPaid;
-                if (paymentStatus === 'Paid') {
-                    orderData.status = 'Completed';
-                }
+                orderData.lastPaymentAmount = effectiveAmountPaid;
+            }
+            
+            if (paymentStatus === 'Paid') {
+                orderData.status = 'Completed';
+            } else {
+                orderData.status = 'Pending';
             }
 
             if (editingOrder) {
@@ -95,7 +128,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                     ...orderData,
                     id: newOrderRef.id,
                     simplifiedId: generateSimpleOrderId(newCount),
-                    status: 'Pending',
                     timestamp: now,
                 };
                 
@@ -114,9 +146,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         }
     };
     
-    const balance = isAmountPaidEntered ? finalAmountPaid - total : 0;
-
-
     return (
         <Dialog open onOpenChange={onClose}>
             <DialogContent className="sm:max-w-md animate-fade-in-up">
@@ -139,10 +168,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                 <Label htmlFor="tag">Tag (Customer Name / Table No.)</Label>
                                 <Input id="tag" type="text" value={orderTag} onChange={(e) => setOrderTag(e.target.value)} placeholder="e.g., 'Table 5' or 'John D.'" />
                             </div>
+                             {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
                         </div>
                         <DialogFooter className="grid grid-cols-2 gap-2">
-                             <Button onClick={() => processOrder(false)} disabled={isProcessing} variant="secondary" className="bg-yellow-500 hover:bg-yellow-600 text-white">{isProcessing ? 'Processing...' : 'Pay Later'}</Button>
-                            <Button onClick={() => setStep(2)} className="w-full">Proceed to Payment</Button>
+                             <Button onClick={handlePayLater} disabled={isProcessing} variant="secondary" className="bg-yellow-500 hover:bg-yellow-600 text-white">{isProcessing ? 'Processing...' : 'Pay Later'}</Button>
+                            <Button onClick={handleProceedToPayment} className="w-full">Proceed to Payment</Button>
                         </DialogFooter>
                     </>
                 )}
@@ -163,23 +193,37 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                      <div>
                                         <Label htmlFor="cashPaid">Amount Paid by Customer (Optional)</Label>
                                         <div className="flex gap-2">
-                                        <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
-                                         <Button variant="outline" onClick={() => setAmountPaidInput(String(total))} className="h-12">Exact</Button>
+                                            <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                            <Button variant="outline" onClick={() => setAmountPaidInput(String(total))} className="h-12">Exact</Button>
                                         </div>
                                     </div>
                                     
-                                    {isAmountPaidEntered && balance > 0 && (
-                                        <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(balance)}</p>
+                                    {change > 0 && (
+                                        <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(change)}</p>
                                     )}
-                                    {isAmountPaidEntered && balance < 0 && (
-                                        <p className="font-semibold text-orange-500 text-center">Deficit (Pardoned): {formatCurrency(Math.abs(balance))}</p>
+                                    {deficit > 0 && (
+                                        <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>
                                     )}
                                 </div>
                             )}
                              {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                         </div>
+                        
                         <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
-                            <Button onClick={() => processOrder(true)} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">{isProcessing ? 'Processing...' : 'Confirm'}</Button>
+                           {deficit > 0 ? (
+                                <div className="grid grid-cols-2 gap-2">
+                                     <Button onClick={() => processOrder({ isPaid: true, pardonDeficit: true })} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-base">
+                                        {isProcessing ? <LoadingSpinner /> : 'Pardon & Complete'}
+                                    </Button>
+                                     <Button onClick={() => processOrder({ isPaid: true, pardonDeficit: false })} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white h-12 text-base">
+                                        {isProcessing ? <LoadingSpinner /> : 'Leave Unpaid'}
+                                    </Button>
+                                </div>
+                           ) : (
+                             <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                                {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
+                            </Button>
+                           )}
                         </DialogFooter>
                         <Button onClick={() => setStep(1)} variant="link" className="w-full mt-2 text-sm">Back to Options</Button>
                     </>
