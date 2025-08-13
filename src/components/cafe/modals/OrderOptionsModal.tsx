@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc, writeBatch, serverTimestamp, collection, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, writeBatch, serverTimestamp, collection, Timestamp, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
 import type { OrderItem, Order } from '@/lib/types';
@@ -111,7 +111,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 const existingOrderData = existingOrderSnap.data() as Order;
 
                 const newTotalPaid = existingOrderData.amountPaid + (isPaid ? finalAmountPaid : 0);
-                let newBalanceDue = total - newTotalPaid - pardonedAmount;
+                let newBalanceDue = total - newTotalPaid;
+                
+                if (pardonedAmount > 0) {
+                    newBalanceDue = 0; // If deficit is pardoned, balance becomes 0
+                }
 
                 orderData.amountPaid = newTotalPaid;
                 orderData.balanceDue = newBalanceDue;
@@ -124,25 +128,31 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                     orderData.paymentStatus = 'Partially Paid';
                 }
                 
-                orderData.status = (orderData.paymentStatus === 'Unpaid' || orderData.paymentStatus === 'Partially Paid') ? 'Pending' : 'Completed';
+                orderData.status = 'Pending';
                 
                 await updateDoc(orderRef, orderData);
                 finalOrder = { ...existingOrderData, ...orderData, id: editingOrder.id, timestamp: existingOrderData.timestamp };
 
             } else {
                 let paymentStatus: Order['paymentStatus'] = 'Unpaid';
+                 let balanceDue = total;
+                
                 if (isPaid) {
-                     if (paymentMethod === 'cash' && isAmountPaidEntered && finalAmountPaid < total && !pardonDeficit) {
+                    if (paymentMethod === 'cash' && isAmountPaidEntered && finalAmountPaid < total && !pardonDeficit) {
                         paymentStatus = 'Partially Paid';
                     } else if (finalAmountPaid >= total || pardonDeficit) {
                         paymentStatus = 'Paid';
                     }
+                     balanceDue = finalAmountPaid - total - pardonedAmount;
+                     if(pardonDeficit && finalAmountPaid < total) {
+                        balanceDue = 0;
+                     }
                 }
-                const balanceDue = isPaid ? finalAmountPaid - total - pardonedAmount : total;
+                
                 orderData.paymentStatus = paymentStatus;
                 orderData.amountPaid = isPaid ? finalAmountPaid : 0;
                 orderData.balanceDue = balanceDue;
-                orderData.status = (paymentStatus === 'Unpaid' || paymentStatus === 'Partially Paid') ? 'Pending' : 'Completed';
+                orderData.status = 'Pending';
 
 
                 const counterRef = doc(db, "counters", "orderIdCounter");
@@ -225,9 +235,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                             {paymentMethod === 'cash' && (
                             <div className="space-y-2">
                                 <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
-                                <div className="flex gap-2">
-                                    <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Enter amount..." onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
-                                </div>
+                                <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Enter amount..." onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
                                  {change > 0 && (
                                     <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(change)}</p>
                                 )}
@@ -265,5 +273,3 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 };
 
 export default OrderOptionsModal;
-
-    

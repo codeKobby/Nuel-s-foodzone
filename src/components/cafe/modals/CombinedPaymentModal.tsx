@@ -30,7 +30,6 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     const [amountPaidInput, setAmountPaidInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [exactButtonClicked, setExactButtonClicked] = useState(false);
 
     const totalToPay = useMemo(() => {
         return orders.reduce((acc, order) => {
@@ -43,12 +42,6 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     
     const handleAmountPaidChange = (value: string) => {
         setAmountPaidInput(value);
-        setExactButtonClicked(false);
-    };
-
-    const handleExactAmountClick = () => {
-        setAmountPaidInput(String(totalToPay));
-        setExactButtonClicked(true);
     };
     
     const amountPaidNum = parseFloat(amountPaidInput);
@@ -63,7 +56,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 
     const processCombinedPayment = async ({ pardonDeficit = false }) => {
         if (paymentMethod === 'cash' && !isAmountPaidEntered) {
-             setError("Please enter an amount paid or use the 'Exact' button.");
+             setError("Please enter an amount paid.");
              return;
         }
 
@@ -94,14 +87,13 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     lastPaymentTimestamp: now,
                     lastPaymentAmount: amountToPayForOrder,
                     pardonedAmount: order.pardonedAmount || 0,
+                    status: 'Pending', // Orders are always pending until manually completed
                 };
                 
                 if (newBalanceDue <= 0) {
                     updateData.paymentStatus = 'Paid';
-                    updateData.status = 'Completed';
                 } else {
                     updateData.paymentStatus = 'Partially Paid';
-                    updateData.status = 'Pending';
                 }
                 
                 updateData.balanceDue = newBalanceDue;
@@ -126,7 +118,6 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                         notes: `Combined payment deficit of ${formatCurrency(remainingDeficit)} pardoned.`,
                         balanceDue: 0,
                         paymentStatus: 'Paid',
-                        status: 'Completed',
                     });
                  }
             }
@@ -178,10 +169,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                         <div className="space-y-2">
                              <div>
                                 <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
-                                <div className="flex gap-2">
                                 <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => handleAmountPaidChange(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
-                                    <Button onClick={handleExactAmountClick} className={cn("h-12", exactButtonClicked ? "bg-green-500 hover:bg-green-600 text-white" : "")}>Exact</Button>
-                                </div>
                             </div>
                             
                             {change > 0 && (
@@ -217,4 +205,3 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 };
 
 export default CombinedPaymentModal;
-

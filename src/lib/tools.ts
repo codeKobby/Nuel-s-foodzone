@@ -20,7 +20,7 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         const ordersRef = collection(db, "orders");
         
         const miscExpensesRef = collection(db, "miscExpenses");
-        const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<", endDateTimestamp));
+        const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
         
         const reconciliationReportsRef = collection(db, "reconciliationReports");
         const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<", endDateTimestamp));
@@ -71,7 +71,7 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
                 }
             }
 
-            // 3. Change owed to customer (from any order)
+            // 3. Change owed TO the customer (from any order)
             if (order.balanceDue < 0) {
                 changeOwed += Math.abs(order.balanceDue);
             }
