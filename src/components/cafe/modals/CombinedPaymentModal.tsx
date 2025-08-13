@@ -53,14 +53,16 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     
     const amountPaidNum = parseFloat(amountPaidInput);
     const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
-    const finalAmountPaid = isAmountPaidEntered ? amountPaidNum : 0;
+    const finalAmountPaid = paymentMethod === 'momo' ? totalToPay : (isAmountPaidEntered ? amountPaidNum : 0);
     
-    const deficit = isAmountPaidEntered && finalAmountPaid < totalToPay ? totalToPay - finalAmountPaid : 0;
-    const change = isAmountPaidEntered && finalAmountPaid > totalToPay ? finalAmountPaid - totalToPay : 0;
+    const deficit = finalAmountPaid < totalToPay ? totalToPay - finalAmountPaid : 0;
+    const change = finalAmountPaid > totalToPay ? finalAmountPaid - totalToPay : 0;
+    
+    const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && deficit > 0;
 
 
     const processCombinedPayment = async ({ pardonDeficit = false }) => {
-        if (!isAmountPaidEntered) {
+        if (paymentMethod === 'cash' && !isAmountPaidEntered) {
              setError("Please enter an amount paid or use the 'Exact' button.");
              return;
         }
@@ -185,7 +187,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                             {change > 0 && (
                                 <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(change)}</p>
                             )}
-                            {deficit > 0 && (
+                            {showDeficitOptions && (
                                 <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>
                             )}
                         </div>
@@ -194,7 +196,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 </div>
 
                 <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
-                    {deficit > 0 ? (
+                    {showDeficitOptions ? (
                         <div className="grid grid-cols-2 gap-2">
                             <Button onClick={() => processCombinedPayment({ pardonDeficit: true })} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-base">
                                 {isProcessing ? <LoadingSpinner /> : 'Pardon & Complete'}
@@ -204,7 +206,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                             </Button>
                         </div>
                     ) : (
-                        <Button onClick={() => processCombinedPayment({})} disabled={isProcessing || !isAmountPaidEntered} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                        <Button onClick={() => processCombinedPayment({})} disabled={isProcessing || (paymentMethod === 'cash' && !isAmountPaidEntered)} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
                             {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
                         </Button>
                     )}
@@ -215,3 +217,4 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 };
 
 export default CombinedPaymentModal;
+

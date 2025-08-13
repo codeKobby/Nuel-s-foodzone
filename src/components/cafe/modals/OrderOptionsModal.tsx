@@ -54,10 +54,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     const amountPaidNum = parseFloat(amountPaidInput);
     const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
     
-    const finalAmountPaid = isAmountPaidEntered ? amountPaidNum : (paymentMethod === 'momo' ? total : 0);
+    // For momo, it's always the full total. For cash, it's what's entered or 0 if empty.
+    const finalAmountPaid = paymentMethod === 'momo' ? total : (isAmountPaidEntered ? amountPaidNum : 0);
     
-    const deficit = isAmountPaidEntered && finalAmountPaid < total ? total - finalAmountPaid : 0;
-    const change = isAmountPaidEntered && finalAmountPaid > total ? finalAmountPaid - total : 0;
+    const deficit = finalAmountPaid < total ? total - finalAmountPaid : 0;
+    const change = finalAmountPaid > total ? finalAmountPaid - total : 0;
 
     const handleProceedToPayment = () => {
         if (!orderTag) {
@@ -82,65 +83,77 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         setError(null);
 
         const { isPaid, pardonDeficit = false } = options;
-        const finalAmountToPay = isAmountPaidEntered ? finalAmountPaid : (isPaid ? total : 0);
+        
+        let paymentStatus: Order['paymentStatus'] = 'Unpaid';
+        if (isPaid) {
+            // For momo, finalAmountPaid is always total. For cash, it's what was entered.
+            if (paymentMethod === 'cash' && finalAmountPaid < total && !pardonDeficit) {
+                paymentStatus = 'Partially Paid';
+            } else {
+                paymentStatus = 'Paid';
+            }
+        }
+        
+        const pardonedAmount = isPaid && pardonDeficit && paymentMethod === 'cash' ? total - finalAmountPaid : 0;
+        const balanceDue = isPaid ? finalAmountPaid - total - pardonedAmount : total;
 
-        if (isPaid && !isAmountPaidEntered && paymentMethod === 'cash') {
-             setError("Please enter an amount paid or use the 'Exact Amount' button for cash payments.");
-             setIsProcessing(false);
-             return;
+        const orderData: any = {
+            tag: orderTag,
+            orderType,
+            items: Object.values(orderItems).map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
+            total,
+            paymentMethod: isPaid ? paymentMethod : 'Unpaid',
+            paymentStatus,
+            amountPaid: isPaid ? finalAmountPaid : 0,
+            balanceDue,
+            pardonedAmount: (editingOrder?.pardonedAmount || 0) + pardonedAmount,
+            changeGiven: editingOrder?.changeGiven || 0,
+            fulfilledItems: editingOrder?.fulfilledItems || [],
+        };
+        
+        if (pardonedAmount > 0) {
+             orderData.notes = `Deficit of ${formatCurrency(pardonedAmount)} pardoned.`;
         }
 
+        if (isPaid) {
+            orderData.lastPaymentTimestamp = serverTimestamp();
+            orderData.lastPaymentAmount = finalAmountPaid;
+        }
+        
+        orderData.status = (paymentStatus === 'Paid' || paymentStatus === 'Unpaid') ? 'Completed' : 'Pending';
+
+        if (balanceDue > 0) {
+            orderData.status = 'Pending';
+        }
+
+
+        let finalOrder: Order;
+
         try {
-            const batch = writeBatch(db);
-            const now = serverTimestamp();
-            
-            let paymentStatus: Order['paymentStatus'] = 'Unpaid';
-            if (isPaid) {
-                if (finalAmountToPay < total && !pardonDeficit) {
-                    paymentStatus = 'Partially Paid';
-                } else {
-                    paymentStatus = 'Paid';
-                }
-            }
-
-            const pardonedAmount = isPaid && pardonDeficit ? total - finalAmountToPay : 0;
-            const finalBalanceDue = finalAmountToPay - total - pardonedAmount;
-
-            const orderData: any = {
-                tag: orderTag,
-                orderType,
-                items: Object.values(orderItems).map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
-                total,
-                paymentMethod: isPaid ? paymentMethod : 'Unpaid',
-                paymentStatus,
-                amountPaid: finalAmountToPay,
-                balanceDue: finalBalanceDue,
-                pardonedAmount: pardonedAmount,
-                changeGiven: 0, 
-                fulfilledItems: editingOrder?.fulfilledItems || [],
-            };
-            
-            if (pardonedAmount > 0) {
-                 orderData.notes = `Deficit of ${formatCurrency(pardonedAmount)} pardoned.`;
-            }
-
-            if (isPaid) {
-                orderData.lastPaymentTimestamp = now;
-                orderData.lastPaymentAmount = finalAmountToPay;
-            }
-            
-            if (paymentStatus === 'Paid') {
-                orderData.status = 'Completed';
-            } else {
-                orderData.status = 'Pending';
-            }
-
-            let finalOrder: Order;
-
             if (editingOrder) {
                 const orderRef = doc(db, "orders", editingOrder.id);
-                batch.update(orderRef, orderData);
-                finalOrder = { ...editingOrder, ...orderData, timestamp: editingOrder.timestamp };
+                // When editing, we need to handle payments carefully.
+                // We add the new payment to the old one.
+                const existingOrderSnap = await getDoc(orderRef);
+                const existingOrderData = existingOrderSnap.data() as Order;
+
+                const newTotalPaid = existingOrderData.amountPaid + finalAmountPaid;
+                const newBalanceDue = existingOrderData.total - newTotalPaid - pardonedAmount;
+
+                orderData.amountPaid = newTotalPaid;
+                orderData.balanceDue = newBalanceDue;
+
+                if (newBalanceDue <= 0) {
+                    orderData.paymentStatus = 'Paid';
+                    orderData.status = 'Completed';
+                } else {
+                    orderData.paymentStatus = 'Partially Paid';
+                    orderData.status = 'Pending';
+                }
+                
+                await updateDoc(orderRef, orderData);
+                finalOrder = { ...existingOrderData, ...orderData };
+
             } else {
                 const counterRef = doc(db, "counters", "orderIdCounter");
                 const newOrderRef = doc(collection(db, "orders"));
@@ -152,24 +165,28 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                     ...orderData,
                     id: newOrderRef.id,
                     simplifiedId: generateSimpleOrderId(newCount),
+                    timestamp: serverTimestamp()
                 };
                 
-                batch.set(newOrderRef, {...newOrder, timestamp: now});
+                const batch = writeBatch(db);
+                batch.set(newOrderRef, newOrder);
                 batch.set(counterRef, { count: newCount }, { merge: true });
-                finalOrder = { ...newOrder, timestamp: Timestamp.now() }; // approximate timestamp for return
+                await batch.commit();
+
+                finalOrder = { ...newOrder, timestamp: Timestamp.now() } as Order;
             }
 
-            await batch.commit();
             onOrderPlaced(finalOrder);
 
         } catch (e) {
             console.error("Error processing order:", e);
             setError("Failed to place order. Please try again.");
-        } finally {
             setIsProcessing(false);
         }
     };
     
+    const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && deficit > 0;
+
     return (
         <Dialog open onOpenChange={onClose}>
             <DialogContent className="sm:max-w-md animate-fade-in-up">
@@ -213,26 +230,27 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                 <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'secondary'}>Momo/Card</Button>
                             </div>
                            
+                            {paymentMethod === 'cash' && (
                             <div className="space-y-2">
                                 <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
                                 <div className="flex gap-2">
-                                    <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => handleAmountPaidChange(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} autoFocus={paymentMethod === 'cash'} className="text-lg h-12" />
+                                    <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => handleAmountPaidChange(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
                                     <Button onClick={handleExactAmountClick} className={cn("h-12", exactButtonClicked ? "bg-green-500 hover:bg-green-600 text-white" : "")}>Exact</Button>
                                 </div>
+                                 {change > 0 && (
+                                    <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(change)}</p>
+                                )}
+                                {showDeficitOptions && (
+                                    <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>
+                                )}
                             </div>
-                            
-                            {change > 0 && (
-                                <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(change)}</p>
-                            )}
-                            {deficit > 0 && (
-                                <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>
                             )}
                          
                             {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                         </div>
                         
                         <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
-                           {deficit > 0 ? (
+                           {showDeficitOptions ? (
                                 <div className="grid grid-cols-2 gap-2">
                                      <Button onClick={() => processOrder({ isPaid: true, pardonDeficit: true })} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-base">
                                         {isProcessing ? <LoadingSpinner /> : 'Pardon Deficit'}
@@ -242,7 +260,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                     </Button>
                                 </div>
                            ) : (
-                             <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing || (!isAmountPaidEntered && paymentMethod === 'cash')} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                             <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing || (paymentMethod === 'cash' && !isAmountPaidEntered)} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
                                 {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
                             </Button>
                            )}
@@ -256,3 +274,4 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 };
 
 export default OrderOptionsModal;
+
