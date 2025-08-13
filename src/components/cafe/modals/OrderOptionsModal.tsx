@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { collection, doc, addDoc, getDoc, setDoc, serverTimestamp, runTransaction, updateDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { doc, addDoc, getDoc, updateDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
 import type { OrderItem, Order } from '@/lib/types';
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Wallet } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { cn } from '@/lib/utils';
 
@@ -53,11 +53,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     const amountPaidNum = parseFloat(amountPaidInput);
     const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
     
-    // For momo, it's always the full total. For cash, it's what's entered or 0 if empty.
     const finalAmountPaid = paymentMethod === 'momo' ? total : (isAmountPaidEntered ? amountPaidNum : 0);
     
-    const deficit = finalAmountPaid < total ? total - finalAmountPaid : 0;
-    const change = finalAmountPaid > total ? finalAmountPaid - total : 0;
+    const deficit = isAmountPaidEntered && finalAmountPaid < total ? total - finalAmountPaid : 0;
+    const change = isAmountPaidEntered && finalAmountPaid > total ? finalAmountPaid - total : 0;
 
     const handleProceedToPayment = () => {
         if (!orderTag) {
@@ -85,8 +84,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         
         let paymentStatus: Order['paymentStatus'] = 'Unpaid';
         if (isPaid) {
-            // For momo, finalAmountPaid is always total. For cash, it's what was entered.
-            if (paymentMethod === 'cash' && finalAmountPaid < total && !pardonDeficit) {
+            if (paymentMethod === 'cash' && isAmountPaidEntered && finalAmountPaid < total && !pardonDeficit) {
                 paymentStatus = 'Partially Paid';
             } else {
                 paymentStatus = 'Paid';
@@ -108,10 +106,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             pardonedAmount: (editingOrder?.pardonedAmount || 0) + pardonedAmount,
             changeGiven: editingOrder?.changeGiven || 0,
             fulfilledItems: editingOrder?.fulfilledItems || [],
+            notes: editingOrder?.notes || '',
         };
         
         if (pardonedAmount > 0) {
-             orderData.notes = `Deficit of ${formatCurrency(pardonedAmount)} pardoned.`;
+             orderData.notes = `Deficit of ${formatCurrency(pardonedAmount)} pardoned. ${orderData.notes}`.trim();
         }
 
         if (isPaid) {
@@ -119,11 +118,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             orderData.lastPaymentAmount = finalAmountPaid;
         }
         
-        orderData.status = (paymentStatus === 'Paid' || paymentStatus === 'Unpaid') ? 'Completed' : 'Pending';
-
-        if (balanceDue > 0) {
-            orderData.status = 'Pending';
-        }
+        orderData.status = (balanceDue > 0 || paymentStatus === 'Partially Paid') ? 'Pending' : 'Completed';
 
 
         let finalOrder: Order;
@@ -131,17 +126,15 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         try {
             if (editingOrder) {
                 const orderRef = doc(db, "orders", editingOrder.id);
-                // When editing, we need to handle payments carefully.
-                // We add the new payment to the old one.
                 const existingOrderSnap = await getDoc(orderRef);
                 const existingOrderData = existingOrderSnap.data() as Order;
 
                 const newTotalPaid = existingOrderData.amountPaid + finalAmountPaid;
-                const newBalanceDue = existingOrderData.total - newTotalPaid - pardonedAmount;
+                const newBalanceDue = existingOrderData.total - newTotalPaid;
 
                 orderData.amountPaid = newTotalPaid;
                 orderData.balanceDue = newBalanceDue;
-
+                
                 if (newBalanceDue <= 0) {
                     orderData.paymentStatus = 'Paid';
                     orderData.status = 'Completed';
@@ -151,7 +144,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 }
                 
                 await updateDoc(orderRef, orderData);
-                finalOrder = { ...existingOrderData, ...orderData };
+                finalOrder = { ...existingOrderData, ...orderData, id: editingOrder.id };
 
             } else {
                 const counterRef = doc(db, "counters", "orderIdCounter");
@@ -172,7 +165,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 batch.set(counterRef, { count: newCount }, { merge: true });
                 await batch.commit();
 
-                finalOrder = { ...newOrder, timestamp: Timestamp.now() } as Order;
+                finalOrder = { ...newOrder, timestamp: Timestamp.now(), id: newOrderRef.id } as Order;
             }
 
             onOrderPlaced(finalOrder);
@@ -185,6 +178,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     };
     
     const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && deficit > 0;
+    const canConfirmPayment = paymentMethod === 'momo' || (paymentMethod === 'cash' && isAmountPaidEntered);
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -233,8 +227,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                             <div className="space-y-2">
                                 <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
                                 <div className="flex gap-2">
-                                    <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => handleAmountPaidChange(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
-                                    <Button onClick={handleExactAmountClick} className={cn("h-12", exactButtonClicked ? "bg-green-500 hover:bg-green-600 text-white" : "")}>Exact</Button>
+                                    <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => handleAmountPaidChange(e.target.value)} placeholder="Enter amount..." onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                    <Button onClick={handleExactAmountClick} variant="outline" className={cn("h-12", exactButtonClicked ? "bg-green-500 hover:bg-green-600 text-white" : "")}>Exact</Button>
                                 </div>
                                  {change > 0 && (
                                     <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(change)}</p>
@@ -255,11 +249,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                         {isProcessing ? <LoadingSpinner /> : 'Pardon Deficit'}
                                     </Button>
                                      <Button onClick={() => processOrder({ isPaid: true, pardonDeficit: false })} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white h-12 text-base">
-                                        {isProcessing ? <LoadingSpinner /> : 'Leave as Unpaid'}
+                                        {isProcessing ? <LoadingSpinner /> : 'Create Unpaid Balance'}
                                     </Button>
                                 </div>
                            ) : (
-                             <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing || (paymentMethod === 'cash' && !isAmountPaidEntered && total > 0)} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                             <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing || !canConfirmPayment} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
                                 {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
                             </Button>
                            )}
@@ -273,3 +267,4 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 };
 
 export default OrderOptionsModal;
+

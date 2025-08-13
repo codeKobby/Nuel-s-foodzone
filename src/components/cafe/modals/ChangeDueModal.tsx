@@ -111,6 +111,7 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ orders, order, isPopup 
                     onClose={() => setCreditOrder(null)}
                     onCreditApplied={() => {
                         setCreditOrder(null);
+                        onClose(); // Close the main modal too
                     }}
                 />
             )}
@@ -119,3 +120,4 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ orders, order, isPopup 
 };
 
 export default ChangeDueModal;
+

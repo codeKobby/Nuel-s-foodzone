@@ -42,11 +42,11 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
         }
         setError(null);
         onSettle(order.id, amount);
+        onClose();
     };
 
     const handleFullChange = () => {
         setSettleAmount(changeDue.toFixed(2));
-        onSettle(order.id, changeDue);
     };
 
     const title = isPopup ? `Change Due for Order ${order.simplifiedId}` : `Settle Change for ${order.tag || order.simplifiedId}`;
@@ -69,10 +69,10 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
                             value={settleAmount}
                             onChange={(e) => setSettleAmount(e.target.value)}
                             onFocus={(e) => e.target.select()}
-                            placeholder="0.00"
+                            placeholder="Enter amount given..."
                             autoFocus
                         />
-                         <Button onClick={handleFullChange} variant="outline">Full</Button>
+                         <Button onClick={handleFullChange} variant="outline">Full Change</Button>
                     </div>
                     {error && <AlertDescription className="text-red-500 text-xs">{error}</AlertDescription>}
                 </div>

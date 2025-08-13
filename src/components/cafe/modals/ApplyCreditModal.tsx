@@ -155,7 +155,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
                 <DialogFooter>
                     <Button onClick={onClose} variant="secondary">Cancel</Button>
                     <Button onClick={handleApplyCredit} disabled={isProcessing || selectedOrderIds.size === 0}>
-                        {isProcessing ? <LoadingSpinner/> : `Apply ${formatCurrency(creditToApply)} Credit`}
+                        {isProcessing ? <LoadingSpinner /> : `Apply ${formatCurrency(creditToApply)} Credit`}
                     </Button>
                 </DialogFooter>
             </DialogContent>
