@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc, Timestamp, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp, groupOrdersByDate } from '@/lib/utils';
