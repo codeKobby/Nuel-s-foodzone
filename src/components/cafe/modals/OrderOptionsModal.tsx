@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { doc, addDoc, getDoc, updateDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, writeBatch, serverTimestamp, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
 import type { OrderItem, Order } from '@/lib/types';
@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { cn } from '@/lib/utils';
+import { Timestamp } from 'firebase/firestore';
 
 interface OrderOptionsModalProps {
     total: number;
@@ -50,14 +51,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         setExactButtonClicked(true);
     };
 
-    const amountPaidNum = parseFloat(amountPaidInput);
-    const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
-    
-    const finalAmountPaid = paymentMethod === 'momo' ? total : (isAmountPaidEntered ? amountPaidNum : 0);
-    
-    const deficit = isAmountPaidEntered && finalAmountPaid < total ? total - finalAmountPaid : 0;
-    const change = isAmountPaidEntered && finalAmountPaid > total ? finalAmountPaid - total : 0;
-
     const handleProceedToPayment = () => {
         if (!orderTag) {
             setError("Please add a tag (e.g., customer name or table number) to the order.");
@@ -65,7 +58,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         }
         setError(null);
         setStep(2);
-    };
+    }
     
     const handlePayLater = () => {
         if (!orderTag) {
@@ -77,23 +70,22 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         processOrder({ isPaid: false });
     };
 
+
+    const amountPaidNum = parseFloat(amountPaidInput);
+    const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
+    
+    const finalAmountPaid = paymentMethod === 'momo' ? total : (isAmountPaidEntered ? amountPaidNum : 0);
+    
+    const deficit = isAmountPaidEntered && finalAmountPaid < total ? total - finalAmountPaid : 0;
+    const change = isAmountPaidEntered && finalAmountPaid > total ? finalAmountPaid - total : 0;
+
     const processOrder = async (options: { isPaid: boolean, pardonDeficit?: boolean }) => {
         setIsProcessing(true);
         setError(null);
 
         const { isPaid, pardonDeficit = false } = options;
         
-        let paymentStatus: Order['paymentStatus'] = 'Unpaid';
-        if (isPaid) {
-            if (paymentMethod === 'cash' && isAmountPaidEntered && finalAmountPaid < total && !pardonDeficit) {
-                paymentStatus = 'Partially Paid';
-            } else {
-                paymentStatus = 'Paid';
-            }
-        }
-        
         const pardonedAmount = isPaid && pardonDeficit && paymentMethod === 'cash' ? total - finalAmountPaid : 0;
-        const balanceDue = isPaid ? finalAmountPaid - total - pardonedAmount : total;
 
         const orderData: any = {
             tag: orderTag,
@@ -101,9 +93,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             items: Object.values(orderItems).map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
             total,
             paymentMethod: isPaid ? paymentMethod : 'Unpaid',
-            paymentStatus,
-            amountPaid: isPaid ? finalAmountPaid : 0,
-            balanceDue,
             pardonedAmount: (editingOrder?.pardonedAmount || 0) + pardonedAmount,
             changeGiven: editingOrder?.changeGiven || 0,
             fulfilledItems: editingOrder?.fulfilledItems || [],
@@ -120,9 +109,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             orderData.lastPaymentAmount = finalAmountPaid;
         }
         
-        orderData.status = (paymentStatus === 'Unpaid' || paymentStatus === 'Partially Paid') ? 'Pending' : 'Completed';
-
-
         let finalOrder: Order;
 
         try {
@@ -131,24 +117,41 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 const existingOrderSnap = await getDoc(orderRef);
                 const existingOrderData = existingOrderSnap.data() as Order;
 
-                const newTotalPaid = existingOrderData.amountPaid + finalAmountPaid;
-                const newBalanceDue = existingOrderData.total - newTotalPaid;
+                const newTotalPaid = existingOrderData.amountPaid + (isPaid ? finalAmountPaid : 0);
+                const newBalanceDue = total - newTotalPaid - pardonedAmount;
 
                 orderData.amountPaid = newTotalPaid;
                 orderData.balanceDue = newBalanceDue;
-                
-                if (newBalanceDue <= 0 && isPaid) { 
+
+                if (newTotalPaid === 0) {
+                    orderData.paymentStatus = 'Unpaid';
+                } else if (newBalanceDue <= 0) { 
                     orderData.paymentStatus = 'Paid';
-                    orderData.status = 'Completed';
-                } else if(isPaid) {
+                } else {
                     orderData.paymentStatus = 'Partially Paid';
-                    orderData.status = 'Pending';
                 }
+                
+                orderData.status = (orderData.paymentStatus === 'Unpaid' || orderData.paymentStatus === 'Partially Paid') ? 'Pending' : 'Completed';
                 
                 await updateDoc(orderRef, orderData);
                 finalOrder = { ...existingOrderData, ...orderData, id: editingOrder.id };
 
             } else {
+                let paymentStatus: Order['paymentStatus'] = 'Unpaid';
+                if (isPaid) {
+                     if (paymentMethod === 'cash' && isAmountPaidEntered && finalAmountPaid < total && !pardonDeficit) {
+                        paymentStatus = 'Partially Paid';
+                    } else {
+                        paymentStatus = 'Paid';
+                    }
+                }
+                const balanceDue = isPaid ? finalAmountPaid - total - pardonedAmount : total;
+                orderData.paymentStatus = paymentStatus;
+                orderData.amountPaid = isPaid ? finalAmountPaid : 0;
+                orderData.balanceDue = balanceDue;
+                orderData.status = (paymentStatus === 'Unpaid' || paymentStatus === 'Partially Paid') ? 'Pending' : 'Completed';
+
+
                 const counterRef = doc(db, "counters", "orderIdCounter");
                 const newOrderRef = doc(collection(db, "orders"));
 
@@ -179,7 +182,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     };
     
     const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && deficit > 0;
-    const canConfirmPayment = paymentMethod === 'momo' || (paymentMethod === 'cash' && (isAmountPaidEntered || amountPaidInput === ''));
+    const canConfirmPayment = paymentMethod === 'momo' || (paymentMethod === 'cash' && isAmountPaidEntered);
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -228,7 +231,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                             <div className="space-y-2">
                                 <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
                                 <div className="flex gap-2">
-                                    <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => handleAmountPaidChange(e.target.value)} placeholder="Leave blank if not paid" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                    <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => handleAmountPaidChange(e.target.value)} placeholder="Enter amount..." onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
                                     <Button onClick={handleExactAmountClick} variant="outline" className={cn("h-12", exactButtonClicked ? "bg-green-500 hover:bg-green-600 text-white" : "")}>Exact</Button>
                                 </div>
                                  {change > 0 && (
@@ -268,3 +271,5 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 };
 
 export default OrderOptionsModal;
+
+    
