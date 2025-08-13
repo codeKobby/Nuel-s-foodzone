@@ -15,7 +15,7 @@ import FulfillItemsModal from './FulfillItemsModal'; // Import the new modal
 interface OrderDetailsModalProps {
     order: Order;
     onClose: () => void;
-    onEdit: (order: Order) => void;
+    showActions: boolean; // Control visibility of action buttons
 }
 
 const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, ref) => {
@@ -57,9 +57,11 @@ const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, r
             <hr className="my-2 border-dashed border-black" />
             <p className="text-right font-bold">Total: {formatCurrency(order.total)}</p>
             <p className="text-right">Paid ({order.paymentMethod}): {formatCurrency(order.amountPaid)}</p>
-            {isBalanceOwedByCustomer && <p className="text-right font-bold">Balance Due: {formatCurrency(order.balanceDue)}</p>}
             <p className="text-right">Change Given: {formatCurrency(order.changeGiven)}</p>
+            
+            {isBalanceOwedByCustomer && <p className="text-right font-bold">Balance Due: {formatCurrency(order.balanceDue)}</p>}
             {isChangeOwedToCustomer && <p className="text-right font-bold text-red-600">Change Owed: {formatCurrency(Math.abs(order.balanceDue))}</p>}
+
              {(order.creditSource && order.creditSource.length > 0) && (
                 <p className="text-right text-xs">Credit from: {order.creditSource.join(', ')}</p>
             )}
@@ -70,7 +72,7 @@ const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, r
 });
 Receipt.displayName = "Receipt";
 
-const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, onEdit }) => {
+const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, showActions }) => {
     const receiptRef = useRef<HTMLDivElement>(null);
     const [isFulfillModalOpen, setIsFulfillModalOpen] = useState(false);
 
@@ -107,14 +109,11 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
         printWindow.print();
     };
 
-    const handleEdit = () => {
-        onEdit(order);
-        onClose();
-    }
-
     const unfulfilledItems = order.items.filter(item => 
         !order.fulfilledItems?.some(fulfilled => fulfilled.name === item.name && fulfilled.quantity >= item.quantity)
     );
+
+    const canPrint = order.paymentStatus === 'Paid' && order.status === 'Completed';
 
     return (
         <>
@@ -129,24 +128,21 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
                 <div className="max-h-[70vh] overflow-y-auto my-4 rounded-lg border">
                     <Receipt order={order} ref={receiptRef} />
                 </div>
-                <DialogFooter className="sm:justify-between gap-2 flex-wrap">
-                     {order.status === 'Pending' && (
-                        <Button onClick={handleEdit} variant="secondary">
-                            <Pencil size={18} className="mr-2"/>
-                            Edit Order
+
+                {showActions && (
+                    <DialogFooter className="sm:justify-between gap-2 flex-wrap">
+                        {unfulfilledItems.length > 0 && order.status === 'Pending' && (
+                            <Button onClick={() => setIsFulfillModalOpen(true)} variant="outline">
+                                <ShoppingBag size={18} className="mr-2" />
+                                Fulfill Items
+                            </Button>
+                        )}
+                        <Button onClick={handlePrint} disabled={!canPrint} className="flex-grow">
+                            <Printer size={18} className="mr-2" />
+                            {canPrint ? "Print Receipt" : "Awaiting Completion"}
                         </Button>
-                    )}
-                    {unfulfilledItems.length > 0 && (
-                        <Button onClick={() => setIsFulfillModalOpen(true)} variant="outline">
-                            <ShoppingBag size={18} className="mr-2" />
-                            Fulfill Items
-                        </Button>
-                    )}
-                    <Button onClick={handlePrint} className="flex-grow">
-                        <Printer size={18} className="mr-2" />
-                        Print Receipt
-                    </Button>
-                </DialogFooter>
+                    </DialogFooter>
+                )}
             </DialogContent>
         </Dialog>
         {isFulfillModalOpen && (

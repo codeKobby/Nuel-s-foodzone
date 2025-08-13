@@ -180,7 +180,7 @@ const DashboardView: React.FC = () => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 
                 // Unpaid balance for all time, regardless of date range
-                if (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') {
+                if ((order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') && order.balanceDue > 0) {
                     unpaidOrdersValue += order.balanceDue;
                 }
                 
@@ -753,7 +753,7 @@ const DashboardView: React.FC = () => {
                     </Dialog>
                 )}
                 {selectedOrderForDetails && (
-                    <OrderDetailsModal order={selectedOrderForDetails} onClose={() => setSelectedOrderForDetails(null)} onEdit={() => {}} />
+                    <OrderDetailsModal order={selectedOrderForDetails} onClose={() => setSelectedOrderForDetails(null)} showActions={false} />
                 )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-6">
@@ -971,5 +971,3 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
-
-    

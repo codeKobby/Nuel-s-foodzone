@@ -363,7 +363,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                   </TabsContent>
                 </Tabs>
 
-                {selectedOrder && <OrderDetailsModal order={selectedOrder} onEdit={handleEditOrder} onClose={() => setSelectedOrder(null)} />}
+                {selectedOrder && <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} showActions={true} />}
                 {changeDueOrder && <PartialSettleModal order={changeDueOrder} onSettle={settleChange} onClose={() => setChangeDueOrder(null)} />}
                 {isCombinedPaymentModalOpen && <CombinedPaymentModal orders={selectedOrders} onOrderPlaced={handleCombinedPaymentSuccess} onClose={() => setIsCombinedPaymentModalOpen(false)} />}
 
@@ -391,4 +391,3 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 };
 
 export default OrdersView;
-
