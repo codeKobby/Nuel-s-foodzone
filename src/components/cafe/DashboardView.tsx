@@ -52,7 +52,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Badge } from '../ui/badge';
 import OrderDetailsModal from './modals/OrderDetailsModal';
 
@@ -971,3 +971,5 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    
