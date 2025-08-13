@@ -73,31 +73,13 @@ const deleteMenuItemTool = ai.defineTool(
     async (input) => deleteMenuItem(input)
 );
 
-
-const businessChatFlow = ai.defineFlow(
-    {
-        name: 'businessChatFlow',
-        inputSchema: BusinessChatInputSchema,
-        outputSchema: BusinessChatOutputSchema,
-        cache: {
-            // Cache for 10 minutes to allow for fresh data.
-            ttl: 600, 
-        }
-    },
-    async (input) => {
-        
-        // Determine which model to use based on the prompt
-        const useProModel = /detailed report|in-depth analysis/i.test(input.prompt);
-        const model = useProModel ? 'googleai/gemini-2.5-flash' : 'googleai/gemini-2.0-flash';
-        console.log(`Using model: ${model}`);
-
-        const businessChatPrompt = ai.definePrompt({
-            name: 'businessChatPrompt',
-            input: { schema: BusinessChatInputSchema },
-            output: { format: 'text' },
-            tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
-            model,
-            system: `You are an expert business analyst and friendly assistant for a cafe called "Nuel's Foodzone Cafe".
+const businessChatPrompt = ai.definePrompt({
+    name: 'businessChatPrompt',
+    input: { schema: BusinessChatInputSchema },
+    output: { format: 'text' },
+    tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
+    model: 'googleai/gemini-2.0-flash', // Use a single, fast model for chat
+    system: `You are an expert business analyst and friendly assistant for a cafe called "Nuel's Foodzone Cafe".
 Your role is to answer questions from the business owner or manager based on sales data, and to help them manage the menu.
 You have access to several tools to help you.
 
@@ -117,22 +99,40 @@ Previous conversation context:
 {{/each}}
 {{/if}}
 `,
-            prompt: `User question: {{prompt}}`
-        });
+    prompt: `User question: {{prompt}}`
+});
 
-
+const businessChatFlow = ai.defineFlow(
+    {
+        name: 'businessChatFlow',
+        inputSchema: BusinessChatInputSchema,
+        outputSchema: BusinessChatOutputSchema,
+        cache: {
+            // Cache for 10 minutes to allow for fresh data.
+            ttl: 600,
+        }
+    },
+    async (input) => {
         try {
-            let response = await businessChatPrompt(input);
+            const { history, prompt } = input;
+            
+            // Build the full context for the prompt, including the latest user message
+            const fullHistory = [
+                ...history,
+                { role: 'user', content: prompt }
+            ];
+
+            let response = await businessChatPrompt({ history: fullHistory, prompt });
 
             // Handle tool calls if the model requests them
             while (response.isToolRequest()) {
                 const toolResponse = await response.executeTool();
-                response = await businessChatPrompt(input, {
-                    history: [response.request, toolResponse],
+                response = await businessChatPrompt({
+                    history: [...fullHistory, response.request, toolResponse],
+                    prompt,
                 });
             }
-
-            // Return the final text response
+            
             return response.text;
 
         } catch (error) {

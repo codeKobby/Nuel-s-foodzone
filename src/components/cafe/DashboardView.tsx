@@ -132,6 +132,7 @@ const DashboardView: React.FC = () => {
     const [isPardonedModalOpen, setIsPardonedModalOpen] = useState(false);
     const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
     const [allTimeDiscrepancy, setAllTimeDiscrepancy] = useState(0);
+    const [allDiscrepancyReports, setAllDiscrepancyReports] = useState<ReconciliationReport[]>([]);
 
     
     // Sorting state
@@ -182,43 +183,44 @@ const DashboardView: React.FC = () => {
                 }
                 
                 const orderDate = order.timestamp.toDate();
+                const completedDate = order.lastPaymentTimestamp?.toDate() ?? orderDate;
 
                 // --- Calculations for selected date range ---
-                if (orderDate >= startDate && orderDate <= endDate) {
-                     // 1. Total Sales (from completed orders created in range)
-                    if (order.status === 'Completed') {
-                        totalSales += order.total;
-                        totalOrders++;
-                        
-                        const dayKey = format(orderDate, 'MMM d');
-                         if (!salesByDay[dayKey]) {
-                            salesByDay[dayKey] = { sales: 0, revenue: 0 };
-                        }
-                        salesByDay[dayKey].sales += order.total;
-
-                        order.items.forEach(item => {
-                            const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
-                            itemStats[item.name] = {
-                                count: currentStats.count + item.quantity,
-                                totalValue: currentStats.totalValue + (item.quantity * item.price)
-                            };
-                        });
+                // 1. Total Sales & Item Performance (from orders COMPLETED in range)
+                if (order.status === 'Completed' && completedDate >= startDate && completedDate <= endDate) {
+                    totalSales += order.total;
+                    totalOrders++;
+                    
+                    const dayKey = format(completedDate, 'MMM d');
+                     if (!salesByDay[dayKey]) {
+                        salesByDay[dayKey] = { sales: 0, revenue: 0 };
                     }
+                    salesByDay[dayKey].sales += order.total;
 
-                     // 2. Pardoned Amounts
+                    order.items.forEach(item => {
+                        const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                        itemStats[item.name] = {
+                            count: currentStats.count + item.quantity,
+                            totalValue: currentStats.totalValue + (item.quantity * item.price)
+                        };
+                    });
+                }
+                
+                // 2. Pardoned Amounts
+                if (orderDate >= startDate && orderDate <= endDate) {
                     if (order.pardonedAmount && order.pardonedAmount > 0) {
                         totalPardonedAmount += order.pardonedAmount;
                         pardonedOrders.push(order);
                     }
-                    
-                    // 3. Paid Revenue (from any payment made in range)
-                     const paymentDate = order.lastPaymentTimestamp?.toDate() ?? orderDate;
-                    if (paymentDate >= startDate && paymentDate <= endDate) {
-                        if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                            const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
-                            if (order.paymentMethod === 'cash') cashSales += paidAmount;
-                            if (order.paymentMethod === 'momo') momoSales += paidAmount;
-                        }
+                }
+                
+                // 3. Paid Revenue (from any payment made in range)
+                 const paymentDate = order.lastPaymentTimestamp?.toDate() ?? orderDate;
+                if (paymentDate >= startDate && paymentDate <= endDate) {
+                    if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
+                        const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
+                        if (order.paymentMethod === 'cash') cashSales += paidAmount;
+                        if (order.paymentMethod === 'momo') momoSales += paidAmount;
                     }
                 }
             });
@@ -274,11 +276,11 @@ const DashboardView: React.FC = () => {
                 momoSales,
                 unpaidOrdersValue,
                 totalMiscExpenses,
-                totalDiscrepancy: allTimeDiscrepancy, // Use the all-time value
+                totalDiscrepancy: allTimeDiscrepancy, 
                 totalPardonedAmount,
                 salesData,
                 itemPerformance,
-                discrepancyReports: [], // This can be deprecated or changed to show all-time
+                discrepancyReports: allDiscrepancyReports,
                 pardonedOrders,
             });
 
@@ -288,7 +290,7 @@ const DashboardView: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [date, allTimeDiscrepancy]);
+    }, [date, allTimeDiscrepancy, allDiscrepancyReports]);
     
      useEffect(() => {
         // Listener for all miscellaneous expenses (for the unsettled expenses list)
@@ -315,9 +317,7 @@ const DashboardView: React.FC = () => {
                 }
             });
             setAllTimeDiscrepancy(total);
-             if (stats) {
-                setStats(prev => prev ? ({ ...prev, totalDiscrepancy: total, discrepancyReports: reports }) : null);
-            }
+            setAllDiscrepancyReports(reports.sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()));
         });
 
 
@@ -367,7 +367,7 @@ const DashboardView: React.FC = () => {
                 totalOrders: stats.totalOrders,
                 avgOrderValue: stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0,
                 itemPerformance: stats.itemPerformance.slice(0, 10), // Send top 10 items
-                cashDiscrepancy: stats.totalDiscrepancy || 0,
+                cashDiscrepancy: stats.totalDiscrepancy ?? 0,
                 miscExpenses: stats.totalMiscExpenses,
             };
             const result = await analyzeBusiness(input);
@@ -683,7 +683,7 @@ const DashboardView: React.FC = () => {
                         <DialogContent>
                              <DialogHeader>
                                 <DialogTitle>Reconciliation Report Details</DialogTitle>
-                                <DialogDescription>Breakdown of all historical reconciliation reports.</DialogDescription>
+                                <DialogDescription>Breakdown of all historical reconciliation reports with a non-zero discrepancy.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="h-72 my-4">
                                <div className="space-y-3 pr-4">
@@ -694,8 +694,8 @@ const DashboardView: React.FC = () => {
                                                 <p className="font-semibold">{report.period}</p>
                                                 <p className="text-sm text-muted-foreground">{formatTimestamp(report.timestamp)}</p>
                                             </div>
-                                             <Badge variant="default" className={report.totalDiscrepancy > 0 ? 'bg-blue-500' : report.totalDiscrepancy < 0 ? 'bg-red-500' : 'bg-green-500'}>
-                                                {formatCurrency(report.totalDiscrepancy)}
+                                             <Badge variant="default" className={report.totalDiscrepancy > 0 ? 'bg-blue-500' : 'bg-red-500'}>
+                                                {report.totalDiscrepancy > 0 ? `Surplus: ${formatCurrency(report.totalDiscrepancy)}` : `Deficit: ${formatCurrency(report.totalDiscrepancy)}`}
                                             </Badge>
                                         </div>
                                          <div className="text-xs grid grid-cols-2 gap-x-4 gap-y-1 mt-2 border-t pt-2">
@@ -750,15 +750,15 @@ const DashboardView: React.FC = () => {
                         icon={<FileWarning className={stats.totalDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
                         title="Total Discrepancy (All Time)" 
                         value={formatCurrency(stats.totalDiscrepancy)} 
-                        description="Click to view details"
-                        onClick={() => setIsDiscrepancyModalOpen(true)}
+                        description={stats.discrepancyReports.length > 0 ? "Click to view details" : undefined}
+                        onClick={stats.discrepancyReports.length > 0 ? () => setIsDiscrepancyModalOpen(true) : undefined}
                     />
                      <StatCard 
                         icon={<Ban className={stats.totalPardonedAmount === 0 ? "text-muted-foreground" : "text-orange-500"}/>} 
                         title="Pardoned Deficits" 
                         value={formatCurrency(stats.totalPardonedAmount)} 
-                        description="Click to view details"
-                        onClick={() => setIsPardonedModalOpen(true)}
+                        description={stats.pardonedOrders.length > 0 ? "Click to view details" : undefined}
+                        onClick={stats.pardonedOrders.length > 0 ? () => setIsPardonedModalOpen(true) : undefined}
                     />
                 </div>
                 
@@ -959,6 +959,7 @@ const DashboardView: React.FC = () => {
 export default DashboardView;
 
     
+
 
 
 
