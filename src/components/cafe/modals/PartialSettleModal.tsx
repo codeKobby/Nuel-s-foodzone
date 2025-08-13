@@ -24,7 +24,8 @@ interface PartialSettleModalProps {
 }
 
 const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose, onSettle }) => {
-    const [settleAmount, setSettleAmount] = useState(order.balanceDue.toFixed(2));
+    const changeDue = Math.abs(order.balanceDue);
+    const [settleAmount, setSettleAmount] = useState(changeDue.toFixed(2));
     const [error, setError] = useState<string | null>(null);
 
     const handleSettle = () => {
@@ -33,8 +34,8 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
             setError("Please enter a valid positive amount.");
             return;
         }
-        if (amount > order.balanceDue) {
-            setError(`Cannot settle more than the outstanding balance of ${formatCurrency(order.balanceDue)}.`);
+        if (amount > changeDue) {
+            setError(`Cannot settle more than the change due of ${formatCurrency(changeDue)}.`);
             return;
         }
         setError(null);
@@ -47,11 +48,11 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
                 <DialogHeader>
                     <DialogTitle>Settle Change for {order.tag || order.simplifiedId}</DialogTitle>
                     <DialogDescription>
-                        Outstanding balance: <span className="font-bold text-red-500">{formatCurrency(order.balanceDue)}</span>
+                        Outstanding change: <span className="font-bold text-red-500">{formatCurrency(changeDue)}</span>
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
-                    <Label htmlFor="settle-amount">Amount to Settle</Label>
+                    <Label htmlFor="settle-amount">Amount Given to Customer</Label>
                     <Input
                         id="settle-amount"
                         type="number"

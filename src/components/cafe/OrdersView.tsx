@@ -58,8 +58,8 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
         'Partially Paid': 'text-yellow-600 dark:text-yellow-400',
     };
     
-    const isBalanceOwedByCustomer = (order.paymentStatus === 'Partially Paid' || order.paymentStatus === 'Unpaid') && order.balanceDue > 0;
-    const isChangeOwedToCustomer = order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total;
+    const isBalanceOwedByCustomer = order.balanceDue > 0;
+    const isChangeOwedToCustomer = order.balanceDue < 0;
     
     const itemSnippet = useMemo(() => {
         return order.items.map(item => `${item.quantity}x ${item.name}`).join(', ').substring(0, 100);
@@ -99,7 +99,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                 }
                  {isChangeOwedToCustomer && 
                     <p className="text-sm text-red-500 flex items-center">
-                        <Coins size={14} className="inline mr-2"/>Change Due: {formatCurrency(order.balanceDue)}
+                        <Coins size={14} className="inline mr-2"/>Change Due: {formatCurrency(Math.abs(order.balanceDue))}
                     </p>
                 }
                 <p className="text-xs text-muted-foreground mt-2 flex items-center"><CalendarDays size={12} className="inline mr-1.5" />{formatTimestamp(order.timestamp)}</p>
@@ -115,7 +115,6 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                 ) : (
                     <>
                      <Button onClick={() => onDetailsClick(order)} variant="outline" className="col-span-2">Details</Button>
-                     <Button onClick={() => onDelete(order)} variant="destructive" className="col-span-2"><Trash2 size={16} className="mr-2"/> Delete</Button>
                     </>
                 )}
             </CardFooter>
@@ -207,7 +206,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                     throw "Document does not exist!";
                 }
                 const currentBalance = orderDoc.data().balanceDue || 0;
-                const newBalance = Math.max(0, currentBalance - settleAmount);
+                const newBalance = currentBalance + settleAmount; // Adding because change is negative
                 const currentChangeGiven = orderDoc.data().changeGiven || 0;
                 const newChangeGiven = currentChangeGiven + settleAmount;
 
@@ -215,7 +214,6 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                     balanceDue: newBalance,
                     changeGiven: newChangeGiven,
                     lastPaymentTimestamp: serverTimestamp(),
-                    lastPaymentAmount: settleAmount,
                 });
             });
         } catch (e) {
@@ -260,7 +258,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
         };
     }, [orders, filteredOrdersByTime, searchQuery]);
     
-    const changeDueOrders = useMemo(() => orders.filter(o => o.paymentMethod === 'cash' && o.balanceDue > 0 && o.amountPaid >= o.total), [orders]);
+    const changeDueOrders = useMemo(() => orders.filter(o => o.balanceDue < 0), [orders]);
     const selectedOrders = useMemo(() => orders.filter(o => selectedOrderIds.has(o.id)), [orders, selectedOrderIds]);
     const pendingOrdersCount = useMemo(() => Object.values(finalFilteredOrders.pending).flat().length, [finalFilteredOrders.pending]);
     const unpaidOrdersCount = useMemo(() => Object.values(finalFilteredOrders.unpaid).flat().length, [finalFilteredOrders.unpaid]);
@@ -398,5 +396,3 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 };
 
 export default OrdersView;
-
-    

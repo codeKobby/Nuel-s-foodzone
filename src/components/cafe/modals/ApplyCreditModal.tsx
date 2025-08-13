@@ -32,17 +32,20 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
     const [isProcessing, setIsProcessing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const { toast } = useToast();
+    
+    const availableCredit = Math.abs(sourceOrder.balanceDue);
 
     useEffect(() => {
         const q = query(
             collection(db, "orders"),
-            where("paymentStatus", "in", ["Unpaid", "Partially Paid"])
+            where("paymentStatus", "in", ["Unpaid", "Partially Paid"]),
+            where("balanceDue", ">", 0)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedOrders = snapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as Order))
-                .filter(order => order.id !== sourceOrder.id && order.balanceDue > 0); // Exclude self and fully paid
+                .filter(order => order.id !== sourceOrder.id); // Exclude self
             setUnpaidOrders(fetchedOrders);
             setLoading(false);
         });
@@ -68,7 +71,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
             .reduce((sum, o) => sum + o.balanceDue, 0);
     }, [unpaidOrders, selectedOrderIds]);
 
-    const creditToApply = Math.min(sourceOrder.balanceDue, selectedOrdersTotal);
+    const creditToApply = Math.min(availableCredit, selectedOrdersTotal);
     
     const filteredOrders = useMemo(() => {
         return unpaidOrders.filter(order => 
@@ -99,7 +102,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
                 <DialogHeader>
                     <DialogTitle>Apply Credit to Another Order</DialogTitle>
                     <DialogDescription>
-                        Use the <span className="font-bold text-primary">{formatCurrency(sourceOrder.balanceDue)}</span> credit from order #{sourceOrder.simplifiedId} to pay for other unpaid orders.
+                        Use the <span className="font-bold text-primary">{formatCurrency(availableCredit)}</span> credit from order #{sourceOrder.simplifiedId} to pay for other unpaid orders.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -161,5 +164,3 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
 };
 
 export default ApplyCreditModal;
-
-    

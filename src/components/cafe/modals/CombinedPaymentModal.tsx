@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { collection, doc, writeBatch, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency } from '@/lib/utils';
@@ -24,7 +24,7 @@ interface CombinedPaymentModalProps {
 
 const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onClose, onOrderPlaced }) => {
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'momo'>('cash');
-    const [cashPaid, setCashPaid] = useState('');
+    const [amountPaidInput, setAmountPaidInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -37,20 +37,17 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         }, 0);
     }, [orders]);
     
-    // If cashPaid is empty, assume exact payment. Otherwise, use the entered value.
-    const amountPaidNum = parseFloat(cashPaid || String(totalToPay));
-    
-    // balanceDue will be positive if change is owed to customer, negative if customer still owes money
-    const finalBalanceDue = amountPaidNum - totalToPay;
+    const amountPaidNum = parseFloat(amountPaidInput);
+    const finalAmountPaid = !amountPaidInput || isNaN(amountPaidNum) ? totalToPay : amountPaidNum;
+    const finalBalanceDue = finalAmountPaid - totalToPay;
 
 
     const processCombinedPayment = async () => {
         setIsProcessing(true);
         setError(null);
 
-        // Final validation for cash payment
-        if (paymentMethod === 'cash' && amountPaidNum < totalToPay) {
-            setError('Cash paid cannot be less than the total amount for combined payment.');
+        if (paymentMethod === 'cash' && amountPaidInput && amountPaidNum < totalToPay) {
+            setError('Cash paid cannot be less than the total amount.');
             setIsProcessing(false);
             return;
         }
@@ -59,7 +56,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             const batch = writeBatch(db);
             const now = serverTimestamp();
 
-            let amountToDistribute = totalToPay;
+            let amountToDistribute = finalAmountPaid;
             
             const ordersToPay = orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0).sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
 
@@ -69,31 +66,30 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 const amountToPayForOrder = Math.min(amountToDistribute, orderBalance);
                 
                 const newAmountPaid = order.amountPaid + amountToPayForOrder;
-                
+                const newBalanceDue = orderBalance - amountToPayForOrder;
+
                 const updateData: any = {
-                    paymentMethod: order.paymentMethod === 'Unpaid' ? paymentMethod : order.paymentMethod,
-                    paymentStatus: 'Paid',
+                    paymentMethod: paymentMethod,
+                    paymentStatus: newBalanceDue <= 0 ? 'Paid' : 'Partially Paid',
                     amountPaid: newAmountPaid,
-                    balanceDue: 0, // Initially zeroed out
+                    balanceDue: newBalanceDue,
                     lastPaymentTimestamp: now,
                     lastPaymentAmount: amountToPayForOrder,
-                    status: 'Completed'
                 };
+
+                if (newBalanceDue <= 0) {
+                    updateData.status = 'Completed';
+                }
 
                 batch.update(orderRef, updateData);
                 amountToDistribute -= amountToPayForOrder;
             }
             
-             // If there is outstanding change due to overpayment in cash, record it on the last order.
-             if (paymentMethod === 'cash' && finalBalanceDue > 0 && ordersToPay.length > 0) {
+            if (amountToDistribute > 0 && ordersToPay.length > 0) {
                 const lastOrder = ordersToPay[ordersToPay.length - 1];
                 const lastOrderRef = doc(db, "orders", lastOrder.id);
-                // The balanceDue field tracks both money owed by customer and change owed to customer.
-                // Here we set it to the change owed.
                 batch.update(lastOrderRef, { 
-                    balanceDue: finalBalanceDue,
-                    // cashPaid and changeGiven are for single orders, not combined.
-                    // We can derive change from (amountPaid - total) on the receipt if needed.
+                    balanceDue: -amountToDistribute, // Negative balance due is change owed
                 });
             }
 
@@ -141,10 +137,10 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     {paymentMethod === 'cash' && (
                         <div className="space-y-4">
                             <div>
-                                <Label htmlFor="cashPaid">Amount Paid by Customer (Optional)</Label>
-                                <Input id="cashPaid" type="number" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
+                                <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
                             </div>
-                            {finalBalanceDue > 0 && <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(finalBalanceDue)}</p>}
+                            {amountPaidInput && finalBalanceDue > 0 && <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(finalBalanceDue)}</p>}
                         </div>
                     )}
                      {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}

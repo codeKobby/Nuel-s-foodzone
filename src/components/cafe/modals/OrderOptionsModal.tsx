@@ -27,33 +27,26 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     const [orderType, setOrderType] = useState<'Dine-In' | 'Takeout' | 'Delivery'>('Dine-In');
     const [orderTag, setOrderTag] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'momo'>('cash');
-    const [cashPaid, setCashPaid] = useState('');
+    const [amountPaidInput, setAmountPaidInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (editingOrder) {
             setOrderType(editingOrder.orderType);
-            setOrderTag(editingOrder.tag);
+            setOrderTag(editingOrder.tag || '');
         }
     }, [editingOrder]);
 
-    const amountPaidNum = parseFloat(cashPaid || '0');
-    
-    // If cashPaid is empty, assume exact payment, so finalAmountPaid will be total
-    const finalAmountPaid = paymentMethod === 'cash' 
-        ? (cashPaid ? amountPaidNum : total)
-        : total;
-
-    // This will be positive if change is owed, or negative if the customer underpaid
+    const amountPaidNum = parseFloat(amountPaidInput);
+    const finalAmountPaid = !amountPaidInput || isNaN(amountPaidNum) ? total : amountPaidNum;
     const finalBalanceDue = finalAmountPaid - total;
-        
+
     const processOrder = async (isPaid: boolean) => {
         setIsProcessing(true);
         setError(null);
         
-        // Final validation for cash payment
-        if (isPaid && paymentMethod === 'cash' && cashPaid && amountPaidNum < total) {
+        if (isPaid && paymentMethod === 'cash' && amountPaidInput && amountPaidNum < total) {
             setError('Cash paid cannot be less than the total amount.');
             setIsProcessing(false);
             return;
@@ -75,24 +68,23 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 paymentMethod: isPaid ? paymentMethod : 'Unpaid',
                 paymentStatus,
                 amountPaid: isPaid ? finalAmountPaid : 0,
-                balanceDue: isPaid ? finalBalanceDue : total, // balanceDue now tracks underpayment OR change owed
-                changeGiven: 0, // This field is for manually settled change later.
+                balanceDue: isPaid ? finalBalanceDue : total,
+                changeGiven: 0, 
             };
 
             if (isPaid) {
                 orderData.lastPaymentTimestamp = now;
                 orderData.lastPaymentAmount = finalAmountPaid;
-                if (orderData.paymentStatus === 'Paid') {
+                if (paymentStatus === 'Paid') {
                     orderData.status = 'Completed';
                 }
             }
-
 
             if (editingOrder) {
                 const orderRef = doc(db, "orders", editingOrder.id);
                 batch.update(orderRef, orderData);
             } else {
-                 const counterRef = doc(db, "counters", "orderIdCounter");
+                const counterRef = doc(db, "counters", "orderIdCounter");
                 const newOrderRef = doc(collection(db, "orders"));
 
                 const counterSnap = await getDoc(counterRef);
@@ -165,11 +157,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                             {paymentMethod === 'cash' && (
                                 <div className="space-y-4">
                                     <div>
-                                        <Label htmlFor="cashPaid">Amount Paid by Customer (Optional)</Label>
-                                        <Input id="cashPaid" type="number" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                        <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
+                                        <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
                                     </div>
-                                    {cashPaid && finalBalanceDue > 0 && <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(finalBalanceDue)}</p>}
-                                    {cashPaid && finalBalanceDue < 0 && <p className="font-semibold text-yellow-500 text-center">Balance Remaining: {formatCurrency(Math.abs(finalBalanceDue))}</p>}
+                                    {amountPaidInput && finalBalanceDue > 0 && <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(finalBalanceDue)}</p>}
+                                    {amountPaidInput && finalBalanceDue < 0 && <p className="font-semibold text-yellow-500 text-center">Balance Remaining: {formatCurrency(Math.abs(finalBalanceDue))}</p>}
                                 </div>
                             )}
                              {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}

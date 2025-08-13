@@ -53,7 +53,7 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ orders, onClose, onSett
                                         <div className="flex justify-between items-center">
                                             <div>
                                                 <p className="font-semibold">{order.tag || order.simplifiedId}</p>
-                                                <p className="text-sm text-red-500 font-bold">{formatCurrency(order.balanceDue)} due</p>
+                                                <p className="text-sm text-red-500 font-bold">{formatCurrency(Math.abs(order.balanceDue))} due</p>
                                                 <p className="text-xs text-muted-foreground">{formatTimestamp(order.timestamp)}</p>
                                             </div>
                                             <div className="flex flex-col gap-2">

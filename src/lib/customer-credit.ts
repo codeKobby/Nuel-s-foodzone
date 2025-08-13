@@ -18,26 +18,21 @@ export async function applyChangeAsCreditToOrders(sourceOrderId: string, targetO
             const sourceOrderRef = doc(db, "orders", sourceOrderId);
             const targetOrderRefs = targetOrderIds.map(id => doc(db, "orders", id));
 
-            // 1. READ all documents first.
             const sourceOrderDoc = await transaction.get(sourceOrderRef);
             const targetOrderDocs = await Promise.all(targetOrderRefs.map(ref => transaction.get(ref)));
 
-            if (!sourceOrderDoc.exists() || sourceOrderDoc.data().balanceDue <= 0) {
+            if (!sourceOrderDoc.exists() || sourceOrderDoc.data().balanceDue >= 0) {
                 throw new Error("Source order not found or has no credit to apply.");
             }
 
-            let availableCredit = sourceOrderDoc.data().balanceDue;
-
-            // 2. Now, perform all WRITE operations.
+            let availableCredit = Math.abs(sourceOrderDoc.data().balanceDue);
             
-            // First, update the source order
             transaction.update(sourceOrderRef, {
                 balanceDue: 0,
-                changeGiven: sourceOrderDoc.data().balanceDue,
+                changeGiven: availableCredit,
                 creditSource: [...(sourceOrderDoc.data().creditSource || []), `Applied to other orders on ${new Date().toLocaleDateString()}`]
             });
 
-            // Then, iterate and update target orders
             for (const targetDoc of targetOrderDocs) {
                 if (availableCredit <= 0) break;
 
@@ -48,7 +43,7 @@ export async function applyChangeAsCreditToOrders(sourceOrderId: string, targetO
 
                 const targetOrderData = targetDoc.data() as Order;
                 const balanceToPay = targetOrderData.balanceDue;
-                if (balanceToPay <= 0) continue; // Skip already paid orders
+                if (balanceToPay <= 0) continue; 
 
                 const creditToApply = Math.min(availableCredit, balanceToPay);
 

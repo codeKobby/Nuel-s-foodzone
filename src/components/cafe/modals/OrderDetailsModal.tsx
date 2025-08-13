@@ -17,8 +17,8 @@ interface OrderDetailsModalProps {
 }
 
 const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, ref) => {
-    const isBalanceOwedByCustomer = order.paymentStatus !== 'Paid' && order.balanceDue > 0;
-    const isChangeOwedToCustomer = order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total;
+    const isBalanceOwedByCustomer = order.balanceDue > 0;
+    const isChangeOwedToCustomer = order.balanceDue < 0;
 
     return (
         <div ref={ref} className="receipt p-4 bg-white text-black font-mono">
@@ -55,7 +55,7 @@ const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, r
             <p className="text-right">Paid ({order.paymentMethod}): {formatCurrency(order.amountPaid)}</p>
             {isBalanceOwedByCustomer && <p className="text-right font-bold">Balance Due: {formatCurrency(order.balanceDue)}</p>}
             <p className="text-right">Change Given: {formatCurrency(order.changeGiven)}</p>
-            {isChangeOwedToCustomer && <p className="text-right font-bold text-red-600">Change Owed: {formatCurrency(order.balanceDue)}</p>}
+            {isChangeOwedToCustomer && <p className="text-right font-bold text-red-600">Change Owed: {formatCurrency(Math.abs(order.balanceDue))}</p>}
              {(order.creditSource && order.creditSource.length > 0) && (
                 <p className="text-right text-xs">Credit from: {order.creditSource.join(', ')}</p>
             )}
