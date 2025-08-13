@@ -13,7 +13,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import { cn } from '@/lib/utils';
 
 
 interface OrderOptionsModalProps {
@@ -40,10 +39,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         }
     }, [editingOrder]);
 
-    const handleExactAmountClick = () => {
-        setAmountPaidInput(String(total));
-    };
-
     const handleProceedToPayment = () => {
         if (!orderTag) {
             setError("Please add a tag (e.g., customer name or table number) to the order.");
@@ -59,7 +54,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             return;
         }
         setError(null);
-        setAmountPaidInput('0');
+        setAmountPaidInput('0'); // Explicitly set to 0 for unpaid orders
         processOrder({ isPaid: false });
     };
 
@@ -71,6 +66,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     
     const deficit = isAmountPaidEntered && finalAmountPaid < total ? total - finalAmountPaid : 0;
     const change = isAmountPaidEntered && finalAmountPaid > total ? finalAmountPaid - total : 0;
+    
+    const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && deficit > 0;
+    // Payment can be confirmed if it's momo OR if it's cash and an amount has been entered.
+    const canConfirmPayment = paymentMethod === 'momo' || (paymentMethod === 'cash' && isAmountPaidEntered);
+
 
     const processOrder = async (options: { isPaid: boolean, pardonDeficit?: boolean }) => {
         setIsProcessing(true);
@@ -111,7 +111,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 const existingOrderData = existingOrderSnap.data() as Order;
 
                 const newTotalPaid = existingOrderData.amountPaid + (isPaid ? finalAmountPaid : 0);
-                const newBalanceDue = total - newTotalPaid - pardonedAmount;
+                let newBalanceDue = total - newTotalPaid - pardonedAmount;
 
                 orderData.amountPaid = newTotalPaid;
                 orderData.balanceDue = newBalanceDue;
@@ -134,7 +134,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 if (isPaid) {
                      if (paymentMethod === 'cash' && isAmountPaidEntered && finalAmountPaid < total && !pardonDeficit) {
                         paymentStatus = 'Partially Paid';
-                    } else {
+                    } else if (finalAmountPaid >= total || pardonDeficit) {
                         paymentStatus = 'Paid';
                     }
                 }
@@ -147,24 +147,28 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 
                 const counterRef = doc(db, "counters", "orderIdCounter");
                 const newOrderRef = doc(collection(db, "orders"));
-
-                const counterSnap = await getDoc(counterRef);
-                const newCount = (counterSnap.exists() ? counterSnap.data().count : 0) + 1;
                 
-                const newOrder: Omit<Order, 'timestamp' | 'id'> = {
+                const newOrderData = {
                     ...orderData,
-                    simplifiedId: generateSimpleOrderId(newCount),
                     timestamp: serverTimestamp()
-                };
-                
-                const batch = writeBatch(db);
-                batch.set(newOrderRef, newOrder);
-                batch.set(counterRef, { count: newCount }, { merge: true });
-                await batch.commit();
+                }
 
-                finalOrder = { ...newOrder, timestamp: Timestamp.now(), id: newOrderRef.id } as Order;
+                await runTransaction(db, async (transaction) => {
+                    const counterDoc = await transaction.get(counterRef);
+                    const newCount = (counterDoc.exists() ? counterDoc.data().count : 0) + 1;
+                    
+                    const newOrderWithId: Omit<Order, 'id' | 'timestamp'> = {
+                        ...newOrderData,
+                        simplifiedId: generateSimpleOrderId(newCount),
+                    };
+
+                    transaction.set(newOrderRef, newOrderWithId);
+                    transaction.set(counterRef, { count: newCount }, { merge: true });
+
+                    finalOrder = { ...newOrderWithId, id: newOrderRef.id, timestamp: Timestamp.now() } as Order;
+                });
             }
-
+            // @ts-ignore
             onOrderPlaced(finalOrder);
 
         } catch (e) {
@@ -174,8 +178,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         }
     };
     
-    const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && deficit > 0;
-    const canConfirmPayment = paymentMethod === 'momo' || (paymentMethod === 'cash' && isAmountPaidEntered);
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -225,7 +227,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                 <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
                                 <div className="flex gap-2">
                                     <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Enter amount..." onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
-                                    <Button onClick={handleExactAmountClick} variant="outline" className="h-12">Exact</Button>
                                 </div>
                                  {change > 0 && (
                                     <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(change)}</p>
@@ -264,3 +265,5 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 };
 
 export default OrderOptionsModal;
+
+    
