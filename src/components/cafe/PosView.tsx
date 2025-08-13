@@ -1,12 +1,13 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Search, ShoppingBag, Plus, Minus, PlusCircle, X, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import type { MenuItem, OrderItem } from '@/lib/types';
+import type { MenuItem, OrderItem, Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import OrderOptionsModal from './modals/OrderOptionsModal';
 import BreakfastModal from './modals/BreakfastModal';
 import CustomOrderModal from './modals/CustomOrderModal';
+import ChangeDueModal from './modals/ChangeDueModal';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
   AlertDialog,
@@ -135,6 +137,7 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
     const [isCartSheetOpen, setIsCartSheetOpen] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
     const { editingOrder, clearEditingOrder } = useContext(OrderEditingContext);
+    const [orderWithChangeDue, setOrderWithChangeDue] = useState<Order | null>(null);
 
 
     useEffect(() => {
@@ -264,6 +267,44 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
         setIsCartSheetOpen(false);
         setShowOrderOptionsModal(true);
     };
+    
+    const handleOrderPlaced = (order: Order) => {
+        setCurrentOrder({});
+        setShowOrderOptionsModal(false);
+        clearEditingOrder();
+        if (order.balanceDue < 0) {
+            setOrderWithChangeDue(order);
+        } else {
+            setActiveView('orders');
+        }
+    };
+    
+     const handleSettleChange = async (orderId: string, settleAmount: number) => {
+        const orderRef = doc(db, "orders", orderId);
+        try {
+             await runTransaction(db, async (transaction) => {
+                const orderDoc = await transaction.get(orderRef);
+                if (!orderDoc.exists()) throw "Document does not exist!";
+                
+                const currentBalance = orderDoc.data().balanceDue || 0;
+                const newBalance = currentBalance + settleAmount;
+                const currentChangeGiven = orderDoc.data().changeGiven || 0;
+                const newChangeGiven = currentChangeGiven + settleAmount;
+
+                transaction.update(orderRef, { 
+                    balanceDue: newBalance,
+                    changeGiven: newChangeGiven,
+                    lastPaymentTimestamp: serverTimestamp(),
+                });
+            });
+            setOrderWithChangeDue(null);
+            setActiveView('orders');
+        } catch (e) {
+            console.error(e);
+            setError("Failed to settle change.");
+        }
+    };
+
 
     const categories = ['All', ...Array.from(new Set(menuItems.map(item => item.category)))].sort();
     const filteredItems = menuItems.filter(item => 
@@ -390,12 +431,18 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                     orderItems={currentOrder}
                     editingOrder={editingOrder}
                     onClose={() => setShowOrderOptionsModal(false)}
-                    onOrderPlaced={() => {
-                        setCurrentOrder({});
-                        setShowOrderOptionsModal(false);
-                        clearEditingOrder();
+                    onOrderPlaced={handleOrderPlaced}
+                />
+            )}
+            {orderWithChangeDue && (
+                 <ChangeDueModal
+                    order={orderWithChangeDue}
+                    onClose={() => {
+                        setOrderWithChangeDue(null);
                         setActiveView('orders');
                     }}
+                    onSettle={handleSettleChange}
+                    isPopup={true}
                 />
             )}
             {showBreakfastModal && (
@@ -429,5 +476,3 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
 };
 
 export default PosView;
-
-    

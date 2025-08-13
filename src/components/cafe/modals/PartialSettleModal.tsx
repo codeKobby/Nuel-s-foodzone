@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -15,17 +16,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertDescription } from '@/components/ui/alert';
 
 interface PartialSettleModalProps {
     order: Order;
     onClose: () => void;
     onSettle: (orderId: string, amount: number) => void;
+    isPopup?: boolean;
 }
 
-const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose, onSettle }) => {
+const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose, onSettle, isPopup = false }) => {
     const changeDue = Math.abs(order.balanceDue);
-    const [settleAmount, setSettleAmount] = useState(changeDue.toFixed(2));
+    const [settleAmount, setSettleAmount] = useState('');
     const [error, setError] = useState<string | null>(null);
 
     const handleSettle = () => {
@@ -42,31 +44,41 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
         onSettle(order.id, amount);
     };
 
+    const handleFullChange = () => {
+        setSettleAmount(changeDue.toFixed(2));
+        onSettle(order.id, changeDue);
+    };
+
+    const title = isPopup ? `Change Due for Order ${order.simplifiedId}` : `Settle Change for ${order.tag || order.simplifiedId}`;
+
     return (
         <Dialog open onOpenChange={onClose}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Settle Change for {order.tag || order.simplifiedId}</DialogTitle>
+                    <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>
                         Outstanding change: <span className="font-bold text-red-500">{formatCurrency(changeDue)}</span>
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
                     <Label htmlFor="settle-amount">Amount Given to Customer</Label>
-                    <Input
-                        id="settle-amount"
-                        type="number"
-                        value={settleAmount}
-                        onChange={(e) => setSettleAmount(e.target.value)}
-                        onFocus={(e) => e.target.select()}
-                        placeholder="0.00"
-                        autoFocus
-                    />
+                    <div className="flex items-center gap-2">
+                         <Input
+                            id="settle-amount"
+                            type="number"
+                            value={settleAmount}
+                            onChange={(e) => setSettleAmount(e.target.value)}
+                            onFocus={(e) => e.target.select()}
+                            placeholder="0.00"
+                            autoFocus
+                        />
+                         <Button onClick={handleFullChange} variant="outline">Full</Button>
+                    </div>
                     {error && <AlertDescription className="text-red-500 text-xs">{error}</AlertDescription>}
                 </div>
                 <DialogFooter>
                     <Button onClick={onClose} variant="secondary">Cancel</Button>
-                    <Button onClick={handleSettle} className="bg-green-500 hover:bg-green-600">Settle Amount</Button>
+                    <Button onClick={handleSettle} disabled={!settleAmount} className="bg-green-500 hover:bg-green-600">Settle Amount</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
