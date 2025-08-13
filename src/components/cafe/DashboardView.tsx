@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart"
 import { LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
 import { DateRange } from "react-day-picker"
-import { addDays, format, startOfWeek, endOfWeek, startOfMonth } from "date-fns"
+import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, endOfToday } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -544,23 +544,23 @@ const DashboardView: React.FC = () => {
     
     const setDateRange = (rangeType: 'today' | 'week' | 'month') => {
         const today = new Date();
-        let from, to;
+        let fromDate, toDate;
 
         switch (rangeType) {
             case 'today':
-                from = today;
-                to = today;
+                fromDate = startOfToday();
+                toDate = endOfToday();
                 break;
             case 'week':
-                from = startOfWeek(today, { weekStartsOn: 1 }); // Monday
-                to = today;
+                fromDate = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+                toDate = endOfToday();
                 break;
             case 'month':
-                from = startOfMonth(today);
-                to = endOfMonth(today);
+                fromDate = startOfMonth(today);
+                toDate = endOfToday();
                 break;
         }
-        setDate({ from, to });
+        setDate({ from: fromDate, to: toDate });
     };
 
     return (
@@ -910,6 +910,7 @@ const DashboardView: React.FC = () => {
 export default DashboardView;
 
     
+
 
 
 

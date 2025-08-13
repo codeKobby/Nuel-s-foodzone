@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -15,6 +16,8 @@ import { AlertTriangle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import { cn } from '@/lib/utils';
+
 
 interface CombinedPaymentModalProps {
     orders: Order[];
@@ -27,6 +30,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     const [amountPaidInput, setAmountPaidInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [exactButtonClicked, setExactButtonClicked] = useState(false);
 
     const totalToPay = useMemo(() => {
         return orders.reduce((acc, order) => {
@@ -37,6 +41,16 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         }, 0);
     }, [orders]);
     
+    const handleAmountPaidChange = (value: string) => {
+        setAmountPaidInput(value);
+        setExactButtonClicked(false);
+    };
+
+    const handleExactAmountClick = () => {
+        setAmountPaidInput(String(totalToPay));
+        setExactButtonClicked(true);
+    };
+    
     const amountPaidNum = parseFloat(amountPaidInput);
     const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
     const finalAmountPaid = isAmountPaidEntered ? amountPaidNum : 0;
@@ -46,16 +60,19 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 
 
     const processCombinedPayment = async ({ pardonDeficit = false }) => {
+        if (!isAmountPaidEntered) {
+             setError("Please enter an amount paid or use the 'Exact' button.");
+             return;
+        }
+
         setIsProcessing(true);
         setError(null);
         
-        const effectiveAmountPaid = isAmountPaidEntered ? finalAmountPaid : totalToPay;
-
         try {
             const batch = writeBatch(db);
             const now = serverTimestamp();
 
-            let amountToDistribute = effectiveAmountPaid;
+            let amountToDistribute = finalAmountPaid;
             
             const ordersToPay = orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0).sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
 
@@ -74,7 +91,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     amountPaid: newAmountPaid,
                     lastPaymentTimestamp: now,
                     lastPaymentAmount: amountToPayForOrder,
-                    pardonedAmount: 0 // Reset pardoned amount for this order initially
+                    pardonedAmount: order.pardonedAmount || 0,
                 };
                 
                 if (newBalanceDue <= 0) {
@@ -91,18 +108,15 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 amountToDistribute -= amountToPayForOrder;
             }
             
-            const remainingDeficit = totalToPay - effectiveAmountPaid;
+            const remainingDeficit = totalToPay - finalAmountPaid;
 
-            // Distribute change or pardoned amounts
             if (ordersToPay.length > 0) {
                  const lastOrder = ordersToPay[ordersToPay.length - 1];
                  const lastOrderRef = doc(db, "orders", lastOrder.id);
                  
-                 // If there's change left over
                  if(amountToDistribute > 0) {
                     batch.update(lastOrderRef, { balanceDue: -amountToDistribute }); // Negative balance due is change
                  } 
-                 // If there was a deficit and it's being pardoned
                  else if (pardonDeficit && remainingDeficit > 0) {
                     const lastOrderData = (await getDoc(lastOrderRef)).data() as Order;
                     batch.update(lastOrderRef, {
@@ -161,10 +175,10 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     {paymentMethod === 'cash' && (
                         <div className="space-y-2">
                              <div>
-                                <Label htmlFor="cashPaid">Amount Paid by Customer (Optional)</Label>
+                                <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
                                 <div className="flex gap-2">
-                                <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
-                                    <Button variant="outline" onClick={() => setAmountPaidInput(String(totalToPay))} className="h-12">Exact</Button>
+                                <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => handleAmountPaidChange(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                    <Button onClick={handleExactAmountClick} className={cn("h-12", exactButtonClicked ? "bg-green-500 hover:bg-green-600 text-white" : "")}>Exact</Button>
                                 </div>
                             </div>
                             
@@ -190,7 +204,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                             </Button>
                         </div>
                     ) : (
-                        <Button onClick={() => processCombinedPayment({})} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                        <Button onClick={() => processCombinedPayment({})} disabled={isProcessing || !isAmountPaidEntered} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
                             {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
                         </Button>
                     )}

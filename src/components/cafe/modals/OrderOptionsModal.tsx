@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -13,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, Wallet } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import { cn } from '@/lib/utils';
 
 interface OrderOptionsModalProps {
     total: number;
@@ -30,6 +32,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     const [amountPaidInput, setAmountPaidInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [exactButtonClicked, setExactButtonClicked] = useState(false);
 
     useEffect(() => {
         if (editingOrder) {
@@ -37,9 +40,21 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             setOrderTag(editingOrder.tag || '');
         }
     }, [editingOrder]);
+    
+    const handleAmountPaidChange = (value: string) => {
+        setAmountPaidInput(value);
+        setExactButtonClicked(false);
+    };
+
+    const handleExactAmountClick = () => {
+        setAmountPaidInput(String(total));
+        setExactButtonClicked(true);
+    };
 
     const amountPaidNum = parseFloat(amountPaidInput);
     const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
+    
+    // Only set finalAmountPaid if input is valid. Otherwise it's 0.
     const finalAmountPaid = isAmountPaidEntered ? amountPaidNum : 0;
     
     const deficit = isAmountPaidEntered && finalAmountPaid < total ? total - finalAmountPaid : 0;
@@ -60,6 +75,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             return;
         }
         setError(null);
+        // Leaving the amount paid field blank signals no payment is made now.
         processOrder({ isPaid: false });
     }
 
@@ -68,22 +84,27 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         setError(null);
 
         const { isPaid, pardonDeficit = false } = options;
-        const effectiveAmountPaid = isAmountPaidEntered ? finalAmountPaid : (isPaid ? total : 0);
-        
+
+        if (isPaid && !isAmountPaidEntered) {
+             setError("Please enter an amount paid or use the 'Exact' button.");
+             setIsProcessing(false);
+             return;
+        }
+
         try {
             const batch = writeBatch(db);
             const now = serverTimestamp();
             
             let paymentStatus: Order['paymentStatus'] = 'Unpaid';
             if (isPaid) {
-                if (effectiveAmountPaid < total && !pardonDeficit) {
+                if (finalAmountPaid < total && !pardonDeficit) {
                     paymentStatus = 'Partially Paid';
                 } else {
                     paymentStatus = 'Paid';
                 }
             }
 
-            const pardonedAmount = isPaid && pardonDeficit ? total - effectiveAmountPaid : 0;
+            const pardonedAmount = isPaid && pardonDeficit ? total - finalAmountPaid : 0;
 
             const orderData: any = {
                 tag: orderTag,
@@ -92,8 +113,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 total,
                 paymentMethod: isPaid ? paymentMethod : 'Unpaid',
                 paymentStatus,
-                amountPaid: effectiveAmountPaid,
-                balanceDue: effectiveAmountPaid - total,
+                amountPaid: finalAmountPaid,
+                balanceDue: finalAmountPaid - total,
                 pardonedAmount: pardonedAmount,
                 changeGiven: 0, 
                 fulfilledItems: editingOrder?.fulfilledItems || [],
@@ -105,7 +126,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 
             if (isPaid) {
                 orderData.lastPaymentTimestamp = now;
-                orderData.lastPaymentAmount = effectiveAmountPaid;
+                orderData.lastPaymentAmount = finalAmountPaid;
             }
             
             if (paymentStatus === 'Paid') {
@@ -191,10 +212,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                             {paymentMethod === 'cash' && (
                                 <div className="space-y-2">
                                      <div>
-                                        <Label htmlFor="cashPaid">Amount Paid by Customer (Optional)</Label>
+                                        <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
                                         <div className="flex gap-2">
-                                            <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
-                                            <Button variant="outline" onClick={() => setAmountPaidInput(String(total))} className="h-12">Exact</Button>
+                                            <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => handleAmountPaidChange(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                            <Button onClick={handleExactAmountClick} className={cn("h-12", exactButtonClicked ? "bg-green-500 hover:bg-green-600 text-white" : "")}>Exact</Button>
                                         </div>
                                     </div>
                                     
@@ -220,7 +241,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                     </Button>
                                 </div>
                            ) : (
-                             <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                             <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing || !isAmountPaidEntered} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
                                 {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
                             </Button>
                            )}

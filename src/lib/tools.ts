@@ -46,8 +46,8 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             const order = doc.data() as Order;
             const orderDate = order.timestamp.toDate();
 
+            // 1. Total Sales (from completed orders created in range)
             if (orderDate >= startDate && orderDate <= endDate) {
-                // 1. Total Sales (from completed orders created in range)
                 if (order.status === 'Completed') {
                     totalOrders++;
                     totalSales += order.total;
@@ -56,21 +56,21 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
                         itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
                     });
                 }
+            }
 
-                // 2. Paid Revenue (from any payment made in range)
-                const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
-                if (paymentDate >= startDate && paymentDate <= endDate) {
-                     if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                        const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
-                        if (order.paymentMethod === 'cash') cashSales += paidAmount;
-                        if (order.paymentMethod === 'momo') momoSales += paidAmount;
-                    }
+            // 2. Paid Revenue (from any payment made in range)
+            const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
+            if (paymentDate >= startDate && paymentDate <= endDate) {
+                 if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
+                    const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
+                    if (order.paymentMethod === 'cash') cashSales += paidAmount;
+                    if (order.paymentMethod === 'momo') momoSales += paidAmount;
                 }
+            }
 
-                // 3. Change owed to customer (from any order completed in range)
-                 if (order.balanceDue < 0) {
-                    changeOwed += Math.abs(order.balanceDue);
-                }
+            // 3. Change owed to customer (from any order)
+            if (order.balanceDue < 0) {
+                changeOwed += Math.abs(order.balanceDue);
             }
         });
         

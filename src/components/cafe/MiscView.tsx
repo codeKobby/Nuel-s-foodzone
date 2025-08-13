@@ -1,12 +1,13 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { MiscExpense } from '@/lib/types';
+import type { MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp, groupOrdersByDate } from '@/lib/utils';
-import { Trash2, Check, PlusCircle, Coins, CreditCard } from 'lucide-react';
+import { Trash2, Check, PlusCircle, Coins, CreditCard, Lock } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,22 +72,35 @@ const MiscView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [formState, setFormState] = useState({ purpose: '', amount: '' });
-    const [source, setSource] = useState<'cash' | 'momo' | null>(null);
+    const [source, setSource] = useState<'cash' | 'momo' | null>('cash');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<MiscExpense | null>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const isMobile = useIsMobile();
+    const [lastReconciliationDate, setLastReconciliationDate] = useState<Date | null>(null);
     
     const groupedExpenses = useMemo(() => groupOrdersByDate(expenses), [expenses]);
 
-
     useEffect(() => {
+        const reportsRef = collection(db, "reconciliationReports");
+        const q = query(reportsRef, orderBy('timestamp', 'desc'), where('timestamp', '!=', null));
+        const unsubscribeReports = onSnapshot(q, (snapshot) => {
+            if (!snapshot.empty) {
+                const lastReport = snapshot.docs[0].data() as ReconciliationReport;
+                setLastReconciliationDate(lastReport.timestamp.toDate());
+            }
+        });
+
         const expensesRef = collection(db, "miscExpenses");
-        const q = query(expensesRef, orderBy('timestamp', 'desc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        const qExpenses = query(expensesRef, orderBy('timestamp', 'desc'));
+        const unsubscribeExpenses = onSnapshot(qExpenses, (snapshot) => {
             setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MiscExpense)));
             setLoading(false);
         }, (e) => { setError("Failed to load miscellaneous expenses."); setLoading(false); });
-        return () => unsubscribe();
+
+        return () => {
+            unsubscribeReports();
+            unsubscribeExpenses();
+        };
     }, []);
     
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormState(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -104,7 +118,7 @@ const MiscView: React.FC = () => {
         try {
             await addDoc(collection(db, "miscExpenses"), data);
             setFormState({ purpose: '', amount: ''});
-            setSource(null);
+            setSource('cash');
             setIsSheetOpen(false); // Close sheet on mobile after submission
         } catch (e) { setError("Failed to save expense."); }
     };
@@ -113,14 +127,12 @@ const MiscView: React.FC = () => {
         try { await deleteDoc(doc(db, "miscExpenses", itemId)); } catch (e) { setError("Failed to delete expense."); }
         setShowDeleteConfirm(null);
     };
-    
-    const handleSettle = async (itemId: string) => {
-        try {
-            await updateDoc(doc(db, "miscExpenses", itemId), { settled: true });
-        } catch (e) {
-            setError("Failed to settle expense.");
-        }
+
+    const isExpenseLocked = (expense: MiscExpense) => {
+        if (!lastReconciliationDate || !expense.timestamp) return false;
+        return expense.timestamp.toDate() <= lastReconciliationDate;
     };
+
 
     return (
         <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
@@ -166,7 +178,9 @@ const MiscView: React.FC = () => {
                                         <Separator className="flex-1" />
                                     </div>
                                     <div className="space-y-3">
-                                        {expensesOnDate.map(item => (
+                                        {expensesOnDate.map(item => {
+                                            const locked = isExpenseLocked(item);
+                                            return (
                                             <div key={item.id} className={cn('p-3 rounded-lg flex justify-between items-center', item.settled ? 'bg-green-100 dark:bg-green-900/20' : 'bg-secondary')}>
                                                 <div>
                                                     <div className="flex items-center gap-2">
@@ -178,13 +192,16 @@ const MiscView: React.FC = () => {
                                                 <div className="flex items-center space-x-1">
                                                     {item.settled ? (
                                                         <Badge variant="default" className="bg-green-500 hover:bg-green-500">Settled</Badge>
-                                                    ) : (
-                                                        <Button variant="ghost" size="icon" onClick={() => handleSettle(item.id)}><Check className="h-4 w-4 text-green-500" /></Button>
+                                                    ) : locked ? (
+                                                        <Badge variant="secondary"><Lock className="mr-2 h-3 w-3" />Locked</Badge>
+                                                    ) : null}
+                                                    {!locked && (
+                                                         <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                                                     )}
-                                                    <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                                                 </div>
                                             </div>
-                                        ))}
+                                            )
+                                        })}
                                     </div>
                                 </div>
                             ))}
