@@ -52,7 +52,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import { Badge } from '../ui/badge';
 import OrderDetailsModal from './modals/OrderDetailsModal';
 
@@ -247,7 +247,7 @@ const DashboardView: React.FC = () => {
             const discrepancyReports: ReconciliationReport[] = [];
             reportsSnapshot.forEach(doc => {
                 const report = {id: doc.id, ...doc.data()} as ReconciliationReport;
-                totalDiscrepancy += report.totalDiscrepancy;
+                totalDiscrepancy += report.totalDiscrepancy; // Sum up both surpluses and deficits
                 if (report.totalDiscrepancy !== 0) {
                     discrepancyReports.push(report);
                 }
