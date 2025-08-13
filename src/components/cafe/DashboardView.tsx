@@ -111,7 +111,7 @@ const DashboardView: React.FC = () => {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [date, setDate] = useState<DateRange | undefined>({ from: addDays(new Date(), -6), to: new Date() });
+    const [date, setDate] = useState<DateRange | undefined>({ from: startOfWeek(new Date(), { weekStartsOn: 1 }), to: endOfToday() });
     const [activeDatePreset, setActiveDatePreset] = useState<PresetDateRange>('week');
     
     // AI Features State
@@ -168,7 +168,7 @@ const DashboardView: React.FC = () => {
             const [allOrdersSnapshot, miscSnapshot, reportsSnapshot] = await Promise.all([
                 getDocs(allOrdersQuery),
                 getDocs(miscQuery),
-                getDocs(reportsQuery),
+                getDocs(reportsSnapshot),
             ]);
 
             // Process Orders
@@ -605,8 +605,7 @@ const DashboardView: React.FC = () => {
     const setDateRange = (rangeType: PresetDateRange) => {
         const today = new Date();
         let fromDate, toDate;
-        setActiveDatePreset(rangeType);
-
+        
         switch (rangeType) {
             case 'today':
                 fromDate = startOfToday();
@@ -620,8 +619,11 @@ const DashboardView: React.FC = () => {
                 fromDate = startOfMonth(today);
                 toDate = endOfToday();
                 break;
+            default:
+                return;
         }
         setDate({ from: fromDate, to: toDate });
+        setActiveDatePreset(rangeType);
     };
 
     return (
@@ -808,15 +810,15 @@ const DashboardView: React.FC = () => {
                                                 formatter={(value, name) => {
                                                     const formattedValue = formatCurrency(Number(value));
                                                     const label = name === 'sales' ? 'Total Sales' : 'Net Revenue';
-                                                    return `${formattedValue} (${label})`;
+                                                    return `${formattedValue}`;
                                                 }}
                                                 labelClassName="font-bold"
                                                 indicator="dot"
                                             />}
                                         />
                                         <Legend />
-                                        <Line name="Total Sales" dataKey="sales" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-                                        <Line name="Net Revenue" dataKey="revenue" type="monotone" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
+                                        <Line name="Total Sales" dataKey="sales" stroke="hsl(var(--primary))" strokeWidth={2} dot={true} />
+                                        <Line name="Net Revenue" dataKey="revenue" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={true} />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </ChartContainer>
@@ -974,3 +976,5 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    
