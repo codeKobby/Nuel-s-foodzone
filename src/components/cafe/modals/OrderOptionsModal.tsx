@@ -39,25 +39,21 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     }, [editingOrder]);
 
     const amountPaidNum = parseFloat(amountPaidInput);
-    const finalAmountPaid = !amountPaidInput || isNaN(amountPaidNum) ? total : amountPaidNum;
-    const finalBalanceDue = finalAmountPaid - total;
+    const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
+    const finalAmountPaid = isAmountPaidEntered ? amountPaidNum : total;
 
     const processOrder = async (isPaid: boolean) => {
         setIsProcessing(true);
         setError(null);
         
-        if (isPaid && paymentMethod === 'cash' && amountPaidInput && amountPaidNum < total) {
-            setError('Cash paid cannot be less than the total amount.');
-            setIsProcessing(false);
-            return;
-        }
+        const pardonedAmount = isPaid && finalAmountPaid < total ? total - finalAmountPaid : 0;
 
         try {
             const batch = writeBatch(db);
             const now = serverTimestamp();
             
             const paymentStatus = isPaid 
-                ? (finalAmountPaid < total ? 'Partially Paid' : 'Paid')
+                ? (finalAmountPaid < total && pardonedAmount === 0 ? 'Partially Paid' : 'Paid')
                 : 'Unpaid';
             
             const orderData: any = {
@@ -68,9 +64,14 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 paymentMethod: isPaid ? paymentMethod : 'Unpaid',
                 paymentStatus,
                 amountPaid: isPaid ? finalAmountPaid : 0,
-                balanceDue: isPaid ? finalBalanceDue : total,
+                balanceDue: isPaid ? finalAmountPaid - total : total,
+                pardonedAmount: pardonedAmount,
                 changeGiven: 0, 
             };
+            
+            if (pardonedAmount > 0) {
+                 orderData.notes = `Deficit of ${formatCurrency(pardonedAmount)} pardoned.`;
+            }
 
             if (isPaid) {
                 orderData.lastPaymentTimestamp = now;
@@ -112,6 +113,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             setIsProcessing(false);
         }
     };
+    
+    const balance = isAmountPaidEntered ? finalAmountPaid - total : 0;
+
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -155,12 +159,21 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                 <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'secondary'}>Momo/Card</Button>
                             </div>
                             {paymentMethod === 'cash' && (
-                                <div className="space-y-4">
-                                    <div>
-                                        <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
+                                <div className="space-y-2">
+                                     <div>
+                                        <Label htmlFor="cashPaid">Amount Paid by Customer (Optional)</Label>
+                                        <div className="flex gap-2">
                                         <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                         <Button variant="outline" onClick={() => setAmountPaidInput(String(total))} className="h-12">Exact</Button>
+                                        </div>
                                     </div>
-                                    {amountPaidInput && finalBalanceDue > 0 && <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(finalBalanceDue)}</p>}
+                                    
+                                    {isAmountPaidEntered && balance > 0 && (
+                                        <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(balance)}</p>
+                                    )}
+                                    {isAmountPaidEntered && balance < 0 && (
+                                        <p className="font-semibold text-orange-500 text-center">Deficit (Pardoned): {formatCurrency(Math.abs(balance))}</p>
+                                    )}
                                 </div>
                             )}
                              {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}

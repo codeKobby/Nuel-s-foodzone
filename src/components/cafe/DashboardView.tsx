@@ -7,7 +7,7 @@ import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, add
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport, ChatSession, AnalyzeBusinessOutput } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, ArrowDownUp, SortAsc, SortDesc } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, ArrowDownUp, SortAsc, SortDesc, Ban } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart"
 import { LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
 import { DateRange } from "react-day-picker"
-import { addDays, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns"
+import { addDays, format, startOfWeek, endOfWeek, startOfMonth } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -34,7 +34,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Sheet,
@@ -56,6 +55,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Badge } from '../ui/badge';
+import OrderDetailsModal from './modals/OrderDetailsModal';
 
 
 interface DashboardStats {
@@ -64,9 +64,11 @@ interface DashboardStats {
     unpaidOrdersValue: number;
     totalMiscExpenses: number;
     totalDiscrepancy: number;
+    totalPardonedAmount: number;
     salesData: { date: string; sales: number }[];
     itemPerformance: { name: string; count: number; totalValue: number }[];
     discrepancyReports: ReconciliationReport[];
+    pardonedOrders: Order[];
     cashSales: number;
     momoSales: number;
     totalOrders: number;
@@ -123,6 +125,9 @@ const DashboardView: React.FC = () => {
     const [itemSearchQuery, setItemSearchQuery] = useState('');
     const [miscExpenses, setMiscExpenses] = useState<MiscExpense[]>([]);
     const [isDiscrepancyModalOpen, setIsDiscrepancyModalOpen] = useState(false);
+    const [isPardonedModalOpen, setIsPardonedModalOpen] = useState(false);
+    const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
+
     
     // Sorting state
     const [itemSortKey, setItemSortKey] = useState<ItemSortKey>('count');
@@ -161,10 +166,11 @@ const DashboardView: React.FC = () => {
             ]);
 
             // Process Orders
-            let cashSales = 0, momoSales = 0, totalSales = 0, totalOrders = 0;
+            let cashSales = 0, momoSales = 0, totalSales = 0, totalOrders = 0, totalPardonedAmount = 0;
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             const salesByDay: Record<string, number> = {};
             let unpaidOrdersValue = 0;
+            const pardonedOrders: Order[] = [];
             
             allOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
@@ -177,31 +183,38 @@ const DashboardView: React.FC = () => {
                 const orderDate = order.timestamp.toDate();
 
                 // --- Calculations for selected date range ---
-                
-                // 1. Total Sales (from completed orders created in range)
-                if (order.status === 'Completed' && orderDate >= startDate && orderDate <= endDate) {
-                    totalSales += order.total;
-                    totalOrders++;
-                    
-                    const dayKey = format(orderDate, 'MMM d');
-                    salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.total;
+                if (orderDate >= startDate && orderDate <= endDate) {
+                     // 1. Total Sales (from completed orders created in range)
+                    if (order.status === 'Completed') {
+                        totalSales += order.total;
+                        totalOrders++;
+                        
+                        const dayKey = format(orderDate, 'MMM d');
+                        salesByDay[dayKey] = (salesByDay[dayKey] || 0) + order.total;
 
-                    order.items.forEach(item => {
-                        const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
-                        itemStats[item.name] = {
-                            count: currentStats.count + item.quantity,
-                            totalValue: currentStats.totalValue + (item.quantity * item.price)
-                        };
-                    });
-                }
-                
-                // 2. Paid Revenue (from any payment made in range)
-                 const paymentDate = order.lastPaymentTimestamp?.toDate() ?? orderDate;
-                if (paymentDate >= startDate && paymentDate <= endDate) {
-                    if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                        const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
-                        if (order.paymentMethod === 'cash') cashSales += paidAmount;
-                        if (order.paymentMethod === 'momo') momoSales += paidAmount;
+                        order.items.forEach(item => {
+                            const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                            itemStats[item.name] = {
+                                count: currentStats.count + item.quantity,
+                                totalValue: currentStats.totalValue + (item.quantity * item.price)
+                            };
+                        });
+                    }
+
+                     // 2. Pardoned Amounts
+                    if (order.pardonedAmount && order.pardonedAmount > 0) {
+                        totalPardonedAmount += order.pardonedAmount;
+                        pardonedOrders.push(order);
+                    }
+                    
+                    // 3. Paid Revenue (from any payment made in range)
+                     const paymentDate = order.lastPaymentTimestamp?.toDate() ?? orderDate;
+                    if (paymentDate >= startDate && paymentDate <= endDate) {
+                        if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
+                            const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
+                            if (order.paymentMethod === 'cash') cashSales += paidAmount;
+                            if (order.paymentMethod === 'momo') momoSales += paidAmount;
+                        }
                     }
                 }
             });
@@ -241,9 +254,11 @@ const DashboardView: React.FC = () => {
                 unpaidOrdersValue,
                 totalMiscExpenses,
                 totalDiscrepancy,
+                totalPardonedAmount,
                 salesData,
                 itemPerformance,
-                discrepancyReports
+                discrepancyReports,
+                pardonedOrders,
             });
 
         } catch (e) {
@@ -651,17 +666,55 @@ const DashboardView: React.FC = () => {
                         </DialogContent>
                     </Dialog>
                 )}
+                 {isPardonedModalOpen && (
+                    <Dialog open onOpenChange={setIsPardonedModalOpen}>
+                        <DialogContent>
+                             <DialogHeader>
+                                <DialogTitle>Pardoned Deficit Details</DialogTitle>
+                                <DialogDescription>Orders with accepted deficits in the selected period.</DialogDescription>
+                            </DialogHeader>
+                            <ScrollArea className="h-72 my-4">
+                               <div className="space-y-3 pr-4">
+                                {stats.pardonedOrders.length > 0 ? stats.pardonedOrders.map(order => (
+                                    <div key={order.id} className="p-3 rounded-lg bg-secondary cursor-pointer hover:bg-muted" onClick={() => setSelectedOrderForDetails(order)}>
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="font-semibold">{order.simplifiedId} ({order.tag || 'No Tag'})</p>
+                                                <p className="text-sm text-muted-foreground">{formatTimestamp(order.timestamp)}</p>
+                                            </div>
+                                             <Badge variant="destructive">
+                                                -{formatCurrency(order.pardonedAmount)}
+                                            </Badge>
+                                        </div>
+                                         {order.notes && <p className="text-xs italic mt-2 border-t pt-2">Notes: {order.notes}</p>}
+                                    </div>
+                                )) : <p className="text-muted-foreground text-center italic py-10">No pardoned deficits recorded in this period.</p>}
+                               </div>
+                            </ScrollArea>
+                        </DialogContent>
+                    </Dialog>
+                )}
+                {selectedOrderForDetails && (
+                    <OrderDetailsModal order={selectedOrderForDetails} onClose={() => setSelectedOrderForDetails(null)} onEdit={() => {}} />
+                )}
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-6">
                     <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Completed orders in period"/>
                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - Misc. Expenses"/>
                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} />
-                    <StatCard 
+                     <StatCard 
                         icon={<FileWarning className={stats.totalDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
                         title="Total Discrepancy" 
                         value={formatCurrency(stats.totalDiscrepancy)} 
                         description="Click to view details"
                         onClick={() => setIsDiscrepancyModalOpen(true)}
+                    />
+                     <StatCard 
+                        icon={<Ban className={stats.totalPardonedAmount === 0 ? "text-muted-foreground" : "text-orange-500"}/>} 
+                        title="Pardoned Deficits" 
+                        value={formatCurrency(stats.totalPardonedAmount)} 
+                        description="Click to view details"
+                        onClick={() => setIsPardonedModalOpen(true)}
                     />
                 </div>
                 
@@ -857,6 +910,7 @@ const DashboardView: React.FC = () => {
 export default DashboardView;
 
     
+
 
 
 

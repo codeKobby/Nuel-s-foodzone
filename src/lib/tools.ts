@@ -1,4 +1,5 @@
 
+
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
@@ -45,30 +46,30 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             const order = doc.data() as Order;
             const orderDate = order.timestamp.toDate();
 
-            // 1. Total Sales (from completed orders created in range)
-            if (order.status === 'Completed' && orderDate >= startDate && orderDate <= endDate) {
-                totalOrders++;
-                totalSales += order.total;
+            if (orderDate >= startDate && orderDate <= endDate) {
+                // 1. Total Sales (from completed orders created in range)
+                if (order.status === 'Completed') {
+                    totalOrders++;
+                    totalSales += order.total;
 
-                order.items.forEach(item => {
-                    itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
-                });
-            }
-
-            // 2. Paid Revenue (from any payment made in range)
-            const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
-            if (paymentDate >= startDate && paymentDate <= endDate) {
-                 if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                    const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
-                    if (order.paymentMethod === 'cash') cashSales += paidAmount;
-                    if (order.paymentMethod === 'momo') momoSales += paidAmount;
+                    order.items.forEach(item => {
+                        itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
+                    });
                 }
-            }
 
-            // 3. Change owed to customer (from any order completed in range)
-            if (order.status === 'Completed' && orderDate >= startDate && orderDate <= endDate) {
-                if (order.paymentMethod === 'cash' && order.balanceDue > 0 && order.amountPaid >= order.total) {
-                    changeOwed += order.balanceDue;
+                // 2. Paid Revenue (from any payment made in range)
+                const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
+                if (paymentDate >= startDate && paymentDate <= endDate) {
+                     if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
+                        const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
+                        if (order.paymentMethod === 'cash') cashSales += paidAmount;
+                        if (order.paymentMethod === 'momo') momoSales += paidAmount;
+                    }
+                }
+
+                // 3. Change owed to customer (from any order completed in range)
+                 if (order.balanceDue < 0) {
+                    changeOwed += Math.abs(order.balanceDue);
                 }
             }
         });

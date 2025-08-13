@@ -39,11 +39,13 @@ export interface Order {
   amountPaid: number;
   changeGiven: number; // This tracks cash that has been physically returned or settled.
   balanceDue: number; // Positive if customer owes money, negative if change is owed to customer
+  pardonedAmount: number; // For tracking accepted deficits
   status: 'Pending' | 'Completed';
   timestamp: Timestamp;
   creditSource?: string[]; // Note for traceability, e.g., "Converted to credit for [customerTag]"
   lastPaymentTimestamp?: Timestamp;
   lastPaymentAmount?: number;
+  notes?: string;
 }
 
 export interface MiscExpense {

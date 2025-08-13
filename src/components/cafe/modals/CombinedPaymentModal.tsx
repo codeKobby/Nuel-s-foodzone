@@ -38,19 +38,15 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     }, [orders]);
     
     const amountPaidNum = parseFloat(amountPaidInput);
-    const finalAmountPaid = !amountPaidInput || isNaN(amountPaidNum) ? totalToPay : amountPaidNum;
-    const finalBalanceDue = finalAmountPaid - totalToPay;
+    const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
+    const finalAmountPaid = isAmountPaidEntered ? amountPaidNum : totalToPay;
 
 
     const processCombinedPayment = async () => {
         setIsProcessing(true);
         setError(null);
 
-        if (paymentMethod === 'cash' && amountPaidInput && amountPaidNum < totalToPay) {
-            setError('Cash paid cannot be less than the total amount.');
-            setIsProcessing(false);
-            return;
-        }
+        const pardonedAmount = finalAmountPaid < totalToPay ? totalToPay - finalAmountPaid : 0;
 
         try {
             const batch = writeBatch(db);
@@ -61,13 +57,15 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             const ordersToPay = orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0).sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
 
             for (const order of ordersToPay) {
+                if (amountToDistribute <= 0 && pardonedAmount === 0) break;
+
                 const orderRef = doc(db, "orders", order.id);
                 const orderBalance = order.balanceDue;
                 const amountToPayForOrder = Math.min(amountToDistribute, orderBalance);
                 
                 const newAmountPaid = order.amountPaid + amountToPayForOrder;
                 const newBalanceDue = orderBalance - amountToPayForOrder;
-
+                
                 const updateData: any = {
                     paymentMethod: paymentMethod,
                     paymentStatus: newBalanceDue <= 0 ? 'Paid' : 'Partially Paid',
@@ -75,6 +73,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     balanceDue: newBalanceDue,
                     lastPaymentTimestamp: now,
                     lastPaymentAmount: amountToPayForOrder,
+                    pardonedAmount: 0 // Reset pardoned amount for this order initially
                 };
 
                 if (newBalanceDue <= 0) {
@@ -85,13 +84,25 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 amountToDistribute -= amountToPayForOrder;
             }
             
-            if (amountToDistribute > 0 && ordersToPay.length > 0) {
-                const lastOrder = ordersToPay[ordersToPay.length - 1];
-                const lastOrderRef = doc(db, "orders", lastOrder.id);
-                batch.update(lastOrderRef, { 
-                    balanceDue: -amountToDistribute, // Negative balance due is change owed
-                });
+            // Distribute change or pardoned amounts
+            if (ordersToPay.length > 0) {
+                 const lastOrder = ordersToPay[ordersToPay.length - 1];
+                 const lastOrderRef = doc(db, "orders", lastOrder.id);
+                 
+                 // If there's change left over
+                 if(amountToDistribute > 0) {
+                    batch.update(lastOrderRef, { balanceDue: -amountToDistribute }); // Negative balance due is change
+                 } 
+                 // If there was a deficit
+                 else if (pardonedAmount > 0) {
+                    const lastOrderData = (await getDoc(lastOrderRef)).data() as Order;
+                    batch.update(lastOrderRef, {
+                        pardonedAmount: (lastOrderData.pardonedAmount || 0) + pardonedAmount,
+                        notes: `Combined payment deficit of ${formatCurrency(pardonedAmount)} pardoned.`
+                    });
+                 }
             }
+
 
             await batch.commit();
             onOrderPlaced();
@@ -102,6 +113,9 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             setIsProcessing(false);
         }
     };
+    
+    const balance = isAmountPaidEntered ? finalAmountPaid - totalToPay : 0;
+
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -135,12 +149,21 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                         <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'secondary'}>Momo/Card</Button>
                     </div>
                     {paymentMethod === 'cash' && (
-                        <div className="space-y-4">
-                            <div>
-                                <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
+                        <div className="space-y-2">
+                             <div>
+                                <Label htmlFor="cashPaid">Amount Paid by Customer (Optional)</Label>
+                                <div className="flex gap-2">
                                 <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                    <Button variant="outline" onClick={() => setAmountPaidInput(String(totalToPay))} className="h-12">Exact</Button>
+                                </div>
                             </div>
-                            {amountPaidInput && finalBalanceDue > 0 && <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(finalBalanceDue)}</p>}
+                            
+                            {isAmountPaidEntered && balance > 0 && (
+                                <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(balance)}</p>
+                            )}
+                            {isAmountPaidEntered && balance < 0 && (
+                                <p className="font-semibold text-orange-500 text-center">Deficit (Pardoned): {formatCurrency(Math.abs(balance))}</p>
+                            )}
                         </div>
                     )}
                      {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
@@ -148,7 +171,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 
                 <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
                     <Button onClick={processCombinedPayment} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
-                        {isProcessing ? 'Processing...' : 'Confirm Payment'}
+                        {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
