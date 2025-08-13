@@ -1,7 +1,8 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
-import { collection, onSnapshot, runTransaction, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Search, ShoppingBag, Plus, Minus, PlusCircle, X, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
@@ -15,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import OrderOptionsModal from './modals/OrderOptionsModal';
 import BreakfastModal from './modals/BreakfastModal';
 import CustomOrderModal from './modals/CustomOrderModal';
-import PartialSettleModal from './modals/PartialSettleModal';
+import ChangeDueModal from './modals/ChangeDueModal';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
   AlertDialog,
@@ -76,7 +77,7 @@ const OrderCart: React.FC<OrderCartProps> = ({ currentOrder, total, updateQuanti
                                     <p className="text-xs text-muted-foreground">{formatCurrency(item.price)}</p>
                                 </div>
                                 <div className="flex items-center space-x-1">
-                                    <Button size="icon" variant="ghost" className="h-6 w-6 rounded-full" onClick={()={() => updateQuantity(item.id, -1)}}><Minus size={14} /></Button>
+                                    <Button size="icon" variant="ghost" className="h-6 w-6 rounded-full" onClick={() => updateQuantity(item.id, -1)}><Minus size={14} /></Button>
                                     <Input 
                                         type="number"
                                         value={item.quantity}
@@ -84,9 +85,9 @@ const OrderCart: React.FC<OrderCartProps> = ({ currentOrder, total, updateQuanti
                                         onBlur={(e) => handleQuantityBlur(e, item.id)}
                                         className="font-bold w-10 text-center h-7 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
-                                    <Button size="icon" variant="ghost" className="h-6 w-6 rounded-full" onClick={()={() => updateQuantity(item.id, 1)}}><Plus size={14} /></Button>
+                                    <Button size="icon" variant="ghost" className="h-6 w-6 rounded-full" onClick={() => updateQuantity(item.id, 1)}><Plus size={14} /></Button>
                                 </div>
-                                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full ml-1 text-red-500" onClick={()={() => removeItem(item.id)}}><Trash2 size={16} /></Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full ml-1 text-red-500" onClick={() => removeItem(item.id)}><Trash2 size={16} /></Button>
                             </div>
                         ))}
                     </div>
@@ -343,14 +344,14 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                                     variant="ghost" 
                                     size="icon" 
                                     className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full" 
-                                    onClick={()={() => setSearchQuery('')}
+                                    onClick={() => setSearchQuery('')}
                                 >
                                     <X size={16} />
                                 </Button>
                             )}
                         </div>
                         <Button
-                            onClick={()={() => setShowCustomOrderModal(true)}
+                            onClick={() => setShowCustomOrderModal(true)}
                             className="h-10 px-3 rounded-lg"
                             variant="outline"
                         >
@@ -361,7 +362,7 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                         {categories.map(category => (
                             <Button
                                 key={category}
-                                onClick={()={() => setActiveCategory(category)}
+                                onClick={() => setActiveCategory(category)}
                                 variant={activeCategory === category ? 'default' : 'secondary'}
                                 size="sm"
                                 className="flex-shrink-0 rounded-md"
@@ -376,7 +377,7 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                 {!loading && !error && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pt-4">
                         {filteredItems.map(item => (
-                            <Card key={item.id} onClick={()={() => addToOrder(item)} className="cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1 hover:border-primary/50">
+                            <Card key={item.id} onClick={() => addToOrder(item)} className="cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1 hover:border-primary/50">
                                 <CardHeader className="p-2 md:p-3">
                                     <CardTitle className="text-sm md:text-base leading-tight">{item.name}</CardTitle>
                                     <CardDescription className="text-xs">{item.category}</CardDescription>
@@ -433,14 +434,13 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                 />
             )}
             {orderWithChangeDue && (
-                 <PartialSettleModal
-                    order={orderWithChangeDue}
+                 <ChangeDueModal
+                    orderForPopup={orderWithChangeDue}
                     onClose={() => {
                         setOrderWithChangeDue(null);
                         setActiveView('orders');
                     }}
                     onSettle={handleSettleChange}
-                    isPopup={true}
                 />
             )}
             {showBreakfastModal && (

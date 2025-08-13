@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc, writeBatch, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, writeBatch, serverTimestamp, collection, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
 import type { OrderItem, Order } from '@/lib/types';
@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { cn } from '@/lib/utils';
-import { Timestamp } from 'firebase/firestore';
+
 
 interface OrderOptionsModalProps {
     total: number;
@@ -32,7 +32,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     const [amountPaidInput, setAmountPaidInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [exactButtonClicked, setExactButtonClicked] = useState(false);
 
     useEffect(() => {
         if (editingOrder) {
@@ -40,15 +39,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             setOrderTag(editingOrder.tag || '');
         }
     }, [editingOrder]);
-    
-    const handleAmountPaidChange = (value: string) => {
-        setAmountPaidInput(value);
-        setExactButtonClicked(false);
-    };
 
     const handleExactAmountClick = () => {
         setAmountPaidInput(String(total));
-        setExactButtonClicked(true);
     };
 
     const handleProceedToPayment = () => {
@@ -66,7 +59,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             return;
         }
         setError(null);
-        setAmountPaidInput('');
+        setAmountPaidInput('0');
         processOrder({ isPaid: false });
     };
 
@@ -124,7 +117,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 orderData.balanceDue = newBalanceDue;
 
                 if (newTotalPaid === 0) {
-                    orderData.paymentStatus = 'Unpaid';
+                     orderData.paymentStatus = 'Unpaid';
                 } else if (newBalanceDue <= 0) { 
                     orderData.paymentStatus = 'Paid';
                 } else {
@@ -134,7 +127,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 orderData.status = (orderData.paymentStatus === 'Unpaid' || orderData.paymentStatus === 'Partially Paid') ? 'Pending' : 'Completed';
                 
                 await updateDoc(orderRef, orderData);
-                finalOrder = { ...existingOrderData, ...orderData, id: editingOrder.id };
+                finalOrder = { ...existingOrderData, ...orderData, id: editingOrder.id, timestamp: existingOrderData.timestamp };
 
             } else {
                 let paymentStatus: Order['paymentStatus'] = 'Unpaid';
@@ -231,8 +224,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                             <div className="space-y-2">
                                 <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
                                 <div className="flex gap-2">
-                                    <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => handleAmountPaidChange(e.target.value)} placeholder="Enter amount..." onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
-                                    <Button onClick={handleExactAmountClick} variant="outline" className={cn("h-12", exactButtonClicked ? "bg-green-500 hover:bg-green-600 text-white" : "")}>Exact</Button>
+                                    <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Enter amount..." onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                    <Button onClick={handleExactAmountClick} variant="outline" className="h-12">Exact</Button>
                                 </div>
                                  {change > 0 && (
                                     <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(change)}</p>
@@ -271,5 +264,3 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 };
 
 export default OrderOptionsModal;
-
-    
