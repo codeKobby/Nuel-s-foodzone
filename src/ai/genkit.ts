@@ -3,9 +3,6 @@ import {googleAI} from '@genkit-ai/googleai';
 
 export const ai = genkit({
   plugins: [googleAI()],
-  model: 'googleai/gemini-1.5-flash-latest',
+  logLevel: 'debug',
   enableTracing: true,
-  flowStateStore: 'firebase',
-  traceStore: 'firebase',
-  cache: 'firebase'
 });

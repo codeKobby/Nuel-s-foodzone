@@ -79,5 +79,3 @@ export const groupOrdersByDate = <T extends Order | MiscExpense>(items: T[]): Re
 
     return grouped;
 };
-
-    

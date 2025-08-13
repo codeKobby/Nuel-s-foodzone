@@ -161,7 +161,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                         <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Leave blank for exact amount" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
                                     </div>
                                     {amountPaidInput && finalBalanceDue > 0 && <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(finalBalanceDue)}</p>}
-                                    {amountPaidInput && finalBalanceDue < 0 && <p className="font-semibold text-yellow-500 text-center">Balance Remaining: {formatCurrency(Math.abs(finalBalanceDue))}</p>}
                                 </div>
                             )}
                              {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
