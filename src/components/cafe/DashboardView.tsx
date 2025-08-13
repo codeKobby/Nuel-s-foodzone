@@ -323,7 +323,7 @@ const DashboardView: React.FC = () => {
                 totalOrders: stats.totalOrders,
                 avgOrderValue: stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0,
                 itemPerformance: stats.itemPerformance.slice(0, 10), // Send top 10 items
-                cashDiscrepancy: stats.totalDiscrepancy ?? 0,
+                cashDiscrepancy: stats.totalDiscrepancy || 0,
                 miscExpenses: stats.totalMiscExpenses,
             };
             const result = await analyzeBusiness(input);
@@ -910,6 +910,7 @@ const DashboardView: React.FC = () => {
 export default DashboardView;
 
     
+
 
 
 
