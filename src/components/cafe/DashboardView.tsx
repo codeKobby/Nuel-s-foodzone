@@ -21,7 +21,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { businessChat } from '@/ai/flows/business-chat-flow';
-import { analyzeBusiness } from '@/ai/flows/analyze-business-flow';
 import { type BusinessChatInput, type AnalyzeBusinessInput } from '@/ai/schemas';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -98,11 +97,11 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
 
 const chartConfig = {
   sales: {
-    label: "Sales",
+    label: "Total Sales",
     color: "hsl(var(--primary))",
   },
    revenue: {
-    label: "Revenue",
+    label: "Net Revenue",
     color: "hsl(var(--chart-1))",
   },
 } satisfies ChartConfig
@@ -168,7 +167,7 @@ const DashboardView: React.FC = () => {
             const [allOrdersSnapshot, miscSnapshot, reportsSnapshot] = await Promise.all([
                 getDocs(allOrdersQuery),
                 getDocs(miscQuery),
-                getDocs(reportsSnapshot),
+                getDocs(reportsQuery),
             ]);
 
             // Process Orders
@@ -809,16 +808,15 @@ const DashboardView: React.FC = () => {
                                             content={<ChartTooltipContent
                                                 formatter={(value, name) => {
                                                     const formattedValue = formatCurrency(Number(value));
-                                                    const label = name === 'sales' ? 'Total Sales' : 'Net Revenue';
-                                                    return `${formattedValue}`;
+                                                    return <span>{formattedValue}</span>;
                                                 }}
                                                 labelClassName="font-bold"
                                                 indicator="dot"
                                             />}
                                         />
                                         <Legend />
-                                        <Line name="Total Sales" dataKey="sales" stroke="hsl(var(--primary))" strokeWidth={2} dot={true} />
-                                        <Line name="Net Revenue" dataKey="revenue" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={true} />
+                                        <Line name="Total Sales" type="monotone" dataKey="sales" stroke="hsl(var(--primary))" strokeWidth={2} dot={true} />
+                                        <Line name="Net Revenue" type="monotone" dataKey="revenue" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={true} />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </ChartContainer>
@@ -977,4 +975,3 @@ const DashboardView: React.FC = () => {
 
 export default DashboardView;
 
-    
