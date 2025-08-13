@@ -166,12 +166,12 @@ const DashboardView: React.FC = () => {
             const reconciliationReportsRef = collection(db, "reconciliationReports");
             const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
 
-
             const [allOrdersSnapshot, miscSnapshot, reportsSnapshot] = await Promise.all([
                 getDocs(allOrdersQuery),
                 getDocs(miscQuery),
                 getDocs(reportsQuery),
             ]);
+
 
             // Process Orders
             let cashSales = 0, momoSales = 0, totalSales = 0, totalOrders = 0, totalPardonedAmount = 0, totalItemsSold = 0;
@@ -435,7 +435,7 @@ const DashboardView: React.FC = () => {
 
         try {
             const input: BusinessChatInput = {
-                history: newHistory, // Pass full history including new user message
+                history: newHistory.map(m => ({...m, parts: [{text: m.content}]})),
                 prompt: '', // Prompt is now part of history
             };
             const response = await businessChat(input);
@@ -808,22 +808,12 @@ const DashboardView: React.FC = () => {
                         </CardHeader>
                         <CardContent>
                             <ChartContainer config={chartConfig} className="h-[250px] md:h-[300px] w-full">
-                                <AreaChart data={stats.salesData} margin={{ top: 20, right: 20, bottom: 5, left: 0 }}>
-                                    <defs>
-                                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="var(--color-sales)" stopOpacity={0.8}/>
-                                            <stop offset="95%" stopColor="var(--color-sales)" stopOpacity={0.1}/>
-                                        </linearGradient>
-                                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.8}/>
-                                            <stop offset="95%" stopColor="var(--color-revenue)" stopOpacity={0.1}/>
-                                        </linearGradient>
-                                    </defs>
+                                <LineChart data={stats.salesData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                                     <CartesianGrid vertical={false} />
                                     <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} />
                                     <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
                                     <Tooltip
-                                        cursor={false}
+                                        cursor={true}
                                         content={<ChartTooltipContent
                                             formatter={(value, name) => (
                                                 <div className="flex items-center gap-2">
@@ -834,9 +824,9 @@ const DashboardView: React.FC = () => {
                                             labelClassName="font-bold"
                                         />}
                                     />
-                                    <Area type="linear" dataKey="sales" stroke="var(--color-sales)" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
-                                    <Area type="linear" dataKey="revenue" stroke="var(--color-revenue)" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
-                                </AreaChart>
+                                    <Line type="linear" dataKey="sales" stroke="var(--color-sales)" strokeWidth={2} dot={stats.salesData.length === 1} />
+                                    <Line type="linear" dataKey="revenue" stroke="var(--color-revenue)" strokeWidth={2} dot={stats.salesData.length === 1} />
+                                </LineChart>
                             </ChartContainer>
                         </CardContent>
                     </Card>
@@ -992,9 +982,3 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
-
-
-
-    
-
-    

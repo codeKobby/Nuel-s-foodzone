@@ -10,10 +10,10 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const formatCurrency = (amount: number) => {
-    if (isNaN(amount)) {
+    if (isNaN(amount) || amount === null) {
         return 'GH₵0.00';
     }
-    return `GH₵${(amount || 0).toFixed(2)}`;
+    return `GH₵${amount.toFixed(2)}`;
 };
 
 export const formatTimestamp = (timestamp: any, timeOnly: boolean = false): string => {
