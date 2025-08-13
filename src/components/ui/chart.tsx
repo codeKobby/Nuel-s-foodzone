@@ -358,6 +358,7 @@ function getPayloadConfigFromPayload(
 const ChartYAxis = RechartsPrimitive.YAxis;
 const ChartXAxis = RechartsPrimitive.XAxis;
 const ChartLine = RechartsPrimitive.Line;
+const ChartArea = RechartsPrimitive.Area;
 
 
 export {
@@ -369,5 +370,8 @@ export {
   ChartStyle,
   ChartYAxis,
   ChartXAxis,
-  ChartLine
+  ChartLine,
+  ChartArea
 }
+
+    

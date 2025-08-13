@@ -6,14 +6,14 @@ import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, add
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport, ChatSession, AnalyzeBusinessOutput } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, ArrowDownUp, SortAsc, SortDesc, Ban } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, ArrowDownUp, SortAsc, SortDesc, Ban, Package } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart"
-import { LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
+import { LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { DateRange } from "react-day-picker"
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, endOfToday } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -54,10 +54,12 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Badge } from '../ui/badge';
 import OrderDetailsModal from './modals/OrderDetailsModal';
+import { analyzeBusiness } from '@/ai/flows/analyze-business-flow';
 
 
 interface DashboardStats {
     totalSales: number;
+    totalItemsSold: number;
     netRevenue: number;
     unpaidOrdersValue: number;
     totalMiscExpenses: number;
@@ -82,7 +84,7 @@ type ItemSortDirection = 'asc' | 'desc';
 type PresetDateRange = 'today' | 'week' | 'month' | 'custom';
 
 
-const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, description?: string, onClick?: () => void }> = ({ icon, title, value, description, onClick }) => (
+const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, description?: string, onClick?: () => void, children?: React.ReactNode }> = ({ icon, title, value, description, onClick, children }) => (
     <Card onClick={onClick} className={onClick ? 'cursor-pointer hover:bg-secondary' : ''}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -91,6 +93,7 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
         <CardContent>
             <div className="text-2xl font-bold">{value}</div>
             {description && <p className="text-xs text-muted-foreground">{description}</p>}
+            {children}
         </CardContent>
     </Card>
 );
@@ -98,11 +101,11 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
 const chartConfig = {
   sales: {
     label: "Total Sales",
-    color: "hsl(var(--primary))",
+    color: "hsl(var(--chart-1))",
   },
    revenue: {
     label: "Net Revenue",
-    color: "hsl(var(--chart-1))",
+    color: "hsl(var(--chart-2))",
   },
 } satisfies ChartConfig
 
@@ -171,7 +174,7 @@ const DashboardView: React.FC = () => {
             ]);
 
             // Process Orders
-            let cashSales = 0, momoSales = 0, totalSales = 0, totalOrders = 0, totalPardonedAmount = 0;
+            let cashSales = 0, momoSales = 0, totalSales = 0, totalOrders = 0, totalPardonedAmount = 0, totalItemsSold = 0;
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             const salesByDay: Record<string, { sales: number; revenue: number }> = {};
             let unpaidOrdersValue = 0;
@@ -201,6 +204,7 @@ const DashboardView: React.FC = () => {
                     salesByDay[dayKey].sales += order.total;
 
                     order.items.forEach(item => {
+                        totalItemsSold += item.quantity;
                         const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
                         itemStats[item.name] = {
                             count: currentStats.count + item.quantity,
@@ -304,6 +308,7 @@ const DashboardView: React.FC = () => {
 
             setStats({
                 totalSales,
+                totalItemsSold,
                 netRevenue,
                 totalOrders,
                 cashSales,
@@ -430,8 +435,8 @@ const DashboardView: React.FC = () => {
 
         try {
             const input: BusinessChatInput = {
-                history: newHistory.slice(0, -1), // Pass previous messages for context
-                prompt: currentInput,
+                history: newHistory, // Pass full history including new user message
+                prompt: '', // Prompt is now part of history
             };
             const response = await businessChat(input);
             const newModelMessage: ChatMessage = { role: 'model', content: response };
@@ -761,7 +766,12 @@ const DashboardView: React.FC = () => {
                 )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-6">
-                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Completed orders in period"/>
+                    <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)}>
+                         <div className="text-xs text-muted-foreground flex items-center pt-1">
+                            <Package className="mr-1.5 h-3 w-3"/>
+                            {stats.totalItemsSold} items from {stats.totalOrders} orders
+                        </div>
+                    </StatCard>
                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - Expenses - Pardons"/>
                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} />
                      <StatCard 
@@ -798,27 +808,35 @@ const DashboardView: React.FC = () => {
                         </CardHeader>
                         <CardContent>
                             <ChartContainer config={chartConfig} className="h-[250px] md:h-[300px] w-full">
-                                <ResponsiveContainer>
-                                    <LineChart data={stats.salesData} margin={{ top: 20, right: 20, bottom: 5, left: 0 }}>
-                                        <CartesianGrid vertical={false} />
-                                        <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} />
-                                        <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
-                                        <Tooltip
-                                            cursor={false}
-                                            content={<ChartTooltipContent
-                                                formatter={(value, name) => {
-                                                    const formattedValue = formatCurrency(Number(value));
-                                                    return <span>{formattedValue}</span>;
-                                                }}
-                                                labelClassName="font-bold"
-                                                indicator="dot"
-                                            />}
-                                        />
-                                        <Legend />
-                                        <Line name="Total Sales" type="monotone" dataKey="sales" stroke="hsl(var(--primary))" strokeWidth={2} dot={true} />
-                                        <Line name="Net Revenue" type="monotone" dataKey="revenue" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={true} />
-                                    </LineChart>
-                                </ResponsiveContainer>
+                                <AreaChart data={stats.salesData} margin={{ top: 20, right: 20, bottom: 5, left: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="var(--color-sales)" stopOpacity={0.8}/>
+                                            <stop offset="95%" stopColor="var(--color-sales)" stopOpacity={0.1}/>
+                                        </linearGradient>
+                                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.8}/>
+                                            <stop offset="95%" stopColor="var(--color-revenue)" stopOpacity={0.1}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid vertical={false} />
+                                    <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} />
+                                    <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
+                                    <Tooltip
+                                        cursor={false}
+                                        content={<ChartTooltipContent
+                                            formatter={(value, name) => (
+                                                <div className="flex items-center gap-2">
+                                                    <div className={cn("w-2 h-2 rounded-full", name === 'sales' ? 'bg-[--color-sales]' : 'bg-[--color-revenue]')}></div>
+                                                    <span className="capitalize">{name === 'sales' ? 'Total Sales' : 'Net Revenue'}: {formatCurrency(Number(value))}</span>
+                                                </div>
+                                            )}
+                                            labelClassName="font-bold"
+                                        />}
+                                    />
+                                    <Area type="linear" dataKey="sales" stroke="var(--color-sales)" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
+                                    <Area type="linear" dataKey="revenue" stroke="var(--color-revenue)" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
+                                </AreaChart>
                             </ChartContainer>
                         </CardContent>
                     </Card>
@@ -975,3 +993,6 @@ const DashboardView: React.FC = () => {
 
 export default DashboardView;
 
+
+
+    
