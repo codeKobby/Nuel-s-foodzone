@@ -43,9 +43,10 @@ interface OrderCardProps {
     onStatusUpdate: (id: string, status: 'Pending' | 'Completed') => void;
     onEdit: (order: Order) => void;
     onDelete: (order: Order) => void;
+    onChangeDueClick: (order: Order) => void;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionChange, onDetailsClick, onStatusUpdate, onEdit, onDelete }) => {
+const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionChange, onDetailsClick, onStatusUpdate, onEdit, onDelete, onChangeDueClick }) => {
     
     const paymentStatusConfig = {
         'Paid': {
@@ -103,9 +104,9 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                     </p>
                 }
                  {isChangeOwedToCustomer && 
-                    <p className="text-sm text-red-500 flex items-center">
+                    <Button variant="link" className="p-0 h-auto text-sm text-red-500 flex items-center" onClick={() => onChangeDueClick(order)}>
                         <Coins size={14} className="inline mr-2"/>Change Due: {formatCurrency(Math.abs(order.balanceDue))}
-                    </p>
+                    </Button>
                 }
                 <p className="text-xs text-muted-foreground mt-2 flex items-center"><CalendarDays size={12} className="inline mr-1.5" />{formatTimestamp(order.timestamp)}</p>
             </CardContent>
@@ -132,7 +133,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-    const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
+    const [changeDueOrder, setChangeDueOrder] = useState<Order | null>(null);
     const [isCombinedPaymentModalOpen, setIsCombinedPaymentModalOpen] = useState(false);
     const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
     const [timeRange, setTimeRange] = useState('Today');
@@ -221,6 +222,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                     lastPaymentTimestamp: serverTimestamp(),
                 });
             });
+            setChangeDueOrder(null);
         } catch (e) {
             console.error(e);
             setError("Failed to settle change.");
@@ -263,7 +265,6 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
         };
     }, [orders, filteredOrdersByTime, searchQuery]);
     
-    const changeDueOrders = useMemo(() => orders.filter(o => o.balanceDue < 0), [orders]);
     const selectedOrders = useMemo(() => orders.filter(o => selectedOrderIds.has(o.id)), [orders, selectedOrderIds]);
     const pendingOrdersCount = useMemo(() => Object.values(finalFilteredOrders.pending).flat().length, [finalFilteredOrders.pending]);
     const unpaidOrdersCount = useMemo(() => Object.values(finalFilteredOrders.unpaid).flat().length, [finalFilteredOrders.unpaid]);
@@ -296,6 +297,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                                     onSelectionChange={handleSelectionChange}
                                     onEdit={handleEditOrder}
                                     onDelete={setOrderToDelete}
+                                    onChangeDueClick={setChangeDueOrder}
                                 />
                             )}
                         </div>
@@ -323,19 +325,6 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                         />
                     </div>
                     <div className="flex items-center space-x-2 w-full md:w-auto">
-                        {changeDueOrders.length > 0 && (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="outline" size="icon" className="relative" onClick={() => setIsChangeModalOpen(true)}>
-                                        <HandCoins className="text-red-500" />
-                                        <Badge className="absolute -top-2 -right-2 h-5 w-5 justify-center p-0">{changeDueOrders.length}</Badge>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>View Orders with Change Due</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        )}
                         {selectedOrderIds.size > 0 && (
                              <Tooltip>
                                 <TooltipTrigger asChild>
@@ -374,7 +363,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                 </Tabs>
 
                 {selectedOrder && <OrderDetailsModal order={selectedOrder} onEdit={handleEditOrder} onClose={() => setSelectedOrder(null)} />}
-                {isChangeModalOpen && <ChangeDueModal orders={changeDueOrders} onSettle={settleChange} onClose={() => setIsChangeModalOpen(false)} />}
+                {changeDueOrder && <ChangeDueModal order={changeDueOrder} onSettle={settleChange} onClose={() => setChangeDueOrder(null)} />}
                 {isCombinedPaymentModalOpen && <CombinedPaymentModal orders={selectedOrders} onOrderPlaced={handleCombinedPaymentSuccess} onClose={() => setIsCombinedPaymentModalOpen(false)} />}
 
                 {orderToDelete && (

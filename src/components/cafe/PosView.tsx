@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
-import { collection, onSnapshot, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, runTransaction, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Search, ShoppingBag, Plus, Minus, PlusCircle, X, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
@@ -442,7 +442,6 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                         setActiveView('orders');
                     }}
                     onSettle={handleSettleChange}
-                    isPopup={true}
                 />
             )}
             {showBreakfastModal && (
