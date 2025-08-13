@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -52,7 +53,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     const amountPaidNum = parseFloat(amountPaidInput);
     const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
     
-    // If exact button is clicked, it's an exact payment. Otherwise, if no input, it's 0.
     const finalAmountPaid = paymentMethod === 'momo' ? total : (isAmountPaidEntered ? amountPaidNum : 0);
     
     const deficit = isAmountPaidEntered && finalAmountPaid < total ? total - finalAmountPaid : 0;
@@ -65,7 +65,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         }
         setError(null);
         setStep(2);
-    }
+    };
     
     const handlePayLater = () => {
         if (!orderTag) {
@@ -73,10 +73,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             return;
         }
         setError(null);
-        // Treat leaving amount paid blank as pay later
         setAmountPaidInput('');
         processOrder({ isPaid: false });
-    }
+    };
 
     const processOrder = async (options: { isPaid: boolean, pardonDeficit?: boolean }) => {
         setIsProcessing(true);
@@ -121,7 +120,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             orderData.lastPaymentAmount = finalAmountPaid;
         }
         
-        orderData.status = (balanceDue > 0 || paymentStatus === 'Partially Paid') ? 'Pending' : 'Completed';
+        orderData.status = (paymentStatus === 'Unpaid' || paymentStatus === 'Partially Paid') ? 'Pending' : 'Completed';
 
 
         let finalOrder: Order;
@@ -138,7 +137,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 orderData.amountPaid = newTotalPaid;
                 orderData.balanceDue = newBalanceDue;
                 
-                if (newBalanceDue <= 0 && isPaid) { // Only mark fully paid if a payment was made
+                if (newBalanceDue <= 0 && isPaid) { 
                     orderData.paymentStatus = 'Paid';
                     orderData.status = 'Completed';
                 } else if(isPaid) {
@@ -156,9 +155,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 const counterSnap = await getDoc(counterRef);
                 const newCount = (counterSnap.exists() ? counterSnap.data().count : 0) + 1;
                 
-                const newOrder: Omit<Order, 'timestamp'> = {
+                const newOrder: Omit<Order, 'timestamp' | 'id'> = {
                     ...orderData,
-                    id: newOrderRef.id,
                     simplifiedId: generateSimpleOrderId(newCount),
                     timestamp: serverTimestamp()
                 };
@@ -181,7 +179,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     };
     
     const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && deficit > 0;
-    const canConfirmPayment = paymentMethod === 'momo' || (paymentMethod === 'cash' && isAmountPaidEntered);
+    const canConfirmPayment = paymentMethod === 'momo' || (paymentMethod === 'cash' && (isAmountPaidEntered || amountPaidInput === ''));
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -197,7 +195,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                 <Label>Order Type</Label>
                                 <div className="flex space-x-2 mt-2">
                                     {(['Dine-In', 'Takeout', 'Delivery'] as const).map(type => (
-                                        <Button key={type} onClick={()={() => setOrderType(type)} variant={orderType === type ? 'default' : 'secondary'} className="flex-1">{type}</Button>
+                                        <Button key={type} onClick={() => setOrderType(type)} variant={orderType === type ? 'default' : 'secondary'} className="flex-1">{type}</Button>
                                     ))}
                                 </div>
                             </div>
@@ -222,8 +220,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                         </DialogHeader>
                         <div className="space-y-4">
                             <div className="flex justify-center space-x-4">
-                                <Button onClick={()={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'secondary'}>Cash</Button>
-                                <Button onClick={()={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'secondary'}>Momo/Card</Button>
+                                <Button onClick={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'secondary'}>Cash</Button>
+                                <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'secondary'}>Momo/Card</Button>
                             </div>
                            
                             {paymentMethod === 'cash' && (
@@ -248,15 +246,15 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                         <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
                            {showDeficitOptions ? (
                                 <div className="grid grid-cols-2 gap-2">
-                                     <Button onClick={()={() => processOrder({ isPaid: true, pardonDeficit: true })} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-base">
+                                     <Button onClick={() => processOrder({ isPaid: true, pardonDeficit: true })} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-base">
                                         {isProcessing ? <LoadingSpinner /> : 'Pardon Deficit'}
                                     </Button>
-                                     <Button onClick={()={() => processOrder({ isPaid: true, pardonDeficit: false })} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white h-12 text-base">
+                                     <Button onClick={() => processOrder({ isPaid: true, pardonDeficit: false })} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white h-12 text-base">
                                         {isProcessing ? <LoadingSpinner /> : 'Create Unpaid Balance'}
                                     </Button>
                                 </div>
                            ) : (
-                             <Button onClick={()={() => processOrder({ isPaid: true })} disabled={isProcessing || !canConfirmPayment} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                             <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing || !canConfirmPayment} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
                                 {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
                             </Button>
                            )}
