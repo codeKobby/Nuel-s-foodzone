@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState } from 'react';
@@ -37,17 +35,9 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ orders, order, isPopup 
         onSettle(orderId, amount);
         setSettleOrder(null);
     };
-
-    if (isPopup && order) {
-        return (
-            <PartialSettleModal 
-                order={order}
-                onClose={onClose}
-                onSettle={onSettle}
-                isPopup={true}
-            />
-        )
-    }
+    
+    // The popup is now handled directly by POSView, this modal is only for the list view from OrdersView
+    if (isPopup) return null;
 
     return (
         <>
@@ -120,4 +110,3 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ orders, order, isPopup 
 };
 
 export default ChangeDueModal;
-

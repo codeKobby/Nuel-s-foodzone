@@ -1,5 +1,3 @@
-
-
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
@@ -40,6 +38,7 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         let changeOwed = 0;
         let totalOrders = 0;
         let totalSales = 0;
+        let totalPardonedAmount = 0;
         const itemCounts: Record<string, number> = {};
 
         allOrdersSnapshot.forEach(doc => {
@@ -55,6 +54,10 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
                     order.items.forEach(item => {
                         itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
                     });
+                }
+                
+                if (order.pardonedAmount && order.pardonedAmount > 0) {
+                    totalPardonedAmount += order.pardonedAmount;
                 }
             }
 
@@ -86,7 +89,7 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             totalDiscrepancy += report.totalDiscrepancy;
         });
 
-        const netSales = (cashSales + momoSales) - totalMiscExpenses;
+        const netSales = (cashSales + momoSales) - totalMiscExpenses - totalPardonedAmount;
         const itemPerformance = Object.entries(itemCounts)
             .sort(([, a], [, b]) => b - a)
             .map(([name, count]) => ({ name, count }));

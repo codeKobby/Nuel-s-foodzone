@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -7,7 +6,7 @@ import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serve
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass, ShoppingCart, Lock, X } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass, ShoppingCart, Lock, X, Ban } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -59,6 +58,7 @@ interface PeriodStats {
     totalExpectedRevenue: number;
     netRevenue: number;
     unpaidOrdersValue: number;
+    totalPardonedAmount: number;
     orders: Order[];
     itemStats: Record<string, { count: number; totalValue: number }>;
 }
@@ -117,7 +117,11 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     }, [momoTransactions]);
 
     const totalCountedRevenue = useMemo(() => totalCountedCash + totalCountedMomo, [totalCountedCash, totalCountedMomo]);
-    const totalDiscrepancy = useMemo(() => totalCountedRevenue - (stats?.totalExpectedRevenue || 0), [totalCountedRevenue, stats]);
+    
+    const totalDiscrepancy = useMemo(() => {
+        if (!stats) return 0;
+        return totalCountedRevenue - stats.totalExpectedRevenue;
+    }, [totalCountedRevenue, stats]);
     
     const handleDenominationChange = (value: string, denomination: string) => {
         setDenominationQuantities(prev => ({ ...prev, [denomination]: value }));
@@ -170,6 +174,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const periodOrders: Order[] = [];
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             let unpaidOrdersValue = 0;
+            let totalPardonedAmount = 0;
 
             allUnpaidOrdersSnapshot.docs.forEach(doc => {
                  const order = { id: doc.id, ...doc.data() } as Order;
@@ -182,6 +187,13 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const orderDate = order.timestamp.toDate();
                 if (orderDate >= startDate && orderDate <= endDate) {
                     periodOrders.push(order);
+                }
+                
+                // Pardoned amount for the period
+                if (orderDate >= startDate && orderDate <= endDate) {
+                    if (order.pardonedAmount && order.pardonedAmount > 0) {
+                        totalPardonedAmount += order.pardonedAmount;
+                    }
                 }
 
                 // Add to total sales and item performance only if completed within the period
@@ -219,12 +231,12 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             });
             
             const totalSales = totalSalesToday;
-            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses);
+            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses) - totalPardonedAmount;
             const expectedCash = cashSales - miscCashExpenses;
             const expectedMomo = momoSales - miscMomoExpenses;
             const totalExpectedRevenue = expectedCash + expectedMomo;
             
-            setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, expectedMomo, totalExpectedRevenue, netRevenue, unpaidOrdersValue, orders: periodOrders, itemStats });
+            setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, expectedMomo, totalExpectedRevenue, netRevenue, unpaidOrdersValue, totalPardonedAmount, orders: periodOrders, itemStats });
         } catch (e) {
             console.error(e);
             setError("Failed to load financial data for the selected period.");
@@ -556,13 +568,13 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
                                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Orders (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
                                     <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses (Cash)" value={formatCurrency(stats.miscCashExpenses)} />
-                                     <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses (MoMo)" value={formatCurrency(stats.miscMomoExpenses)} />
+                                    <StatCard icon={<Ban className="text-red-500" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} />
                                 </CardContent>
                                 <CardFooter>
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
                                         <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Net Revenue</Label>
                                         <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.netRevenue)}</p>
-                                        <p className="text-xs text-muted-foreground">(Paid Sales - Misc. Expenses)</p>
+                                        <p className="text-xs text-muted-foreground">(Paid Sales - Expenses - Pardons)</p>
                                     </div>
                                 </CardFooter>
                             </Card>

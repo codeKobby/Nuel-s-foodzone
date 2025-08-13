@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -247,13 +245,14 @@ const DashboardView: React.FC = () => {
                 }
             });
             
-            const netRevenue = (cashSales + momoSales) - totalMiscExpenses;
+            const netRevenue = (cashSales + momoSales) - totalMiscExpenses - totalPardonedAmount;
             
             // Calculate revenue per day
             Object.keys(salesByDay).forEach(dayKey => {
                 const dateOfKey = new Date(dayKey + `, ${new Date().getFullYear()}`); // Construct a full date to filter payments
                 let dailyPaidAmount = 0;
                 let dailyExpenses = 0;
+                let dailyPardoned = 0;
 
                 allOrdersSnapshot.docs.forEach(doc => {
                     const order = doc.data() as Order;
@@ -261,6 +260,9 @@ const DashboardView: React.FC = () => {
                     if (format(paymentDate, 'MMM d') === dayKey) {
                         if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
                              dailyPaidAmount += order.lastPaymentAmount ?? order.amountPaid;
+                        }
+                        if (order.pardonedAmount && order.pardonedAmount > 0) {
+                            dailyPardoned += order.pardonedAmount;
                         }
                     }
                 });
@@ -273,7 +275,7 @@ const DashboardView: React.FC = () => {
                      }
                 });
 
-                salesByDay[dayKey].revenue = dailyPaidAmount - dailyExpenses;
+                salesByDay[dayKey].revenue = dailyPaidAmount - dailyExpenses - dailyPardoned;
             });
 
             
@@ -739,7 +741,7 @@ const DashboardView: React.FC = () => {
 
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-6">
                     <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="Completed orders in period"/>
-                    <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - Misc. Expenses"/>
+                    <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - Expenses - Pardons"/>
                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} />
                      <StatCard 
                         icon={<FileWarning className={stats.totalDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
@@ -952,14 +954,3 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
-
-    
-
-
-
-
-
-
-
-
-

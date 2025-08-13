@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState } from 'react';
@@ -32,8 +30,8 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
 
     const handleSettle = () => {
         const amount = parseFloat(settleAmount);
-        if (isNaN(amount) || amount <= 0) {
-            setError("Please enter a valid positive amount.");
+        if (isNaN(amount) || amount < 0) {
+            setError("Please enter a valid amount.");
             return;
         }
         if (amount > changeDue) {
@@ -44,12 +42,13 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
         onSettle(order.id, amount);
         onClose();
     };
-
+    
     const handleFullChange = () => {
         setSettleAmount(changeDue.toFixed(2));
     };
 
     const title = isPopup ? `Change Due for Order ${order.simplifiedId}` : `Settle Change for ${order.tag || order.simplifiedId}`;
+    const descriptionText = isPopup ? "How much change are you giving to the customer now?" : "How much of the outstanding change are you giving the customer?";
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -57,7 +56,7 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>
-                        Outstanding change: <span className="font-bold text-red-500">{formatCurrency(changeDue)}</span>
+                        Total change owed: <span className="font-bold text-red-500">{formatCurrency(changeDue)}</span>. {descriptionText}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
