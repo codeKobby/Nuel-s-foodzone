@@ -21,7 +21,6 @@ import {
 } from '@/ai/schemas';
 import { getBusinessDataForRange } from '@/lib/tools';
 import { getMenuItems, addMenuItem, updateMenuItem, deleteMenuItem } from '@/lib/menu-tools';
-import { content, part } from 'genkit';
 
 
 const getBusinessDataTool = ai.defineTool(
@@ -103,32 +102,15 @@ const businessChatFlow = ai.defineFlow(
     async (input) => {
         try {
             const { history, prompt } = input;
-            
-            // Convert history to Genkit's Content format
-            const genkitHistory = history.map(h => content(h));
 
-            let response = await ai.generate({
+            const { text } = await ai.generate({
                 model: 'googleai/gemini-2.0-flash',
-                history: genkitHistory,
+                history: history,
                 prompt: prompt,
                 tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
             });
 
-            while (response.toolRequests.length > 0) {
-                const toolOutputs = [];
-                for (const toolRequest of response.toolRequests) {
-                    const toolResponse = await toolRequest.execute();
-                    toolOutputs.push(part(toolResponse));
-                }
-                 response = await ai.generate({
-                    model: 'googleai/gemini-2.0-flash',
-                    history: [...genkitHistory, content({role: 'user', content: prompt}), content({role: 'model', content: [part(response.toolRequests[0])]}), content({role: 'tool', content: toolOutputs})],
-                    prompt: prompt,
-                    tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
-                });
-            }
-            
-            return response.text;
+            return text;
 
         } catch (error) {
             console.error('Error in business chat flow:', error);
