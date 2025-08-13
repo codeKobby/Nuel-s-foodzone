@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatTimestamp, groupOrdersByDate } from '@/lib/utils';
 import OrderDetailsModal from './modals/OrderDetailsModal';
-import ChangeDueModal from './modals/ChangeDueModal';
+import PartialSettleModal from './modals/PartialSettleModal';
 import CombinedPaymentModal from './modals/CombinedPaymentModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -105,7 +105,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                 }
                  {isChangeOwedToCustomer && 
                     <Button variant="link" className="p-0 h-auto text-sm text-red-500 flex items-center" onClick={() => onChangeDueClick(order)}>
-                        <Coins size={14} className="inline mr-2"/>Change Due: {formatCurrency(Math.abs(order.balanceDue))}
+                        <Coins size={14} className="inline mr-2"/>Change Owed: {formatCurrency(Math.abs(order.balanceDue))}
                     </Button>
                 }
                 <p className="text-xs text-muted-foreground mt-2 flex items-center"><CalendarDays size={12} className="inline mr-1.5" />{formatTimestamp(order.timestamp)}</p>
@@ -203,7 +203,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
         }
     }
     
-    const settleChange = async (orderId: string, settleAmount: number) => {
+    const settleChange = async (orderId: string, settleAmount: number, isFullSettlement: boolean) => {
         const orderRef = doc(db, "orders", orderId);
         try {
              await runTransaction(db, async (transaction) => {
@@ -220,6 +220,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                     balanceDue: newBalance,
                     changeGiven: newChangeGiven,
                     lastPaymentTimestamp: serverTimestamp(),
+                    settledOn: isFullSettlement ? serverTimestamp() : orderDoc.data().settledOn || null,
                 });
             });
             setChangeDueOrder(null);
@@ -363,7 +364,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                 </Tabs>
 
                 {selectedOrder && <OrderDetailsModal order={selectedOrder} onEdit={handleEditOrder} onClose={() => setSelectedOrder(null)} />}
-                {changeDueOrder && <ChangeDueModal order={changeDueOrder} onSettle={settleChange} onClose={() => setChangeDueOrder(null)} />}
+                {changeDueOrder && <PartialSettleModal order={changeDueOrder} onSettle={settleChange} onClose={() => setChangeDueOrder(null)} />}
                 {isCombinedPaymentModalOpen && <CombinedPaymentModal orders={selectedOrders} onOrderPlaced={handleCombinedPaymentSuccess} onClose={() => setIsCombinedPaymentModalOpen(false)} />}
 
                 {orderToDelete && (
@@ -390,3 +391,4 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 };
 
 export default OrdersView;
+

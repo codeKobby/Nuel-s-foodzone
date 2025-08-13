@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import OrderOptionsModal from './modals/OrderOptionsModal';
 import BreakfastModal from './modals/BreakfastModal';
 import CustomOrderModal from './modals/CustomOrderModal';
-import ChangeDueModal from './modals/ChangeDueModal';
+import PartialSettleModal from './modals/PartialSettleModal';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
   AlertDialog,
@@ -279,7 +279,7 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
         }
     };
     
-     const handleSettleChange = async (orderId: string, settleAmount: number) => {
+     const handleSettleChange = async (orderId: string, settleAmount: number, isFullSettlement: boolean) => {
         const orderRef = doc(db, "orders", orderId);
         try {
              await runTransaction(db, async (transaction) => {
@@ -295,6 +295,7 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                     balanceDue: newBalance,
                     changeGiven: newChangeGiven,
                     lastPaymentTimestamp: serverTimestamp(),
+                    settledOn: isFullSettlement ? serverTimestamp() : orderDoc.data().settledOn || null,
                 });
             });
             setOrderWithChangeDue(null);
@@ -435,13 +436,14 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                 />
             )}
             {orderWithChangeDue && (
-                 <ChangeDueModal
+                 <PartialSettleModal
                     order={orderWithChangeDue}
                     onClose={() => {
                         setOrderWithChangeDue(null);
                         setActiveView('orders');
                     }}
                     onSettle={handleSettleChange}
+                    isPopup={true}
                 />
             )}
             {showBreakfastModal && (
@@ -475,3 +477,4 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
 };
 
 export default PosView;
+

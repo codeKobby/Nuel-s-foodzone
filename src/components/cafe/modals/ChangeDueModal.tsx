@@ -20,7 +20,7 @@ import { AlertDescription } from '@/components/ui/alert';
 interface ChangeDueModalProps {
     order: Order;
     onClose: () => void;
-    onSettle: (orderId: string, amount: number) => void;
+    onSettle: (orderId: string, amount: number, isFullSettlement: boolean) => void;
 }
 
 const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ order, onClose, onSettle }) => {
@@ -39,8 +39,8 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ order, onClose, onSettl
             return;
         }
         setError(null);
-        onSettle(order.id, amount);
-        onClose();
+        const isFullSettlement = amount === changeDue;
+        onSettle(order.id, amount, isFullSettlement);
     };
     
     const handleFullChange = () => {
@@ -82,3 +82,4 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ order, onClose, onSettl
 }
 
 export default ChangeDueModal;
+

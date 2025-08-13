@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serve
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass, ShoppingCart, Lock, X, Ban } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass, ShoppingCart, Lock, X, Ban, HelpCircle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import AdvancedReconciliationModal from './modals/AdvancedReconciliationModal';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogContent,
@@ -59,6 +61,7 @@ interface PeriodStats {
     netRevenue: number;
     unpaidOrdersValue: number;
     totalPardonedAmount: number;
+    changeOwedForPeriod: number;
     orders: Order[];
     itemStats: Record<string, { count: number; totalValue: number }>;
 }
@@ -92,6 +95,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     const [showUnpaidOrdersWarning, setShowUnpaidOrdersWarning] = useState(false);
     const [date, setDate] = useState<DateRange | undefined>({ from: new Date(), to: new Date() });
     const isMobile = useIsMobile();
+    const [setAsideChange, setSetAsideChange] = useState(true);
     
     // State for denomination-based counting
     const [denominationQuantities, setDenominationQuantities] = useState(initialDenominations);
@@ -118,10 +122,21 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
     const totalCountedRevenue = useMemo(() => totalCountedCash + totalCountedMomo, [totalCountedCash, totalCountedMomo]);
     
+    const reconciliationExpectedCash = useMemo(() => {
+        if (!stats) return 0;
+        // If we set aside the change, the cash drawer should have that money, so don't subtract it from expected.
+        if (setAsideChange) {
+            return stats.expectedCash;
+        }
+        // If we DON'T set it aside, it's a deficit for the day, so subtract it.
+        return stats.expectedCash - stats.changeOwedForPeriod;
+    }, [stats, setAsideChange]);
+    
     const totalDiscrepancy = useMemo(() => {
         if (!stats) return 0;
-        return totalCountedRevenue - stats.totalExpectedRevenue;
-    }, [totalCountedRevenue, stats]);
+        const expectedRevenue = reconciliationExpectedCash + stats.expectedMomo;
+        return totalCountedRevenue - expectedRevenue;
+    }, [totalCountedRevenue, stats, reconciliationExpectedCash]);
     
     const handleDenominationChange = (value: string, denomination: string) => {
         setDenominationQuantities(prev => ({ ...prev, [denomination]: value }));
@@ -158,7 +173,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const startDateTimestamp = Timestamp.fromDate(startDate);
             const endDateTimestamp = Timestamp.fromDate(endDate);
 
-            // Fetch all orders and misc expenses for the period
             const allOrdersQuery = query(collection(db, "orders"));
             const miscQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
             const allUnpaidOrdersQuery = query(collection(db, "orders"), where("paymentStatus", "in", ["Unpaid", "Partially Paid"]));
@@ -175,6 +189,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             let unpaidOrdersValue = 0;
             let totalPardonedAmount = 0;
+            let changeOwedForPeriod = 0;
 
             allUnpaidOrdersSnapshot.docs.forEach(doc => {
                  const order = { id: doc.id, ...doc.data() } as Order;
@@ -183,20 +198,22 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             
             allOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
-                
                 const orderDate = order.timestamp.toDate();
+                const settledDate = order.settledOn?.toDate();
+
                 if (orderDate >= startDate && orderDate <= endDate) {
                     periodOrders.push(order);
                 }
                 
-                // Pardoned amount for the period
                 if (orderDate >= startDate && orderDate <= endDate) {
                     if (order.pardonedAmount && order.pardonedAmount > 0) {
                         totalPardonedAmount += order.pardonedAmount;
                     }
+                    if (order.balanceDue < 0) {
+                        changeOwedForPeriod += Math.abs(order.balanceDue);
+                    }
                 }
-
-                // Add to total sales and item performance only if completed within the period
+                
                 if (order.status === 'Completed' && orderDate >= startDate && orderDate <= endDate) {
                     totalSalesToday += order.total;
                     order.items.forEach(item => {
@@ -208,7 +225,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     });
                 }
                 
-                // Add to revenue if a payment was made within the period
                 const paymentDate = order.lastPaymentTimestamp ? order.lastPaymentTimestamp.toDate() : orderDate;
                 if (paymentDate >= startDate && paymentDate <= endDate) {
                     if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
@@ -216,6 +232,11 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         if (order.paymentMethod === 'cash') cashSales += paidAmount;
                         if (order.paymentMethod === 'momo') momoSales += paidAmount;
                     }
+                }
+                
+                // If change was settled in this period, it's a cash outflow for this period.
+                if (settledDate && settledDate >= startDate && settledDate <= endDate) {
+                    cashSales -= order.changeGiven;
                 }
             });
 
@@ -236,7 +257,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const expectedMomo = momoSales - miscMomoExpenses;
             const totalExpectedRevenue = expectedCash + expectedMomo;
             
-            setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, expectedMomo, totalExpectedRevenue, netRevenue, unpaidOrdersValue, totalPardonedAmount, orders: periodOrders, itemStats });
+            setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, expectedMomo, totalExpectedRevenue, netRevenue, unpaidOrdersValue, totalPardonedAmount, changeOwedForPeriod, orders: periodOrders, itemStats });
         } catch (e) {
             console.error(e);
             setError("Failed to load financial data for the selected period.");
@@ -267,6 +288,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         setMomoTransactions([]);
         setMomoInput('');
         setNotes('');
+        setSetAsideChange(true);
     }
 
     const handleSaveReport = async () => {
@@ -286,9 +308,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 period: new Date().toDateString(),
                 totalSales: stats.totalSales,
                 
-                expectedCash: stats.expectedCash,
+                expectedCash: reconciliationExpectedCash, // Use the adjusted expected cash
                 expectedMomo: stats.expectedMomo,
-                totalExpectedRevenue: stats.totalExpectedRevenue,
+                totalExpectedRevenue: reconciliationExpectedCash + stats.expectedMomo,
                 
                 countedCash: totalCountedCash,
                 countedMomo: totalCountedMomo,
@@ -296,6 +318,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
                 totalDiscrepancy: totalDiscrepancy,
                 notes: notes,
+
+                changeOwedForPeriod: stats.changeOwedForPeriod,
+                changeOwedSetAside: setAsideChange,
             };
             await addDoc(collection(db, "reconciliationReports"), reportData);
             
@@ -393,6 +418,23 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                 </div>
                             </div>
                         </div>
+                        <div className="p-4 border rounded-md">
+                             <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Label htmlFor="set-aside-switch" className="font-semibold">Set aside change for tomorrow?</Label>
+                                     <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger><HelpCircle className="h-4 w-4 text-muted-foreground" /></TooltipTrigger>
+                                            <TooltipContent>
+                                                <p className="max-w-xs">ON: Assumes you keep the change owed ({formatCurrency(stats.changeOwedForPeriod)}) in the cash drawer to pay customers later. It won't be counted as a deficit today.</p>
+                                                <p className="max-w-xs mt-2">OFF: Treats the change owed as a cash deficit for today's report.</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </div>
+                                <Switch id="set-aside-switch" checked={setAsideChange} onCheckedChange={setSetAsideChange} disabled={stats.changeOwedForPeriod <= 0}/>
+                            </div>
+                        </div>
                         <div>
                             <Label className="text-lg font-semibold" htmlFor="notes">Notes</Label>
                             <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g., reason for deficit/surplus" className="mt-2"/>
@@ -413,7 +455,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             <CardContent className="space-y-1 text-sm">
                                 <div className="flex justify-between"><span>Cash Sales:</span> <span>{formatCurrency(stats.cashSales)}</span></div>
                                 <div className="flex justify-between"><span>(-) Cash Expenses:</span> <span className="text-orange-500">{formatCurrency(stats.miscCashExpenses)}</span></div>
-                                <div className="flex justify-between font-bold border-t pt-1"><span>Expected Cash:</span> <span>{formatCurrency(stats.expectedCash)}</span></div>
+                                 {!setAsideChange && stats.changeOwedForPeriod > 0 && (
+                                     <div className="flex justify-between"><span>(-) Change Owed Deficit:</span> <span className="text-orange-500">{formatCurrency(stats.changeOwedForPeriod)}</span></div>
+                                 )}
+                                <div className="flex justify-between font-bold border-t pt-1"><span>Expected Cash Today:</span> <span>{formatCurrency(reconciliationExpectedCash)}</span></div>
                                 <Separator className="my-2"/>
                                 <div className="flex justify-between"><span>MoMo Sales:</span> <span>{formatCurrency(stats.momoSales)}</span></div>
                                 <div className="flex justify-between"><span>(-) MoMo Expenses:</span> <span className="text-orange-500">{formatCurrency(stats.miscMomoExpenses)}</span></div>
@@ -422,7 +467,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             <CardFooter className="bg-primary/10 p-3">
                                 <div className="w-full flex justify-between items-center">
                                     <span className="font-bold text-primary text-lg">Total Expected:</span>
-                                    <span className="font-extrabold text-primary text-xl">{formatCurrency(stats.totalExpectedRevenue)}</span>
+                                    <span className="font-extrabold text-primary text-xl">{formatCurrency(reconciliationExpectedCash + stats.expectedMomo)}</span>
                                 </div>
                             </CardFooter>
                         </Card>
@@ -464,6 +509,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     );
 
     return (
+        <TooltipProvider>
         <div className="p-4 md:p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
             <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                 <h2 className="text-2xl md:text-3xl font-bold">Accounting</h2>
@@ -574,7 +620,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
                                         <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Net Revenue</Label>
                                         <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.netRevenue)}</p>
-                                        <p className="text-xs text-muted-foreground">(Paid Sales - Expenses - Pardons)</p>
+                                        <p className="text-xs text-muted-foreground">(Paid Sales - Expenses - Pardons - Settled Change)</p>
                                     </div>
                                 </CardFooter>
                             </Card>
@@ -630,6 +676,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     <span>Counted Cash:</span><span className="font-medium text-right">{formatCurrency(report.countedCash)}</span>
                                     <span>Expected Momo:</span><span className="font-medium text-right">{formatCurrency(report.expectedMomo)}</span>
                                     <span>Counted Momo:</span><span className="font-medium text-right">{formatCurrency(report.countedMomo)}</span>
+                                    {report.changeOwedForPeriod > 0 && <span className="col-span-2 mt-1 pt-1 border-t">Change from period: <span className="font-medium">{formatCurrency(report.changeOwedForPeriod)}</span> ({report.changeOwedSetAside ? 'Set Aside' : 'Deficit'})</span>}
                                 </div>
                                 {report.notes && <p className="text-xs italic mt-2 border-t pt-2">Notes: {report.notes}</p>}
                             </div>
@@ -657,6 +704,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 </AlertDialog>
             )}
         </div>
+        </TooltipProvider>
     );
 };
 

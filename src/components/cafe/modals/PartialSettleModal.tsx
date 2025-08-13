@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -19,7 +20,7 @@ import { AlertDescription } from '@/components/ui/alert';
 interface PartialSettleModalProps {
     order: Order;
     onClose: () => void;
-    onSettle: (orderId: string, amount: number) => void;
+    onSettle: (orderId: string, amount: number, isFullSettlement: boolean) => void;
     isPopup?: boolean;
 }
 
@@ -30,8 +31,8 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
 
     const handleSettle = () => {
         const amount = parseFloat(settleAmount);
-        if (isNaN(amount) || amount < 0) {
-            setError("Please enter a valid amount.");
+        if (isNaN(amount) || amount <= 0) { // Should not be able to settle 0
+            setError("Please enter a valid positive amount.");
             return;
         }
         if (amount > changeDue) {
@@ -39,7 +40,8 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
             return;
         }
         setError(null);
-        onSettle(order.id, amount);
+        const isFullSettlement = amount === changeDue;
+        onSettle(order.id, amount, isFullSettlement);
         onClose();
     };
     
@@ -85,3 +87,4 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
 };
 
 export default PartialSettleModal;
+

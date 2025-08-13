@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -207,7 +208,7 @@ const DashboardView: React.FC = () => {
                     });
                 }
                 
-                // 2. Pardoned Amounts
+                // 2. Pardoned Amounts (from orders created in range)
                 if (orderDate >= startDate && orderDate <= endDate) {
                     if (order.pardonedAmount && order.pardonedAmount > 0) {
                         totalPardonedAmount += order.pardonedAmount;
@@ -223,6 +224,13 @@ const DashboardView: React.FC = () => {
                         if (order.paymentMethod === 'cash') cashSales += paidAmount;
                         if (order.paymentMethod === 'momo') momoSales += paidAmount;
                     }
+                }
+                
+                 // 4. Subtract settled change from revenue
+                const settledDate = order.settledOn?.toDate();
+                if (settledDate && settledDate >= startDate && settledDate <= endDate) {
+                    // We subtract change given from cash sales as it's a cash outflow
+                    cashSales -= order.changeGiven;
                 }
             });
 
@@ -253,17 +261,26 @@ const DashboardView: React.FC = () => {
                 let dailyPaidAmount = 0;
                 let dailyExpenses = 0;
                 let dailyPardoned = 0;
+                let dailyChangeSettled = 0;
 
                 allOrdersSnapshot.docs.forEach(doc => {
                     const order = doc.data() as Order;
                     const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
-                    if (format(paymentDate, 'MMM d') === dayKey) {
+                    const orderDate = order.timestamp.toDate();
+                    const settledDate = order.settledOn?.toDate();
+                    
+                     if (format(paymentDate, 'MMM d') === dayKey) {
                         if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
                              dailyPaidAmount += order.lastPaymentAmount ?? order.amountPaid;
                         }
+                    }
+                    if (format(orderDate, 'MMM d') === dayKey) {
                         if (order.pardonedAmount && order.pardonedAmount > 0) {
                             dailyPardoned += order.pardonedAmount;
                         }
+                    }
+                     if (settledDate && format(settledDate, 'MMM d') === dayKey) {
+                        dailyChangeSettled += order.changeGiven;
                     }
                 });
                 
@@ -275,7 +292,7 @@ const DashboardView: React.FC = () => {
                      }
                 });
 
-                salesByDay[dayKey].revenue = dailyPaidAmount - dailyExpenses - dailyPardoned;
+                salesByDay[dayKey].revenue = dailyPaidAmount - dailyExpenses - dailyPardoned - dailyChangeSettled;
             });
 
             

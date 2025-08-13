@@ -1,3 +1,4 @@
+
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
@@ -44,6 +45,7 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         allOrdersSnapshot.forEach(doc => {
             const order = doc.data() as Order;
             const orderDate = order.timestamp.toDate();
+            const settledDate = order.settledOn?.toDate();
 
             // 1. Total Sales (from completed orders created in range)
             if (orderDate >= startDate && orderDate <= endDate) {
@@ -71,9 +73,14 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
                 }
             }
 
-            // 3. Change owed TO the customer (from any order)
-            if (order.balanceDue < 0) {
-                changeOwed += Math.abs(order.balanceDue);
+            // 3. Change owed TO the customer created in this period and not yet settled
+            if (orderDate >= startDate && orderDate <= endDate && order.balanceDue < 0) {
+                 changeOwed += Math.abs(order.balanceDue);
+            }
+            
+            // 4. Subtract change settled in this period that was created earlier
+            if (settledDate && settledDate >= startDate && settledDate <= endDate && orderDate < startDate) {
+                cashSales -= order.changeGiven;
             }
         });
         
@@ -122,3 +129,4 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         };
     }
 }
+

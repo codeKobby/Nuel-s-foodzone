@@ -45,6 +45,7 @@ export interface Order {
   creditSource?: string[]; // Note for traceability, e.g., "Converted to credit for [customerTag]"
   lastPaymentTimestamp?: Timestamp;
   lastPaymentAmount?: number;
+  settledOn?: Timestamp; // The date when an outstanding balance/change was fully settled.
   notes?: string;
 }
 
@@ -76,6 +77,10 @@ export interface ReconciliationReport {
     // Final result
     totalDiscrepancy: number;
     notes: string;
+
+    // Change Owed Handling
+    changeOwedForPeriod: number;
+    changeOwedSetAside: boolean;
 }
 
 export interface ChatMessage {
@@ -97,3 +102,4 @@ export interface OrderEditingContextType {
     loadOrderForEditing: (order: Order) => void;
     clearEditingOrder: () => void;
 }
+
