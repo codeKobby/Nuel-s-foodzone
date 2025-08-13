@@ -24,7 +24,7 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
         
         const reconciliationReportsRef = collection(db, "reconciliationReports");
-        const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<", endDateTimestamp));
+        const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
 
         // Get all orders first to correctly calculate payments vs sales
         const allOrdersSnapshot = await getDocs(query(ordersRef));
@@ -129,4 +129,3 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         };
     }
 }
-
