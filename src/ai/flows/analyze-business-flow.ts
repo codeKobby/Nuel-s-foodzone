@@ -62,7 +62,20 @@ const analyzeBusinessFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await analysisPrompt(input);
-    return output!;
+    
+    if (!output) {
+      console.error('AI analysis returned a null output. This might be due to safety settings or model refusal.');
+      return {
+        analysis: `
+          ## Analysis Failed
+          The AI model was unable to generate a business analysis for the selected period. 
+          This can sometimes happen due to content safety filters or if the model cannot process the request. 
+          Please try a different date range or check the application logs.
+        `
+      };
+    }
+    
+    return output;
   }
 );
 
