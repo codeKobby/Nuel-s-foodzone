@@ -1,9 +1,8 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { collection, doc, addDoc, getDoc, setDoc, serverTimestamp, runTransaction, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, addDoc, getDoc, setDoc, serverTimestamp, runTransaction, updateDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
 import type { OrderItem, Order } from '@/lib/types';
@@ -260,7 +259,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                                     </Button>
                                 </div>
                            ) : (
-                             <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing || (paymentMethod === 'cash' && !isAmountPaidEntered)} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                             <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing || (paymentMethod === 'cash' && !isAmountPaidEntered && total > 0)} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
                                 {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
                             </Button>
                            )}
@@ -274,4 +273,3 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 };
 
 export default OrderOptionsModal;
-
