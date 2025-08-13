@@ -13,8 +13,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig, ChartLine, ChartXAxis, ChartYAxis } from "@/components/ui/chart"
-import { LineChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart"
+import { LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
 import { DateRange } from "react-day-picker"
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -308,7 +308,7 @@ const DashboardView: React.FC = () => {
                 totalOrders: stats.totalOrders,
                 avgOrderValue: stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0,
                 itemPerformance: stats.itemPerformance.slice(0, 10), // Send top 10 items
-                cashDiscrepancy: stats.totalDiscrepancy,
+                cashDiscrepancy: stats.totalDiscrepancy ?? 0,
                 miscExpenses: stats.totalMiscExpenses,
             };
             const result = await analyzeBusiness(input);
@@ -542,7 +542,7 @@ const DashboardView: React.FC = () => {
                 break;
             case 'month':
                 from = startOfMonth(today);
-                to = today;
+                to = endOfMonth(today);
                 break;
         }
         setDate({ from, to });
@@ -558,8 +558,8 @@ const DashboardView: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
                     <div className="flex items-center gap-1">
                         <Button variant="outline" size="sm" onClick={() => setDateRange('today')}>Today</Button>
-                        <Button variant="outline" size="sm" onClick={() => setDateRange('week')}>Week</Button>
-                        <Button variant="outline" size="sm" onClick={() => setDateRange('month')}>Month</Button>
+                        <Button variant="outline" size="sm" onClick={() => setDateRange('week')}>This Week</Button>
+                        <Button variant="outline" size="sm" onClick={() => setDateRange('month')}>This Month</Button>
                     </div>
                     <Popover>
                         <PopoverTrigger asChild>
@@ -686,9 +686,9 @@ const DashboardView: React.FC = () => {
                                 <ResponsiveContainer>
                                     <LineChart data={stats.salesData} margin={{ top: 20, right: 20, bottom: 5, left: 0 }}>
                                         <CartesianGrid vertical={false} />
-                                        <ChartXAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} />
-                                        <ChartYAxis tickFormatter={(value) => formatCurrency(Number(value))} />
-                                        <ChartTooltip
+                                        <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} />
+                                        <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
+                                        <Tooltip
                                             cursor={false}
                                             content={<ChartTooltipContent
                                                 formatter={(value) => formatCurrency(Number(value))}
@@ -697,7 +697,7 @@ const DashboardView: React.FC = () => {
                                             />}
                                         />
                                         <Legend />
-                                        <ChartLine dataKey="sales" type="monotone" stroke="var(--color-sales)" strokeWidth={2} dot={false} />
+                                        <Line dataKey="sales" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </ChartContainer>
@@ -857,5 +857,6 @@ const DashboardView: React.FC = () => {
 export default DashboardView;
 
     
+
 
 

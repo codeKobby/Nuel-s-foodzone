@@ -1,14 +1,16 @@
 
 "use client";
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import type { Order } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Printer, Pencil } from 'lucide-react';
+import { Printer, Pencil, ShoppingBag } from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/app/logo.png';
+import { Badge } from '@/components/ui/badge';
+import FulfillItemsModal from './FulfillItemsModal'; // Import the new modal
 
 interface OrderDetailsModalProps {
     order: Order;
@@ -38,6 +40,7 @@ const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, r
                         <th className="text-left">Item</th>
                         <th className="text-center">Qty</th>
                         <th className="text-right">Price</th>
+                        <th className="text-right">Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -46,6 +49,7 @@ const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, r
                             <td>{item.name}</td>
                             <td className="text-center">{item.quantity}</td>
                             <td className="text-right">{formatCurrency(item.price * item.quantity)}</td>
+                             <td className="text-right">{order.fulfilledItems?.some(f => f.name === item.name && f.quantity === item.quantity) ? '✓' : '...'}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -68,6 +72,8 @@ Receipt.displayName = "Receipt";
 
 const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, onEdit }) => {
     const receiptRef = useRef<HTMLDivElement>(null);
+    const [isFulfillModalOpen, setIsFulfillModalOpen] = useState(false);
+
     const handlePrint = () => {
         const printContents = receiptRef.current?.innerHTML;
         if (!printContents) return;
@@ -106,7 +112,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
         onClose();
     }
 
+    const unfulfilledItems = order.items.filter(item => 
+        !order.fulfilledItems?.some(fulfilled => fulfilled.name === item.name && fulfilled.quantity >= item.quantity)
+    );
+
     return (
+        <>
         <Dialog open onOpenChange={onClose}>
             <DialogContent>
                 <DialogHeader>
@@ -118,11 +129,17 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
                 <div className="max-h-[70vh] overflow-y-auto my-4 rounded-lg border">
                     <Receipt order={order} ref={receiptRef} />
                 </div>
-                <DialogFooter className="sm:justify-between gap-2">
+                <DialogFooter className="sm:justify-between gap-2 flex-wrap">
                      {order.status === 'Pending' && (
                         <Button onClick={handleEdit} variant="secondary">
                             <Pencil size={18} className="mr-2"/>
                             Edit Order
+                        </Button>
+                    )}
+                    {unfulfilledItems.length > 0 && (
+                        <Button onClick={() => setIsFulfillModalOpen(true)} variant="outline">
+                            <ShoppingBag size={18} className="mr-2" />
+                            Fulfill Items
                         </Button>
                     )}
                     <Button onClick={handlePrint} className="flex-grow">
@@ -132,6 +149,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, o
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        {isFulfillModalOpen && (
+            <FulfillItemsModal
+                order={order}
+                onClose={() => setIsFulfillModalOpen(false)}
+            />
+        )}
+        </>
     );
 };
 

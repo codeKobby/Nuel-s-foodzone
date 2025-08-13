@@ -21,12 +21,18 @@ export interface OrderItem {
   category: string;
 }
 
+export interface FulfilledItem {
+    name: string;
+    quantity: number;
+}
+
 export interface Order {
   id:string;
   simplifiedId: string;
   tag: string;
   orderType: 'Dine-In' | 'Takeout' | 'Delivery';
   items: Omit<OrderItem, 'id' | 'category'>[];
+  fulfilledItems: FulfilledItem[];
   total: number;
   paymentMethod: 'cash' | 'momo' | 'Unpaid';
   paymentStatus: 'Paid' | 'Unpaid' | 'Partially Paid';

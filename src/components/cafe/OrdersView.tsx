@@ -46,17 +46,22 @@ interface OrderCardProps {
 }
 
 const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionChange, onDetailsClick, onStatusUpdate, onEdit, onDelete }) => {
-    const paymentStatusVariant = {
-        'Paid': 'default',
-        'Unpaid': 'destructive',
-        'Partially Paid': 'secondary',
+    
+    const paymentStatusConfig = {
+        'Paid': {
+            variant: 'default',
+            className: 'bg-green-500 hover:bg-green-500 text-primary-foreground',
+        },
+        'Unpaid': {
+            variant: 'destructive',
+            className: 'bg-red-500 hover:bg-red-500 text-destructive-foreground',
+        },
+        'Partially Paid': {
+            variant: 'secondary',
+            className: 'bg-yellow-500 hover:bg-yellow-500 text-secondary-foreground',
+        },
     } as const;
 
-    const tagColorClass = {
-        'Paid': 'text-green-600 dark:text-green-400',
-        'Unpaid': 'text-red-600 dark:text-red-400',
-        'Partially Paid': 'text-yellow-600 dark:text-yellow-400',
-    };
     
     const isBalanceOwedByCustomer = order.balanceDue > 0;
     const isChangeOwedToCustomer = order.balanceDue < 0;
@@ -85,9 +90,9 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                             </CardDescription>
                         </div>
                     </div>
-                    <Badge variant={paymentStatusVariant[order.paymentStatus]}>{order.paymentStatus}</Badge>
+                    <Badge variant={paymentStatusConfig[order.paymentStatus].variant} className={paymentStatusConfig[order.paymentStatus].className}>{order.paymentStatus}</Badge>
                 </div>
-                 {order.tag && <p className={cn("text-muted-foreground text-sm pt-2 flex items-center font-semibold", tagColorClass[order.paymentStatus])}><Tag size={14} className="inline mr-2"/>{order.tag}</p>}
+                 {order.tag && <p className={cn("text-muted-foreground text-sm pt-2 flex items-center font-semibold")}><Tag size={14} className="inline mr-2"/>{order.tag}</p>}
             </CardHeader>
             <CardContent className="p-4 flex-grow">
                 <p className="text-muted-foreground text-xs truncate" title={itemSnippet}>{itemSnippet}</p>
