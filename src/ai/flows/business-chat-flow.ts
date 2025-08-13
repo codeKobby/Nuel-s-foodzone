@@ -21,6 +21,7 @@ import {
 } from '@/ai/schemas';
 import { getBusinessDataForRange } from '@/lib/tools';
 import { getMenuItems, addMenuItem, updateMenuItem, deleteMenuItem } from '@/lib/menu-tools';
+import { content, part } from 'genkit';
 
 
 const getBusinessDataTool = ai.defineTool(
@@ -75,7 +76,6 @@ const deleteMenuItemTool = ai.defineTool(
 
 const businessChatPrompt = ai.definePrompt({
     name: 'businessChatPrompt',
-    input: { schema: BusinessChatInputSchema },
     output: { format: 'text' },
     tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
     model: 'googleai/gemini-2.0-flash', // Use a single, fast model for chat
@@ -91,15 +91,7 @@ You have access to several tools to help you.
 - When you receive data or a confirmation message from a tool, analyze it and present the key information to the user in a clear, friendly, and concise way.
 - If the tool returns no data (e.g., zero sales), state that clearly to the user. Do not invent data.
 - If the user's question is unclear, ask for clarification.
-{{#if history}}
-
-Previous conversation context:
-{{#each history}}
-- {{role}}: {{content}}
-{{/each}}
-{{/if}}
 `,
-    prompt: `User question: {{prompt}}`
 });
 
 const businessChatFlow = ai.defineFlow(
@@ -107,29 +99,32 @@ const businessChatFlow = ai.defineFlow(
         name: 'businessChatFlow',
         inputSchema: BusinessChatInputSchema,
         outputSchema: BusinessChatOutputSchema,
-        cache: {
-            // Cache for 10 minutes to allow for fresh data.
-            ttl: 600,
-        }
     },
     async (input) => {
         try {
             const { history, prompt } = input;
             
-            // Build the full context for the prompt, including the latest user message
-            const fullHistory = [
-                ...history,
-                { role: 'user', content: prompt }
-            ];
+            // Convert history to Genkit's Content format
+            const genkitHistory = history.map(h => content(h));
 
-            let response = await businessChatPrompt({ history: fullHistory, prompt });
+            let response = await ai.generate({
+                model: 'googleai/gemini-2.0-flash',
+                history: genkitHistory,
+                prompt: prompt,
+                tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
+            });
 
-            // Handle tool calls if the model requests them
-            while (response.isToolRequest()) {
-                const toolResponse = await response.executeTool();
-                response = await businessChatPrompt({
-                    history: [...fullHistory, response.request, toolResponse],
-                    prompt,
+            while (response.toolRequests.length > 0) {
+                const toolOutputs = [];
+                for (const toolRequest of response.toolRequests) {
+                    const toolResponse = await toolRequest.execute();
+                    toolOutputs.push(part(toolResponse));
+                }
+                 response = await ai.generate({
+                    model: 'googleai/gemini-2.0-flash',
+                    history: [...genkitHistory, content({role: 'user', content: prompt}), content({role: 'model', content: [part(response.toolRequests[0])]}), content({role: 'tool', content: toolOutputs})],
+                    prompt: prompt,
+                    tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
                 });
             }
             
