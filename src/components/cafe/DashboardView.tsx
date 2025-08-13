@@ -80,6 +80,7 @@ interface ChatMessage {
 
 type ItemSortKey = 'count' | 'totalValue';
 type ItemSortDirection = 'asc' | 'desc';
+type PresetDateRange = 'today' | 'week' | 'month' | 'custom';
 
 
 const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, description?: string, onClick?: () => void }> = ({ icon, title, value, description, onClick }) => (
@@ -111,6 +112,7 @@ const DashboardView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [date, setDate] = useState<DateRange | undefined>({ from: addDays(new Date(), -6), to: new Date() });
+    const [activeDatePreset, setActiveDatePreset] = useState<PresetDateRange>('week');
     
     // AI Features State
     const [activeChatSessionId, setActiveChatSessionId] = useState<string | null>(null);
@@ -137,17 +139,17 @@ const DashboardView: React.FC = () => {
     const [itemSortDirection, setItemSortDirection] = useState<ItemSortDirection>('desc');
 
 
-    const fetchDashboardData = useCallback(async () => {
-        if (!date?.from) return;
+    const fetchDashboardData = useCallback(async (currentDateRange: DateRange | undefined) => {
+        if (!currentDateRange?.from) return;
         setLoading(true);
         setError(null);
         setStats(null);
         setAnalysisResult(null);
         
         try {
-            const startDate = new Date(date.from);
+            const startDate = new Date(currentDateRange.from);
             startDate.setHours(0, 0, 0, 0);
-            const endDate = date.to ? new Date(date.to) : new Date(date.from);
+            const endDate = currentDateRange.to ? new Date(currentDateRange.to) : new Date(currentDateRange.from);
             endDate.setHours(23, 59, 59, 999);
 
             const startDateTimestamp = Timestamp.fromDate(startDate);
@@ -323,7 +325,7 @@ const DashboardView: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [date]);
+    }, []);
     
      useEffect(() => {
         // Listener for all miscellaneous expenses (for the unsettled expenses list)
@@ -342,8 +344,8 @@ const DashboardView: React.FC = () => {
     }, []);
     
     useEffect(() => {
-        fetchDashboardData();
-    }, [fetchDashboardData]);
+        fetchDashboardData(date);
+    }, [fetchDashboardData, date]);
     
      useEffect(() => {
         if (chatContainerRef.current) {
@@ -600,9 +602,10 @@ const DashboardView: React.FC = () => {
         </div>
     );
     
-    const setDateRange = (rangeType: 'today' | 'week' | 'month') => {
+    const setDateRange = (rangeType: PresetDateRange) => {
         const today = new Date();
         let fromDate, toDate;
+        setActiveDatePreset(rangeType);
 
         switch (rangeType) {
             case 'today':
@@ -630,16 +633,16 @@ const DashboardView: React.FC = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
                     <div className="flex items-center gap-1">
-                        <Button variant="outline" size="sm" onClick={() => setDateRange('today')}>Today</Button>
-                        <Button variant="outline" size="sm" onClick={() => setDateRange('week')}>This Week</Button>
-                        <Button variant="outline" size="sm" onClick={() => setDateRange('month')}>This Month</Button>
+                        <Button variant={activeDatePreset === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setDateRange('today')}>Today</Button>
+                        <Button variant={activeDatePreset === 'week' ? 'default' : 'outline'} size="sm" onClick={() => setDateRange('week')}>This Week</Button>
+                        <Button variant={activeDatePreset === 'month' ? 'default' : 'outline'} size="sm" onClick={() => setDateRange('month')}>This Month</Button>
                     </div>
                     <Popover>
                         <PopoverTrigger asChild>
                         <Button
                             id="date"
                             variant={"outline"}
-                            className={cn("w-full sm:w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+                            className={cn("w-full sm:w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground", activeDatePreset === 'custom' && 'border-primary')}
                         >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {date?.from ? (
@@ -659,7 +662,7 @@ const DashboardView: React.FC = () => {
                             mode="range"
                             defaultMonth={date?.from}
                             selected={date}
-                            onSelect={setDate}
+                            onSelect={(newDate) => { setDate(newDate); setActiveDatePreset('custom'); }}
                             numberOfMonths={isMobile ? 1 : 2}
                         />
                         </PopoverContent>
