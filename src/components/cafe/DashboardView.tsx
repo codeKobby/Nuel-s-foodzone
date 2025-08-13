@@ -131,8 +131,6 @@ const DashboardView: React.FC = () => {
     const [isDiscrepancyModalOpen, setIsDiscrepancyModalOpen] = useState(false);
     const [isPardonedModalOpen, setIsPardonedModalOpen] = useState(false);
     const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
-    const [allTimeDiscrepancy, setAllTimeDiscrepancy] = useState(0);
-    const [allDiscrepancyReports, setAllDiscrepancyReports] = useState<ReconciliationReport[]>([]);
 
     
     // Sorting state
@@ -161,10 +159,15 @@ const DashboardView: React.FC = () => {
             
             const miscExpensesRef = collection(db, "miscExpenses");
             const miscQuery = query(miscExpensesRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
+            
+            const reconciliationReportsRef = collection(db, "reconciliationReports");
+            const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
 
-            const [allOrdersSnapshot, miscSnapshot] = await Promise.all([
+
+            const [allOrdersSnapshot, miscSnapshot, reportsSnapshot] = await Promise.all([
                 getDocs(allOrdersQuery),
                 getDocs(miscQuery),
+                getDocs(reportsQuery),
             ]);
 
             // Process Orders
@@ -233,6 +236,17 @@ const DashboardView: React.FC = () => {
                 totalMiscExpenses += expense.amount;
             });
             
+            // Process reconciliation reports for the period
+            let totalDiscrepancy = 0;
+            const discrepancyReports: ReconciliationReport[] = [];
+            reportsSnapshot.forEach(doc => {
+                const report = {id: doc.id, ...doc.data()} as ReconciliationReport;
+                totalDiscrepancy += report.totalDiscrepancy;
+                if (report.totalDiscrepancy !== 0) {
+                    discrepancyReports.push(report);
+                }
+            });
+            
             const netRevenue = (cashSales + momoSales) - totalMiscExpenses;
             
             // Calculate revenue per day
@@ -276,11 +290,11 @@ const DashboardView: React.FC = () => {
                 momoSales,
                 unpaidOrdersValue,
                 totalMiscExpenses,
-                totalDiscrepancy: allTimeDiscrepancy, 
+                totalDiscrepancy: totalDiscrepancy, 
                 totalPardonedAmount,
                 salesData,
                 itemPerformance,
-                discrepancyReports: allDiscrepancyReports,
+                discrepancyReports: discrepancyReports.sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()),
                 pardonedOrders,
             });
 
@@ -290,7 +304,7 @@ const DashboardView: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [date, allTimeDiscrepancy, allDiscrepancyReports]);
+    }, [date]);
     
      useEffect(() => {
         // Listener for all miscellaneous expenses (for the unsettled expenses list)
@@ -303,27 +317,8 @@ const DashboardView: React.FC = () => {
             setError("Failed to load miscellaneous expenses.");
         });
 
-        // Listener for all-time discrepancy
-        const reportsRef = collection(db, "reconciliationReports");
-        const reportsQuery = query(reportsRef);
-        const unsubscribeReports = onSnapshot(reportsQuery, (snapshot) => {
-            let total = 0;
-            const reports: ReconciliationReport[] = [];
-            snapshot.forEach(doc => {
-                const report = {id: doc.id, ...doc.data()} as ReconciliationReport;
-                total += report.totalDiscrepancy;
-                if (report.totalDiscrepancy !== 0) {
-                    reports.push(report);
-                }
-            });
-            setAllTimeDiscrepancy(total);
-            setAllDiscrepancyReports(reports.sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()));
-        });
-
-
         return () => {
             unsubscribe();
-            unsubscribeReports();
         };
     }, []);
     
@@ -683,7 +678,7 @@ const DashboardView: React.FC = () => {
                         <DialogContent>
                              <DialogHeader>
                                 <DialogTitle>Reconciliation Report Details</DialogTitle>
-                                <DialogDescription>Breakdown of all historical reconciliation reports with a non-zero discrepancy.</DialogDescription>
+                                <DialogDescription>Breakdown of reconciliation reports with a non-zero discrepancy for the selected period.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="h-72 my-4">
                                <div className="space-y-3 pr-4">
@@ -704,7 +699,7 @@ const DashboardView: React.FC = () => {
                                         </div>
                                          {report.notes && <p className="text-xs italic mt-2 border-t pt-2">Notes: {report.notes}</p>}
                                     </div>
-                                )) : <p className="text-muted-foreground text-center italic py-10">No discrepancies recorded.</p>}
+                                )) : <p className="text-muted-foreground text-center italic py-10">No discrepancies recorded for this period.</p>}
                                </div>
                             </ScrollArea>
                         </DialogContent>
@@ -748,7 +743,7 @@ const DashboardView: React.FC = () => {
                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} />
                      <StatCard 
                         icon={<FileWarning className={stats.totalDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
-                        title="Total Discrepancy (All Time)" 
+                        title="Total Discrepancy (Period)" 
                         value={formatCurrency(stats.totalDiscrepancy)} 
                         description={stats.discrepancyReports.length > 0 ? "Click to view details" : undefined}
                         onClick={stats.discrepancyReports.length > 0 ? () => setIsDiscrepancyModalOpen(true) : undefined}
@@ -959,6 +954,7 @@ const DashboardView: React.FC = () => {
 export default DashboardView;
 
     
+
 
 
 
