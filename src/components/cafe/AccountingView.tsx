@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -42,16 +40,14 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DateRange } from "react-day-picker"
 import { addDays, format, isToday } from "date-fns"
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 
 interface PeriodStats {
     totalSales: number;
+    totalItemsSold: number;
     cashSales: number;
     momoSales: number;
     miscCashExpenses: number;
@@ -60,7 +56,8 @@ interface PeriodStats {
     expectedMomo: number;
     totalExpectedRevenue: number;
     netRevenue: number;
-    unpaidOrdersValue: number;
+    allTimeUnpaidOrdersValue: number;
+    todayUnpaidOrdersValue: number;
     totalPardonedAmount: number;
     changeOwedForPeriod: number;
     orders: Order[];
@@ -94,9 +91,21 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     const [isCloseOutOpen, setIsCloseOutOpen] = useState(false);
     const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
     const [showUnpaidOrdersWarning, setShowUnpaidOrdersWarning] = useState(false);
-    const [date, setDate] = useState<DateRange | undefined>({ from: new Date(), to: new Date() });
     const isMobile = useIsMobile();
     const [setAsideChange, setSetAsideChange] = useState(true);
+    
+    // Get today's date for fixed daily accounting
+    const today = useMemo(() => {
+        const date = new Date();
+        date.setHours(0, 0, 0, 0);
+        return date;
+    }, []);
+    
+    const todayEnd = useMemo(() => {
+        const date = new Date(today);
+        date.setHours(23, 59, 59, 999);
+        return date;
+    }, [today]);
     
     // State for denomination-based counting
     const [denominationQuantities, setDenominationQuantities] = useState(initialDenominations);
@@ -160,61 +169,84 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
 
     const fetchPeriodData = useCallback(async () => {
-        if (!date?.from) return;
         setLoading(true);
         setError(null);
         setStats(null);
         
         try {
-            const startDate = new Date(date.from);
-            startDate.setHours(0, 0, 0, 0);
-            const endDate = date.to ? new Date(date.to) : new Date(date.from);
-            endDate.setHours(23, 59, 59, 999);
+            const startDateTimestamp = Timestamp.fromDate(today);
+            const endDateTimestamp = Timestamp.fromDate(todayEnd);
 
-            const startDateTimestamp = Timestamp.fromDate(startDate);
-            const endDateTimestamp = Timestamp.fromDate(endDate);
-
-            // Consolidated queries
-            const periodOrdersQuery = query(
+            // Query for today's orders
+            const todayOrdersQuery = query(
                 collection(db, "orders"), 
                 where("timestamp", ">=", startDateTimestamp), 
                 where("timestamp", "<=", endDateTimestamp)
             );
-            const miscQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
-            const allUnpaidOrdersQuery = query(collection(db, "orders"), where("paymentStatus", "in", ["Unpaid", "Partially Paid"]));
+            
+            // Query for today's misc expenses
+            const todayMiscQuery = query(
+                collection(db, "miscExpenses"), 
+                where("timestamp", ">=", startDateTimestamp), 
+                where("timestamp", "<=", endDateTimestamp)
+            );
+            
+            // Query for all unpaid orders (all time)
+            const allUnpaidOrdersQuery = query(
+                collection(db, "orders"), 
+                where("paymentStatus", "in", ["Unpaid", "Partially Paid"])
+            );
 
-            const [periodOrdersSnapshot, miscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
-                getDocs(periodOrdersQuery),
-                getDocs(miscQuery),
+            const [todayOrdersSnapshot, todayMiscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
+                getDocs(todayOrdersQuery),
+                getDocs(todayMiscQuery),
                 getDocs(allUnpaidOrdersQuery)
             ]);
 
-            let cashSales = 0, momoSales = 0, totalSalesToday = 0;
-            const periodOrders: Order[] = [];
+            // Initialize variables
+            let totalSales = 0;
+            let totalItemsSold = 0;
+            let cashSales = 0;
+            let momoSales = 0;
+            const todayOrders: Order[] = [];
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
-            let unpaidOrdersValue = 0;
+            let allTimeUnpaidOrdersValue = 0;
+            let todayUnpaidOrdersValue = 0;
             let totalPardonedAmount = 0;
             let changeOwedForPeriod = 0;
 
+            // Process all unpaid orders (all time)
             allUnpaidOrdersSnapshot.docs.forEach(doc => {
-                 const order = { id: doc.id, ...doc.data() } as Order;
-                unpaidOrdersValue += order.balanceDue;
+                const order = { id: doc.id, ...doc.data() } as Order;
+                allTimeUnpaidOrdersValue += order.balanceDue;
+                
+                // Check if this unpaid order is from today
+                const orderDate = order.timestamp.toDate();
+                if (orderDate >= today && orderDate <= todayEnd) {
+                    todayUnpaidOrdersValue += order.balanceDue;
+                }
             });
             
-            periodOrdersSnapshot.docs.forEach(doc => {
+            // Process today's orders
+            todayOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
-                periodOrders.push(order);
+                todayOrders.push(order);
 
+                // Calculate pardoned amounts
                 if (order.pardonedAmount && order.pardonedAmount > 0) {
                     totalPardonedAmount += order.pardonedAmount;
                 }
+                
+                // Calculate change owed (negative balance due means we owe customer change)
                 if (order.balanceDue < 0) {
                     changeOwedForPeriod += Math.abs(order.balanceDue);
                 }
                 
+                // Calculate total sales and items from completed orders
                 if (order.status === 'Completed') {
-                    totalSalesToday += order.total;
+                    totalSales += order.total;
                     order.items.forEach(item => {
+                        totalItemsSold += item.quantity;
                         const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
                         itemStats[item.name] = {
                             count: currentStats.count + item.quantity,
@@ -223,24 +255,26 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     });
                 }
                 
+                // Calculate cash and momo sales (all payments received today)
+                // Check if payment was made today
                 const paymentDate = order.lastPaymentTimestamp ? order.lastPaymentTimestamp.toDate() : order.timestamp.toDate();
-                if (paymentDate >= startDate && paymentDate <= endDate) {
+                if (paymentDate >= today && paymentDate <= todayEnd) {
                     if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                         const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
-                        if (order.paymentMethod === 'cash') cashSales += paidAmount;
-                        if (order.paymentMethod === 'momo') momoSales += paidAmount;
+                        const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
+                        if (order.paymentMethod === 'cash') {
+                            cashSales += paidAmount;
+                        }
+                        if (order.paymentMethod === 'momo') {
+                            momoSales += paidAmount;
+                        }
                     }
-                }
-                
-                const settledDate = order.settledOn?.toDate();
-                if (settledDate && settledDate >= startDate && settledDate <= endDate) {
-                    cashSales -= order.changeGiven;
                 }
             });
 
-
-            let miscCashExpenses = 0, miscMomoExpenses = 0;
-            miscSnapshot.forEach(doc => {
+            // Process today's misc expenses
+            let miscCashExpenses = 0;
+            let miscMomoExpenses = 0;
+            todayMiscSnapshot.forEach(doc => {
                 const expense = doc.data() as MiscExpense;
                 if (expense.source === 'cash') {
                     miscCashExpenses += expense.amount;
@@ -249,20 +283,40 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 }
             });
             
-            const totalSales = totalSalesToday;
-            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses) - totalPardonedAmount;
+            // Calculate expected amounts and net revenue
             const expectedCash = cashSales - miscCashExpenses;
             const expectedMomo = momoSales - miscMomoExpenses;
             const totalExpectedRevenue = expectedCash + expectedMomo;
             
-            setStats({ totalSales, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, expectedMomo, totalExpectedRevenue, netRevenue, unpaidOrdersValue, totalPardonedAmount, changeOwedForPeriod, orders: periodOrders, itemStats });
+            // Net Revenue = (All Payments Received) - (All Expenses) - (Pardoned Amount)
+            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses) - totalPardonedAmount;
+            
+            setStats({ 
+                totalSales, 
+                totalItemsSold,
+                cashSales, 
+                momoSales, 
+                miscCashExpenses, 
+                miscMomoExpenses, 
+                expectedCash, 
+                expectedMomo, 
+                totalExpectedRevenue, 
+                netRevenue, 
+                allTimeUnpaidOrdersValue,
+                todayUnpaidOrdersValue,
+                totalPardonedAmount, 
+                changeOwedForPeriod, 
+                orders: todayOrders, 
+                itemStats 
+            });
+            
         } catch (e) {
             console.error(e);
-            setError("Failed to load financial data for the selected period.");
+            setError("Failed to load financial data for today.");
         } finally {
             setLoading(false);
         }
-    }, [date]);
+    }, [today, todayEnd]);
     
     useEffect(() => {
         fetchPeriodData();
@@ -290,7 +344,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     }
 
     const handleSaveReport = async () => {
-        if (!stats || !date?.from) {
+        if (!stats) {
             setError("No financial data loaded to create a report.");
             return;
         }
@@ -303,10 +357,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         try {
             const reportData: Omit<ReconciliationReport, 'id'> = {
                 timestamp: serverTimestamp(),
-                period: `${format(date.from, 'yyyy-MM-dd')} to ${format(date.to || date.from, 'yyyy-MM-dd')}`,
+                period: format(today, 'yyyy-MM-dd'),
                 totalSales: stats.totalSales,
                 
-                expectedCash: reconciliationExpectedCash, // Use the adjusted expected cash
+                expectedCash: reconciliationExpectedCash,
                 expectedMomo: stats.expectedMomo,
                 totalExpectedRevenue: reconciliationExpectedCash + stats.expectedMomo,
                 
@@ -351,7 +405,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     }, [stats]);
     
     const handleStartEndOfDay = () => {
-        if (stats && stats.unpaidOrdersValue > 0) {
+        if (stats && stats.todayUnpaidOrdersValue > 0) {
             setShowUnpaidOrdersWarning(true);
         } else {
             setIsCloseOutOpen(true);
@@ -510,38 +564,11 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         <TooltipProvider>
         <div className="p-4 md:p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
             <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
-                <h2 className="text-2xl md:text-3xl font-bold">Accounting</h2>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-                     <Popover>
-                        <PopoverTrigger asChild>
-                        <Button
-                            id="date"
-                            variant={"outline"}
-                            className={cn("w-full sm:w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
-                        >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {date?.from ? (
-                            date.to ? (
-                                <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>
-                            ) : (
-                                format(date.from, "LLL dd, y")
-                            )
-                            ) : (
-                            <span>Pick a date</span>
-                            )}
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
-                        <Calendar
-                            initialFocus
-                            mode="range"
-                            defaultMonth={date?.from}
-                            selected={date}
-                            onSelect={setDate}
-                            numberOfMonths={isMobile ? 1 : 2}
-                        />
-                        </PopoverContent>
-                    </Popover>
+                <div>
+                    <h2 className="text-2xl md:text-3xl font-bold">Accounting</h2>
+                    <p className="text-muted-foreground">Daily accounting for {format(today, "EEEE, MMMM dd, yyyy")}</p>
+                </div>
+                <div className="flex items-center gap-2">
                     <Button 
                         onClick={handleStartEndOfDay} 
                         className="w-full md:w-auto"
@@ -561,7 +588,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         <AlertDialogHeader>
                             <AlertDialogTitle>Unpaid Orders Found</AlertDialogTitle>
                             <AlertDialogDescription>
-                                There are {stats.orders.filter(o => o.status === 'Pending').length} unpaid orders totaling {formatCurrency(stats.unpaidOrdersValue)}.
+                                There are unpaid orders from today totaling {formatCurrency(stats.todayUnpaidOrdersValue)}.
                                 It's recommended to resolve these before closing the day.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
@@ -593,32 +620,59 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 <TabsTrigger value="history">History ({reports.length})</TabsTrigger>
               </TabsList>
               <TabsContent value="summary">
-                    {loading ? <div className="mt-8"><LoadingSpinner /></div> : !stats ? <p className="text-muted-foreground text-center italic py-10">No financial data for this period.</p> : (
+                    {loading ? <div className="mt-8"><LoadingSpinner /></div> : !stats ? <p className="text-muted-foreground text-center italic py-10">No financial data for today.</p> : (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mt-4">
                         <div className="lg:col-span-2">
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Financial Summary</CardTitle>
                                     <CardDescription>
-                                        {date?.from && date.to && format(date.from, "LLL dd, y") !== format(date.to, "LLL dd, y") 
-                                            ? `Data from ${format(date.from, "LLL dd, y")} to ${format(date.to, "LLL dd, y")}`
-                                            : `Data for ${date?.from ? format(date.from, "LLL dd, y") : 'the selected date'}`
-                                        }
+                                        Daily financial data for {format(today, "EEEE, MMMM dd, yyyy")}
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    <StatCard icon={<DollarSign className="text-primary"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description="From completed orders today"/>
-                                    <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
-                                    <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
-                                    <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Orders (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
-                                    <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Total Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} description="Cash and MoMo sources" />
-                                    <StatCard icon={<Ban className="text-red-500" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} />
+                                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <StatCard 
+                                        icon={<DollarSign className="text-primary"/>} 
+                                        title="Total Sales" 
+                                        value={formatCurrency(stats.totalSales)} 
+                                        description={`${stats.totalItemsSold} items sold from completed orders`}
+                                    />
+                                    <StatCard 
+                                        icon={<Landmark className="text-blue-500"/>} 
+                                        title="Cash Sales" 
+                                        value={formatCurrency(stats.cashSales)} 
+                                        description="All cash payments received today" 
+                                    />
+                                    <StatCard 
+                                        icon={<CreditCard className="text-purple-500"/>} 
+                                        title="Momo/Card Sales" 
+                                        value={formatCurrency(stats.momoSales)}
+                                        description="All momo/card payments received today" 
+                                    />
+                                    <StatCard 
+                                        icon={<Hourglass className={stats.allTimeUnpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
+                                        title="Unpaid Orders (All Time)" 
+                                        value={formatCurrency(stats.allTimeUnpaidOrdersValue)} 
+                                        description={`${formatCurrency(stats.todayUnpaidOrdersValue)} from today`}
+                                    />
+                                    <StatCard 
+                                        icon={<MinusCircle className="text-orange-500"/>} 
+                                        title="Total Misc. Expenses" 
+                                        value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} 
+                                        description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`} 
+                                    />
+                                    <StatCard 
+                                        icon={<Ban className="text-red-500" />} 
+                                        title="Pardoned Deficits" 
+                                        value={formatCurrency(stats.totalPardonedAmount)}
+                                        description="Unplanned discounts given today" 
+                                    />
                                 </CardContent>
                                 <CardFooter>
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
                                         <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Net Revenue</Label>
                                         <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.netRevenue)}</p>
-                                        <p className="text-xs text-muted-foreground">(Paid Sales - Expenses - Pardons - Settled Change)</p>
+                                        <p className="text-xs text-muted-foreground">(All Payments - Expenses - Pardons)</p>
                                     </div>
                                 </CardFooter>
                             </Card>
@@ -626,7 +680,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                          <Card>
                             <CardHeader>
                                 <CardTitle>Item Sales (Completed Orders)</CardTitle>
-                                <CardDescription>Total count and value of each item sold.</CardDescription>
+                                <CardDescription>Total count and value of each item sold today.</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <ScrollArea className="h-[350px] md:h-[400px] pr-4">
@@ -640,7 +694,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                                 <Badge variant="default" className="bg-primary/80">{formatCurrency(itemStats.totalValue)}</Badge>
                                             </div>
                                         )) : (
-                                            <p className="text-muted-foreground text-center italic py-4">No items sold in this period.</p>
+                                            <p className="text-muted-foreground text-center italic py-4">No items sold today.</p>
                                         )}
                                     </div>
                                 </ScrollArea>
@@ -707,6 +761,3 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-
-
