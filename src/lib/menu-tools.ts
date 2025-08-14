@@ -1,50 +1,78 @@
+
 /**
  * @fileOverview This file contains the functions that interact with the menu items
  * collection in Firestore. These are used as tools by the AI agent.
  */
 
-import { collection, getDocs, addDoc, query, where, writeBatch } from 'firebase/firestore';
-import { db } from './firebase';
-import type { AddMenuItemInput, GetMenuItemsInput, UpdateMenuItemInput, DeleteMenuItemInput, GetMenuItemsOutput } from '@/ai/schemas';
-import type { MenuItem } from './types';
-
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { MenuItem } from '@/lib/types';
+import { 
+  type GetMenuItemsInput, 
+  type GetMenuItemsOutput,
+  type AddMenuItemInput,
+  type UpdateMenuItemInput,
+  type DeleteMenuItemInput
+} from '@/ai/schemas';
 
 /**
- * Retrieves menu items from Firestore.
+ * Retrieves menu items from Firestore, optionally filtered by category.
  */
 export async function getMenuItems(input: GetMenuItemsInput): Promise<GetMenuItemsOutput> {
     try {
         const menuRef = collection(db, "menuItems");
-        let q;
+        let menuQuery = query(menuRef);
+        
         if (input.category) {
-            q = query(menuRef, where("category", "==", input.category));
-        } else {
-            q = query(menuRef);
+            menuQuery = query(menuRef, where('category', '==', input.category));
         }
-        const snapshot = await getDocs(q);
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem));
-        return items;
+        
+        const querySnapshot = await getDocs(menuQuery);
+        const items: MenuItem[] = [];
+        
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            items.push({
+                id: doc.id,
+                name: data.name,
+                price: data.price,
+                category: data.category,
+                stock: data.stock || 0,
+                requiresChoice: data.requiresChoice || false,
+            });
+        });
+
+        return {
+            items,
+            totalCount: items.length,
+        };
     } catch (error) {
-        console.error("Error getting menu items:", error);
-        return [];
+        console.error("Error fetching menu items:", error);
+        return {
+            items: [],
+            totalCount: 0,
+        };
     }
 }
 
 /**
- * Adds a new item to the menu in Firestore.
+ * Adds a new menu item to Firestore.
  */
 export async function addMenuItem(input: AddMenuItemInput): Promise<string> {
     try {
-        await addDoc(collection(db, "menuItems"), {
+        const menuRef = collection(db, "menuItems");
+        const docRef = await addDoc(menuRef, {
             name: input.name,
             price: input.price,
             category: input.category,
-            stock: input.stock ?? 100, // Default stock
+            stock: input.stock,
+            requiresChoice: false,
         });
-        return `Successfully added "${input.name}" to the menu.`;
+        
+        return `Successfully added "${input.name}" to the ${input.category} category with ID: ${docRef.id}`;
     } catch (error) {
         console.error("Error adding menu item:", error);
-        return `Failed to add "${input.name}" to the menu.`;
+        return `Failed to add "${input.name}" to the menu. Error: ${error}`;
     }
 }
 
@@ -53,30 +81,21 @@ export async function addMenuItem(input: AddMenuItemInput): Promise<string> {
  */
 export async function updateMenuItem(input: UpdateMenuItemInput): Promise<string> {
     try {
-        const q = query(collection(db, "menuItems"), where("name", "==", input.name));
-        const snapshot = await getDocs(q);
-
-        if (snapshot.empty) {
-            return `Could not find an item named "${input.name}" to update.`;
-        }
-
-        const batch = writeBatch(db);
-        const updates: Partial<MenuItem> = {};
-        if (input.newName) updates.name = input.newName;
-        if (input.newPrice) updates.price = input.newPrice;
-        if (input.newCategory) updates.category = input.newCategory;
-        if (input.newStock !== undefined) updates.stock = input.newStock;
-
-        snapshot.forEach(doc => {
-            batch.update(doc.ref, updates);
-        });
-
-        await batch.commit();
-        return `Successfully updated the item "${input.name}".`;
-
+        const menuRef = doc(db, "menuItems", input.id);
+        const updateData: any = {};
+        
+        if (input.name !== undefined) updateData.name = input.name;
+        if (input.price !== undefined) updateData.price = input.price;
+        if (input.category !== undefined) updateData.category = input.category;
+        if (input.stock !== undefined) updateData.stock = input.stock;
+        
+        await updateDoc(menuRef, updateData);
+        
+        const updatedFields = Object.keys(updateData).join(', ');
+        return `Successfully updated menu item (ID: ${input.id}). Updated fields: ${updatedFields}`;
     } catch (error) {
         console.error("Error updating menu item:", error);
-        return `Failed to update the item "${input.name}".`;
+        return `Failed to update menu item (ID: ${input.id}). Error: ${error}`;
     }
 }
 
@@ -85,23 +104,12 @@ export async function updateMenuItem(input: UpdateMenuItemInput): Promise<string
  */
 export async function deleteMenuItem(input: DeleteMenuItemInput): Promise<string> {
     try {
-        const q = query(collection(db, "menuItems"), where("name", "==", input.name));
-        const snapshot = await getDocs(q);
-
-        if (snapshot.empty) {
-            return `Could not find an item named "${input.name}" to delete.`;
-        }
+        const menuRef = doc(db, "menuItems", input.id);
+        await deleteDoc(menuRef);
         
-        const batch = writeBatch(db);
-        snapshot.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-
-        await batch.commit();
-        return `Successfully deleted "${input.name}" from the menu.`;
-
+        return `Successfully deleted menu item with ID: ${input.id}`;
     } catch (error) {
         console.error("Error deleting menu item:", error);
-        return `Failed to delete "${input.name}".`;
+        return `Failed to delete menu item (ID: ${input.id}). Error: ${error}`;
     }
 }

@@ -22,7 +22,6 @@ import {
 import { getBusinessDataForRange } from '@/lib/tools';
 import { getMenuItems, addMenuItem, updateMenuItem, deleteMenuItem } from '@/lib/menu-tools';
 
-
 const getBusinessDataTool = ai.defineTool(
     {
         name: 'getBusinessData',
@@ -73,26 +72,6 @@ const deleteMenuItemTool = ai.defineTool(
     async (input) => deleteMenuItem(input)
 );
 
-const businessChatPrompt = ai.definePrompt({
-    name: 'businessChatPrompt',
-    output: { format: 'text' },
-    tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
-    model: 'googleai/gemini-2.0-flash', // Use a single, fast model for chat
-    system: `You are an expert business analyst and friendly assistant for a cafe called "Nuel's Foodzone Cafe".
-Your role is to answer questions from the business owner or manager based on sales data, and to help them manage the menu.
-You have access to several tools to help you.
-
-- For questions about sales, orders, or financial performance (e.g., "What were our sales yesterday?", "How much MoMo did we receive last week?"), you MUST use the 'getBusinessData' tool.
-- For questions about the menu itself (e.g., "How many items are on the menu?", "List all the snacks"), you MUST use the 'getMenuItems' tool.
-- For requests to modify the menu (e.g., "Add a new drink", "Change a price", "Remove an item"), you MUST use the 'addMenuItem', 'updateMenuItem', or 'deleteMenuItem' tools respectively.
-- When adding a new item with the 'addMenuItem' tool, the 'category' is a required field. If the user does not provide a category in their prompt (e.g., "add sausage for 5 cedis"), you MUST ask them for the category before calling the tool. For example: "I can add 'Sausage' for GH₵5.00. What category should I put it in?"
-- Today's date is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}. Use this to determine the correct date range for terms like "yesterday", "last week", or "last month".
-- When you receive data or a confirmation message from a tool, analyze it and present the key information to the user in a clear, friendly, and concise way.
-- If the tool returns no data (e.g., zero sales), state that clearly to the user. Do not invent data.
-- If the user's question is unclear, ask for clarification.
-`,
-});
-
 const businessChatFlow = ai.defineFlow(
     {
         name: 'businessChatFlow',
@@ -102,20 +81,59 @@ const businessChatFlow = ai.defineFlow(
     async (input) => {
         try {
             const { history, prompt } = input;
+            
+            // Determine model based on task complexity
+            const isComplexTask = prompt.toLowerCase().includes('report') || 
+                                 prompt.toLowerCase().includes('analysis') || 
+                                 prompt.toLowerCase().includes('comprehensive') ||
+                                 prompt.toLowerCase().includes('detailed');
+            
+            const model = isComplexTask ? 'googleai/gemini-2.5-pro' : 'googleai/gemini-2.0-flash';
 
             const { text } = await ai.generate({
-                model: 'googleai/gemini-2.0-flash',
-                history: history,
-                prompt: prompt,
+                model,
+                history,
+                prompt,
                 tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
+                system: `You are an expert business analyst and friendly assistant for a cafe called "Nuel's Foodzone Cafe".
+Your role is to answer questions from the business owner or manager based on sales data, and to help them manage the menu.
+You have access to several tools to help you.
+
+**Tool Usage Guidelines:**
+- For questions about sales, orders, or financial performance (e.g., "What were our sales yesterday?", "How much revenue did we make last week?"), use the 'getBusinessData' tool.
+- For questions about the menu itself (e.g., "How many items are on the menu?", "List all the beverages"), use the 'getMenuItems' tool.
+- For requests to modify the menu:
+  - Use 'addMenuItem' to add new items
+  - Use 'updateMenuItem' to change existing items (price, name, category, stock)
+  - Use 'deleteMenuItem' to remove items
+- When adding a new item, the 'category' is REQUIRED. If the user doesn't specify a category, ask them first before calling the tool.
+
+**Date Calculations:**
+Today's date is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}. 
+Use this to calculate date ranges for terms like:
+- "yesterday" = previous day
+- "last week" = 7 days ago to today  
+- "last month" = 30 days ago to today
+- "this week" = Monday of current week to today
+
+**Response Style:**
+- Present data clearly and concisely
+- Use formatting (tables, bullets) when helpful
+- If tools return no data, state this clearly
+- For complex requests, provide comprehensive analysis
+- Always be friendly and helpful
+
+**Error Handling:**
+- If a tool fails, explain what went wrong
+- If data is missing, don't invent information
+- Ask for clarification if requests are unclear`
             });
 
-            return text;
+            return text || "I apologize, but I couldn't generate a response. Please try rephrasing your question.";
 
         } catch (error) {
             console.error('Error in business chat flow:', error);
-            // Fallback response in case of any error during the flow
-            return "I'm sorry, I encountered an error while processing your request. Please try rephrasing your question about the business performance.";
+            return "I'm sorry, I encountered an error while processing your request. Please try rephrasing your question about the business performance or menu management.";
         }
     }
 );
