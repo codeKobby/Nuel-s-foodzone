@@ -82,7 +82,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                             checked={isSelected}
                             onCheckedChange={(checked) => onSelectionChange(order.id, !!checked)}
                             aria-label={`Select order ${order.simplifiedId}`}
-                            disabled={order.paymentStatus === 'Paid'}
+                            disabled={order.paymentStatus === 'Paid' && order.balanceDue === 0}
                         />
                         <div>
                             <CardTitle className="cursor-pointer text-base" onClick={() => onSelectionChange(order.id, !isSelected)}>{order.simplifiedId}</CardTitle>
@@ -166,7 +166,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
         setSelectedOrderIds(prev => {
             const newSet = new Set(prev);
             const order = orders.find(o => o.id === orderId);
-             if (order?.paymentStatus === 'Paid') return prev; 
+             if (order?.paymentStatus === 'Paid' && order.balanceDue === 0) return prev; 
 
             if (isSelected) {
                 newSet.add(orderId);
@@ -263,6 +263,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
             pending: groupOrdersByDate(searchFiltered.filter(o => o.status === 'Pending')),
             unpaid: groupOrdersByDate(searchFiltered.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0)),
             completed: groupOrdersByDate(searchFiltered.filter(o => o.status === 'Completed')),
+            changeDue: groupOrdersByDate(searchFiltered.filter(o => o.balanceDue < 0)),
         };
     }, [orders, filteredOrdersByTime, searchQuery]);
     
@@ -270,6 +271,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
     const pendingOrdersCount = useMemo(() => Object.values(finalFilteredOrders.pending).flat().length, [finalFilteredOrders.pending]);
     const unpaidOrdersCount = useMemo(() => Object.values(finalFilteredOrders.unpaid).flat().length, [finalFilteredOrders.unpaid]);
     const completedOrdersCount = useMemo(() => Object.values(finalFilteredOrders.completed).flat().length, [finalFilteredOrders.completed]);
+    const changeDueOrdersCount = useMemo(() => Object.values(finalFilteredOrders.changeDue).flat().length, [finalFilteredOrders.changeDue]);
 
 
     const renderGroupedOrderList = (groupedOrders: Record<string, Order[]>, emptyMessage: string) => {
@@ -347,9 +349,10 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                     </div>
                 </div>
                 <Tabs defaultValue="pending" className="w-full">
-                  <TabsList className="grid w-full max-w-md grid-cols-3">
+                  <TabsList className="grid w-full max-w-lg grid-cols-4">
                     <TabsTrigger value="pending">Pending ({pendingOrdersCount})</TabsTrigger>
                     <TabsTrigger value="unpaid">Unpaid ({unpaidOrdersCount})</TabsTrigger>
+                    <TabsTrigger value="changeDue">Change Due ({changeDueOrdersCount})</TabsTrigger>
                     <TabsTrigger value="completed">Completed ({completedOrdersCount})</TabsTrigger>
                   </TabsList>
                   <TabsContent value="pending">
@@ -357,6 +360,9 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                   </TabsContent>
                    <TabsContent value="unpaid">
                     {renderGroupedOrderList(finalFilteredOrders.unpaid, "No unpaid orders found.")}
+                  </TabsContent>
+                   <TabsContent value="changeDue">
+                    {renderGroupedOrderList(finalFilteredOrders.changeDue, "No orders with change due found.")}
                   </TabsContent>
                   <TabsContent value="completed">
                     {renderGroupedOrderList(finalFilteredOrders.completed, "No completed orders found.")}

@@ -477,4 +477,3 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
 };
 
 export default PosView;
-

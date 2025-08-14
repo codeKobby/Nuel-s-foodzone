@@ -135,23 +135,26 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 
             } else {
                 let paymentStatus: Order['paymentStatus'] = 'Unpaid';
-                 let balanceDue = total;
+                let balanceDue = total;
                 
                 if (isPaid) {
-                    if (paymentMethod === 'cash' && isAmountPaidEntered && finalAmountPaid < total && !pardonDeficit) {
-                        paymentStatus = 'Partially Paid';
-                    } else if (finalAmountPaid >= total || pardonDeficit) {
-                        paymentStatus = 'Paid';
+                     let amountReceived = finalAmountPaid;
+                    if (pardonDeficit && amountReceived < total) {
+                        amountReceived = total; // If deficit is pardoned, act as if full amount was paid
                     }
-                     balanceDue = finalAmountPaid - total - pardonedAmount;
-                     if(pardonDeficit && finalAmountPaid < total) {
-                        balanceDue = 0;
-                     }
+                    
+                    balanceDue = total - amountReceived; // Positive if deficit, negative if change
+                    
+                     if (amountReceived >= total) {
+                        paymentStatus = 'Paid';
+                    } else {
+                        paymentStatus = 'Partially Paid';
+                    }
                 }
                 
                 orderData.paymentStatus = paymentStatus;
-                orderData.amountPaid = isPaid ? finalAmountPaid : 0;
-                orderData.balanceDue = balanceDue;
+                orderData.amountPaid = isPaid ? finalAmountPaid : 0; // Log the actual amount from customer
+                orderData.balanceDue = balanceDue; // This will be negative if change is due
                 orderData.status = 'Pending';
 
 
