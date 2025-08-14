@@ -51,7 +51,7 @@ export const GetBusinessDataInputSchema = z.object({
 export type GetBusinessDataInput = z.infer<typeof GetBusinessDataInputSchema>;
 
 export const GetBusinessDataOutputSchema = z.object({
-    totalSales: z.number().describe('The total sales revenue for the period from all completed orders.'),
+    totalSales: z.number(),
     netSales: z.number(),
     totalOrders: z.number(),
     itemPerformance: z.array(z.object({
@@ -59,10 +59,10 @@ export const GetBusinessDataOutputSchema = z.object({
         count: z.number(),
     })),
     cashDiscrepancy: z.number(),
-    cashSales: z.number().describe("Total sales paid with cash."),
-    momoSales: z.number().describe("Total sales paid with MoMo/Card."),
-    miscExpenses: z.number().describe("Total amount of all miscellaneous expenses, from both cash and momo."),
-    changeOwed: z.number().describe("Total outstanding change owed to customers from cash transactions."),
+    cashSales: z.number(),
+    momoSales: z.number(),
+    miscExpenses: z.number(),
+    changeOwed: z.number(),
 });
 export type GetBusinessDataOutput = z.infer<typeof GetBusinessDataOutputSchema>;
 
