@@ -63,7 +63,9 @@ interface DashboardStats {
     netRevenue: number;
     unpaidOrdersValue: number;
     totalMiscExpenses: number;
-    totalDiscrepancy: number;
+    totalDiscrepancy: number; // The net total
+    totalSurplus: number; // Sum of all positive discrepancies
+    totalDeficit: number; // Sum of all negative discrepancies (as a positive number)
     totalPardonedAmount: number;
     salesData: { date: string; sales: number, revenue: number }[];
     itemPerformance: { name: string; count: number; totalValue: number }[];
@@ -73,6 +75,7 @@ interface DashboardStats {
     momoSales: number;
     totalOrders: number;
 }
+
 
 interface ChatMessage {
     role: 'user' | 'model';
@@ -222,7 +225,7 @@ const DashboardView: React.FC = () => {
                 }
                 
                 // 3. Paid Revenue (from any payment made in range)
-                 const paymentDate = order.lastPaymentTimestamp?.toDate() ?? orderDate;
+                 const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
                 if (paymentDate >= startDate && paymentDate <= endDate) {
                     if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
                         const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
@@ -249,10 +252,20 @@ const DashboardView: React.FC = () => {
             
             // Process reconciliation reports for the period
             let totalDiscrepancy = 0;
+            let totalSurplus = 0;
+            let totalDeficit = 0;
             const discrepancyReports: ReconciliationReport[] = [];
             reportsSnapshot.forEach(doc => {
                 const report = {id: doc.id, ...doc.data()} as ReconciliationReport;
-                totalDiscrepancy += report.totalDiscrepancy; // Sum up both surpluses and deficits
+                const discrepancy = report.totalDiscrepancy;
+                totalDiscrepancy += discrepancy;
+
+                if (discrepancy > 0) {
+                    totalSurplus += discrepancy;
+                } else if (discrepancy < 0) {
+                    totalDeficit += Math.abs(discrepancy);
+                }
+
                 if (report.totalDiscrepancy !== 0) {
                     discrepancyReports.push(report);
                 }
@@ -315,7 +328,9 @@ const DashboardView: React.FC = () => {
                 momoSales,
                 unpaidOrdersValue,
                 totalMiscExpenses,
-                totalDiscrepancy: totalDiscrepancy, 
+                totalDiscrepancy, 
+                totalSurplus,
+                totalDeficit,
                 totalPardonedAmount,
                 salesData,
                 itemPerformance,
@@ -387,7 +402,7 @@ const DashboardView: React.FC = () => {
                 totalOrders: stats.totalOrders,
                 avgOrderValue: stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0,
                 itemPerformance: stats.itemPerformance.slice(0, 10), // Send top 10 items
-                cashDiscrepancy: stats.totalDiscrepancy ?? 0,
+                cashDiscrepancy: stats.totalDiscrepancy,
                 miscExpenses: stats.totalMiscExpenses,
             };
             const result = await analyzeBusiness(input);
@@ -434,11 +449,11 @@ const DashboardView: React.FC = () => {
         }
 
         try {
-            const input: BusinessChatInput = {
-                history: newHistory.map(m => ({...m, parts: [{text: m.content}]})),
-                prompt: '', // Prompt is now part of history
-            };
-            const response = await businessChat(input);
+            const {text: response} = await businessChat({
+                history: newHistory.map(m => ({role: m.role, content: [{text: m.content}]})),
+                prompt: ''
+            });
+
             const newModelMessage: ChatMessage = { role: 'model', content: response };
             
             // Save the full exchange to Firestore
@@ -774,19 +789,19 @@ const DashboardView: React.FC = () => {
                     </StatCard>
                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description="Paid Sales - Expenses - Pardons"/>
                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Balance (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} />
-                     <StatCard 
-                        icon={<FileWarning className={stats.totalDiscrepancy === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
-                        title="Total Discrepancy (Period)" 
-                        value={formatCurrency(stats.totalDiscrepancy)} 
+                    <StatCard 
+                        icon={<TrendingUp className="text-blue-500" />} 
+                        title="Total Surplus (Period)" 
+                        value={formatCurrency(stats.totalSurplus)}
                         description={stats.discrepancyReports.length > 0 ? "Click to view details" : undefined}
                         onClick={stats.discrepancyReports.length > 0 ? () => setIsDiscrepancyModalOpen(true) : undefined}
                     />
-                     <StatCard 
-                        icon={<Ban className={stats.totalPardonedAmount === 0 ? "text-muted-foreground" : "text-orange-500"}/>} 
-                        title="Pardoned Deficits" 
-                        value={formatCurrency(stats.totalPardonedAmount)} 
-                        description={stats.pardonedOrders.length > 0 ? "Click to view details" : undefined}
-                        onClick={stats.pardonedOrders.length > 0 ? () => setIsPardonedModalOpen(true) : undefined}
+                    <StatCard 
+                        icon={<TrendingDown className="text-red-500" />} 
+                        title="Total Deficit (Period)" 
+                        value={formatCurrency(stats.totalDeficit)}
+                        description={stats.discrepancyReports.length > 0 ? "Click to view details" : undefined}
+                        onClick={stats.discrepancyReports.length > 0 ? () => setIsDiscrepancyModalOpen(true) : undefined}
                     />
                 </div>
                 
@@ -982,5 +997,3 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
-
-    
