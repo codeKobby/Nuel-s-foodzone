@@ -83,7 +83,6 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     lastPaymentTimestamp: now,
                     lastPaymentAmount: amountToPayForOrder,
                     pardonedAmount: order.pardonedAmount || 0,
-                    status: 'Pending', // Orders are always pending until manually completed
                 };
                 
                 if (newBalanceDue <= 0) {
@@ -212,3 +211,4 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 };
 
 export default CombinedPaymentModal;
+
