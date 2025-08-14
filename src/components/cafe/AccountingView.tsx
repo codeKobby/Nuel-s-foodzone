@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -5,7 +6,7 @@ import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serve
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass, ShoppingCart, Lock, X, Ban, HelpCircle } from 'lucide-react';
+import { DollarSign, CreditCard, MinusCircle, History, Landmark, Coins, AlertCircle, Search, Package, Calendar as CalendarIcon, FileCheck, Hourglass, ShoppingCart, Lock, X, Ban, HelpCircle, TrendingUp, TrendingDown, Plus } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -60,6 +61,8 @@ interface PeriodStats {
     todayUnpaidOrdersValue: number;
     totalPardonedAmount: number;
     changeOwedForPeriod: number;
+    settledUnpaidOrdersValue: number; // Unpaid orders from previous days settled today
+    previousDaysChangeGiven: number; // Change given today but from previous days
     orders: Order[];
     itemStats: Record<string, { count: number; totalValue: number }>;
 }
@@ -132,21 +135,24 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
     const totalCountedRevenue = useMemo(() => totalCountedCash + totalCountedMomo, [totalCountedCash, totalCountedMomo]);
     
-    const reconciliationExpectedCash = useMemo(() => {
+    // Adjusted expected cash calculation including settled unpaid orders and previous days change
+    const adjustedExpectedCash = useMemo(() => {
         if (!stats) return 0;
+        let expectedCash = stats.expectedCash + stats.settledUnpaidOrdersValue - stats.previousDaysChangeGiven;
+        
         // If we set aside the change, the cash drawer should have that money, so don't subtract it from expected.
         if (setAsideChange) {
-            return stats.expectedCash;
+            return expectedCash;
         }
         // If we DON'T set it aside, it's a deficit for the day, so subtract it.
-        return stats.expectedCash - stats.changeOwedForPeriod;
+        return expectedCash - stats.changeOwedForPeriod;
     }, [stats, setAsideChange]);
     
     const totalDiscrepancy = useMemo(() => {
         if (!stats) return 0;
-        const expectedRevenue = reconciliationExpectedCash + stats.expectedMomo;
+        const expectedRevenue = adjustedExpectedCash + stats.expectedMomo;
         return totalCountedRevenue - expectedRevenue;
-    }, [totalCountedRevenue, stats, reconciliationExpectedCash]);
+    }, [totalCountedRevenue, stats, adjustedExpectedCash]);
     
     const handleDenominationChange = (value: string, denomination: string) => {
         setDenominationQuantities(prev => ({ ...prev, [denomination]: value }));
@@ -197,10 +203,18 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 where("paymentStatus", "in", ["Unpaid", "Partially Paid"])
             );
 
-            const [todayOrdersSnapshot, todayMiscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
+            // Query for orders settled today (from previous days)
+            const settledTodayQuery = query(
+                collection(db, "orders"),
+                where("settledOn", ">=", startDateTimestamp),
+                where("settledOn", "<=", endDateTimestamp)
+            );
+
+            const [todayOrdersSnapshot, todayMiscSnapshot, allUnpaidOrdersSnapshot, settledTodaySnapshot] = await Promise.all([
                 getDocs(todayOrdersQuery),
                 getDocs(todayMiscQuery),
-                getDocs(allUnpaidOrdersQuery)
+                getDocs(allUnpaidOrdersQuery),
+                getDocs(settledTodayQuery)
             ]);
 
             // Initialize variables
@@ -214,6 +228,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             let todayUnpaidOrdersValue = 0;
             let totalPardonedAmount = 0;
             let changeOwedForPeriod = 0;
+            let settledUnpaidOrdersValue = 0;
+            let previousDaysChangeGiven = 0;
 
             // Process all unpaid orders (all time)
             allUnpaidOrdersSnapshot.docs.forEach(doc => {
@@ -224,6 +240,22 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const orderDate = order.timestamp.toDate();
                 if (orderDate >= today && orderDate <= todayEnd) {
                     todayUnpaidOrdersValue += order.balanceDue;
+                }
+            });
+
+            // Process orders settled today (from previous days)
+            settledTodaySnapshot.docs.forEach(doc => {
+                const order = { id: doc.id, ...doc.data() } as Order;
+                const orderDate = order.timestamp.toDate();
+                
+                // Only count if order was from a previous day but settled today
+                if (orderDate < today) {
+                    settledUnpaidOrdersValue += order.amountPaid;
+                    
+                    // Track change given today for orders from previous days
+                    if (order.changeGiven && order.changeGiven > 0) {
+                        previousDaysChangeGiven += order.changeGiven;
+                    }
                 }
             });
             
@@ -256,7 +288,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 }
                 
                 // Calculate cash and momo sales (all payments received today)
-                // Check if payment was made today
                 const paymentDate = order.lastPaymentTimestamp ? order.lastPaymentTimestamp.toDate() : order.timestamp.toDate();
                 if (paymentDate >= today && paymentDate <= todayEnd) {
                     if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
@@ -286,10 +317,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             // Calculate expected amounts and net revenue
             const expectedCash = cashSales - miscCashExpenses;
             const expectedMomo = momoSales - miscMomoExpenses;
-            const totalExpectedRevenue = expectedCash + expectedMomo;
+            const totalExpectedRevenue = expectedCash + expectedMomo + settledUnpaidOrdersValue;
             
-            // Net Revenue = (All Payments Received) - (All Expenses) - (Pardoned Amount)
-            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses) - totalPardonedAmount;
+            // Net Revenue = (All Payments Received) - (All Expenses) - (Pardoned Amount) + (Settled Unpaid Orders) - (Previous Days Change)
+            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses) - totalPardonedAmount + settledUnpaidOrdersValue - previousDaysChangeGiven;
             
             setStats({ 
                 totalSales, 
@@ -305,13 +336,15 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 allTimeUnpaidOrdersValue,
                 todayUnpaidOrdersValue,
                 totalPardonedAmount, 
-                changeOwedForPeriod, 
+                changeOwedForPeriod,
+                settledUnpaidOrdersValue,
+                previousDaysChangeGiven,
                 orders: todayOrders, 
                 itemStats 
             });
             
         } catch (e) {
-            console.error(e);
+            console.error("Error fetching period data:", e);
             setError("Failed to load financial data for today.");
         } finally {
             setLoading(false);
@@ -328,20 +361,20 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReconciliationReport)));
         }, (err) => {
-            console.error(err);
+            console.error("Error loading reports:", err);
             setError("Failed to load past reports.");
         });
 
         return () => unsubscribe();
     }, []);
     
-    const resetForm = () => {
+    const resetForm = useCallback(() => {
         setDenominationQuantities(initialDenominations);
         setMomoTransactions([]);
         setMomoInput('');
         setNotes('');
         setSetAsideChange(true);
-    }
+    }, []);
 
     const handleSaveReport = async () => {
         if (!stats) {
@@ -352,17 +385,19 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             setError("Please count either cash or Momo/Card before submitting.");
             return;
         }
+        
         setError(null);
         setIsSubmitting(true);
+        
         try {
             const reportData: Omit<ReconciliationReport, 'id'> = {
                 timestamp: serverTimestamp(),
                 period: format(today, 'yyyy-MM-dd'),
                 totalSales: stats.totalSales,
                 
-                expectedCash: reconciliationExpectedCash,
+                expectedCash: adjustedExpectedCash,
                 expectedMomo: stats.expectedMomo,
-                totalExpectedRevenue: reconciliationExpectedCash + stats.expectedMomo,
+                totalExpectedRevenue: adjustedExpectedCash + stats.expectedMomo,
                 
                 countedCash: totalCountedCash,
                 countedMomo: totalCountedMomo,
@@ -374,18 +409,24 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 changeOwedForPeriod: stats.changeOwedForPeriod,
                 changeOwedSetAside: setAsideChange,
             };
+            
             await addDoc(collection(db, "reconciliationReports"), reportData);
             
+            // Reset form and close modal
             resetForm();
             setIsCloseOutOpen(false);
-            fetchPeriodData(); // Refetch data to prevent stale state error
+            setShowConfirm(false);
+            
+            // Delay refetch to prevent stale state errors
+            setTimeout(() => {
+                fetchPeriodData();
+            }, 500);
 
         } catch (e) {
-            console.error(e);
-            setError("Failed to save the report.");
+            console.error("Error saving report:", e);
+            setError("Failed to save the report. Please try again.");
         } finally {
             setIsSubmitting(false);
-            setShowConfirm(false);
         }
     };
     
@@ -413,147 +454,248 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     };
     
     const CloseOutDialog = (
-        <Dialog open={isCloseOutOpen} onOpenChange={setIsCloseOutOpen}>
-            <DialogContent className="max-w-4xl">
-                 <DialogHeader>
-                    <DialogTitle>End-of-Day Reconciliation</DialogTitle>
-                    <DialogDescription>
-                        Count physical cash and reconcile accounts for today's sales. This action will save a permanent report.
+        <Dialog open={isCloseOutOpen} onOpenChange={(open) => {
+            if (!isSubmitting) {
+                setIsCloseOutOpen(open);
+                if (!open) {
+                    resetForm();
+                    setError(null);
+                }
+            }
+        }}>
+            <DialogContent className="max-w-6xl max-h-[90vh]">
+                <DialogHeader className="pb-4 border-b">
+                    <DialogTitle className="text-2xl font-bold">End-of-Day Reconciliation</DialogTitle>
+                    <DialogDescription className="text-base">
+                        Complete daily cash reconciliation and account for all transactions for {format(today, "EEEE, MMMM dd, yyyy")}
                     </DialogDescription>
                 </DialogHeader>
-                 {!stats ? <LoadingSpinner /> : (
-                <ScrollArea className="max-h-[70vh] p-1">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 pr-4">
-                     <div className="space-y-4">
-                        <Label className="text-lg font-semibold">Counted Totals</Label>
-                        <div className="space-y-4 p-4 border rounded-md bg-secondary">
-                             <div>
-                                <Label className="text-base font-medium">Cash by Denomination</Label>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2">
+                
+                {!stats ? <LoadingSpinner /> : (
+                <ScrollArea className="max-h-[70vh]">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-6 pr-4">
+                    {/* Left Column - Input Section */}
+                    <div className="space-y-6">
+                        <div className="p-6 border rounded-lg bg-card">
+                            <Label className="text-xl font-bold mb-4 block">Physical Count</Label>
+                            
+                            {/* Cash Denominations */}
+                            <div className="space-y-4">
+                                <Label className="text-lg font-semibold">Cash by Denomination</Label>
+                                <div className="grid grid-cols-2 gap-3">
                                     {cashDenominations.map(den => (
-                                        <div key={den} className="flex items-center gap-2">
-                                            <Label htmlFor={`den-${den}`} className="w-16 text-right">{`GH₵${den}`}</Label>
-                                            <span className="text-muted-foreground">x</span>
+                                        <div key={den} className="flex items-center gap-3 p-2 bg-secondary rounded-md">
+                                            <Label htmlFor={`den-${den}`} className="w-20 font-medium">{`GH₵${den}`}</Label>
+                                            <span className="text-muted-foreground">×</span>
                                             <Input 
                                                 id={`den-${den}`} 
                                                 type="number" 
                                                 value={denominationQuantities[den]} 
                                                 onChange={e => handleDenominationChange(e.target.value, String(den))} 
                                                 placeholder="0"
-                                                className="h-9 w-full"
+                                                className="flex-1 h-10"
                                             />
                                         </div>
                                     ))}
                                 </div>
+                                <div className="p-3 bg-primary/10 rounded-md">
+                                    <p className="font-semibold text-primary">Total Counted Cash: {formatCurrency(totalCountedCash)}</p>
+                                </div>
                             </div>
-                            <div>
-                                <Label className="text-base font-medium">Momo/Card Transactions</Label>
-                                <div className="mt-2">
-                                     <Input 
-                                        type="number" 
-                                        value={momoInput} 
-                                        onChange={e => setMomoInput(e.target.value)} 
-                                        onKeyDown={handleMomoInputKeyDown}
-                                        placeholder="Enter amount and press Space/Enter"
-                                        className="h-10"
-                                    />
-                                    <div className="flex flex-wrap gap-2 mt-2">
-                                        {momoTransactions.map((amount, index) => (
-                                            <Badge key={index} variant="secondary" className="text-base">
-                                                {formatCurrency(amount)}
-                                                <button onClick={() => removeMomoTransaction(index)} className="ml-2 rounded-full hover:bg-muted-foreground/20 p-0.5">
-                                                    <X className="h-3 w-3" />
-                                                </button>
-                                            </Badge>
-                                        ))}
-                                    </div>
+                            
+                            {/* MoMo Transactions */}
+                            <div className="space-y-4 mt-6">
+                                <Label className="text-lg font-semibold">MoMo/Card Transactions</Label>
+                                <Input 
+                                    type="number" 
+                                    value={momoInput} 
+                                    onChange={e => setMomoInput(e.target.value)} 
+                                    onKeyDown={handleMomoInputKeyDown}
+                                    placeholder="Enter amount and press Space/Enter"
+                                    className="h-12 text-lg"
+                                />
+                                <div className="flex flex-wrap gap-2">
+                                    {momoTransactions.map((amount, index) => (
+                                        <Badge key={index} variant="secondary" className="text-sm px-3 py-1">
+                                            {formatCurrency(amount)}
+                                            <button onClick={() => removeMomoTransaction(index)} className="ml-2 hover:bg-destructive/20 rounded-full p-0.5">
+                                                <X className="h-3 w-3" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                </div>
+                                <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-md">
+                                    <p className="font-semibold text-purple-600 dark:text-purple-400">Total Counted MoMo: {formatCurrency(totalCountedMomo)}</p>
                                 </div>
                             </div>
                         </div>
-                        <div className="p-4 border rounded-md">
-                             <div className="flex items-center justify-between">
+                        
+                        {/* Change Setting */}
+                        <div className="p-4 border rounded-lg">
+                            <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Label htmlFor="set-aside-switch" className="font-semibold">Set aside change for tomorrow?</Label>
-                                     <TooltipProvider>
+                                    <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger><HelpCircle className="h-4 w-4 text-muted-foreground" /></TooltipTrigger>
                                             <TooltipContent>
-                                                <p className="max-w-xs">ON: Assumes you keep the change owed ({formatCurrency(stats.changeOwedForPeriod)}) in the cash drawer to pay customers later. It won't be counted as a deficit today.</p>
-                                                <p className="max-w-xs mt-2">OFF: Treats the change owed as a cash deficit for today's report.</p>
+                                                <p className="max-w-xs">ON: Keep change owed ({formatCurrency(stats.changeOwedForPeriod)}) in drawer for customers. Won't count as deficit.</p>
+                                                <p className="max-w-xs mt-2">OFF: Count change owed as cash deficit for today.</p>
                                             </TooltipContent>
                                         </Tooltip>
                                     </TooltipProvider>
                                 </div>
-                                <Switch id="set-aside-switch" checked={setAsideChange} onCheckedChange={setSetAsideChange} disabled={stats.changeOwedForPeriod <= 0}/>
+                                <Switch 
+                                    id="set-aside-switch" 
+                                    checked={setAsideChange} 
+                                    onCheckedChange={setSetAsideChange} 
+                                    disabled={stats.changeOwedForPeriod <= 0}
+                                />
                             </div>
                         </div>
-                        <div>
-                            <Label className="text-lg font-semibold" htmlFor="notes">Notes</Label>
-                            <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g., reason for deficit/surplus" className="mt-2"/>
+                        
+                        {/* Notes */}
+                        <div className="space-y-2">
+                            <Label className="text-lg font-semibold" htmlFor="notes">Notes & Comments</Label>
+                            <Textarea 
+                                id="notes" 
+                                value={notes} 
+                                onChange={e => setNotes(e.target.value)} 
+                                placeholder="Explain any discrepancies, issues, or special circumstances..."
+                                className="min-h-[100px]"
+                            />
                         </div>
-                        <Button variant="outline" size="sm" className="w-full mt-1" onClick={() => setIsAdvancedModalOpen(true)}>
+                        
+                        {/* Audit Tool */}
+                        <Button 
+                            variant="outline" 
+                            size="lg" 
+                            className="w-full" 
+                            onClick={() => setIsAdvancedModalOpen(true)}
+                        >
                             <Search className="mr-2 h-4 w-4" />
-                            Advanced Reconciliation (Audit Tool)
+                            Advanced Reconciliation Audit
                         </Button>
-                     </div>
+                    </div>
 
-                     <div className="space-y-4 p-4 border rounded-lg bg-card">
-                        <h3 className="text-lg font-semibold text-center mb-2">Reconciliation Summary</h3>
-                        
-                        <Card className="bg-secondary">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-base">Expected Revenue</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-1 text-sm">
-                                <div className="flex justify-between"><span>Cash Sales:</span> <span>{formatCurrency(stats.cashSales)}</span></div>
-                                <div className="flex justify-between"><span>(-) Cash Expenses:</span> <span className="text-orange-500">{formatCurrency(stats.miscCashExpenses)}</span></div>
-                                 {!setAsideChange && stats.changeOwedForPeriod > 0 && (
-                                     <div className="flex justify-between"><span>(-) Change Owed Deficit:</span> <span className="text-orange-500">{formatCurrency(stats.changeOwedForPeriod)}</span></div>
-                                 )}
-                                <div className="flex justify-between font-bold border-t pt-1"><span>Expected Cash Today:</span> <span>{formatCurrency(reconciliationExpectedCash)}</span></div>
-                                <Separator className="my-2"/>
-                                <div className="flex justify-between"><span>MoMo Sales:</span> <span>{formatCurrency(stats.momoSales)}</span></div>
-                                <div className="flex justify-between"><span>(-) MoMo Expenses:</span> <span className="text-orange-500">{formatCurrency(stats.miscMomoExpenses)}</span></div>
-                                <div className="flex justify-between font-bold border-t pt-1"><span>Expected MoMo:</span> <span>{formatCurrency(stats.expectedMomo)}</span></div>
-                            </CardContent>
-                            <CardFooter className="bg-primary/10 p-3">
-                                <div className="w-full flex justify-between items-center">
-                                    <span className="font-bold text-primary text-lg">Total Expected:</span>
-                                    <span className="font-extrabold text-primary text-xl">{formatCurrency(reconciliationExpectedCash + stats.expectedMomo)}</span>
-                                </div>
-                            </CardFooter>
-                        </Card>
-
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-base">Counted Revenue</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-1 text-sm">
-                                <div className="flex justify-between"><span>Counted Cash:</span> <span className="font-bold">{formatCurrency(totalCountedCash)}</span></div>
-                                <div className="flex justify-between"><span>Counted MoMo:</span> <span className="font-bold">{formatCurrency(totalCountedMomo)}</span></div>
-                            </CardContent>
-                             <CardFooter className="bg-green-50 dark:bg-green-900/20 p-3">
-                                <div className="w-full flex justify-between items-center">
-                                    <span className="font-bold text-green-700 dark:text-green-300 text-lg">Total Counted:</span>
-                                    <span className="font-extrabold text-green-600 dark:text-green-400 text-xl">{formatCurrency(totalCountedRevenue)}</span>
-                                </div>
-                            </CardFooter>
-                        </Card>
-                        
-                        <div className="pt-2 flex justify-between items-center">
-                             <Label className="text-lg font-semibold">Final Status</Label>
-                             {renderDifferenceBadge(totalDiscrepancy)}
+                    {/* Right Column - Expected Revenue Breakdown */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="text-center">
+                            <h3 className="text-2xl font-bold mb-2">Reconciliation Analysis</h3>
+                            <p className="text-muted-foreground">Comparing expected vs counted revenue</p>
                         </div>
-                     </div>
+                        
+                        {/* Expected Revenue Card */}
+                        <Card className="border-2">
+                            <CardHeader className="bg-blue-50 dark:bg-blue-900/20">
+                                <CardTitle className="flex items-center gap-2">
+                                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                                    Expected Revenue Breakdown
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Cash Section */}
+                                    <div className="space-y-3">
+                                        <h4 className="font-semibold text-lg text-blue-600">Cash</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span>Today's Cash Sales:</span>
+                                                <span className="font-medium">{formatCurrency(stats.cashSales)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-orange-600">
+                                                <span>(-) Cash Expenses:</span>
+                                                <span className="font-medium">-{formatCurrency(stats.miscCashExpenses)}</span>
+                                            </div>
+                                            {stats.settledUnpaidOrdersValue > 0 && (
+                                                <div className="flex justify-between text-green-600">
+                                                    <span>(+) Settled Old Orders:</span>
+                                                    <span className="font-medium">+{formatCurrency(stats.settledUnpaidOrdersValue)}</span>
+                                                </div>
+                                            )}
+                                            {stats.previousDaysChangeGiven > 0 && (
+                                                <div className="flex justify-between text-red-600">
+                                                    <span>(-) Previous Days Change:</span>
+                                                    <span className="font-medium">-{formatCurrency(stats.previousDaysChangeGiven)}</span>
+                                                </div>
+                                            )}
+                                            {!setAsideChange && stats.changeOwedForPeriod > 0 && (
+                                                <div className="flex justify-between text-red-600">
+                                                    <span>(-) Change Owed Deficit:</span>
+                                                    <span className="font-medium">-{formatCurrency(stats.changeOwedForPeriod)}</span>
+                                                </div>
+                                            )}
+                                            <Separator />
+                                            <div className="flex justify-between font-bold text-blue-700 text-base">
+                                                <span>Expected Cash:</span>
+                                                <span>{formatCurrency(adjustedExpectedCash)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* MoMo Section */}
+                                    <div className="space-y-3">
+                                        <h4 className="font-semibold text-lg text-purple-600">MoMo / Card</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span>Today's MoMo Sales:</span>
+                                                <span className="font-medium">{formatCurrency(stats.momoSales)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-orange-600">
+                                                <span>(-) MoMo Expenses:</span>
+                                                <span className="font-medium">-{formatCurrency(stats.miscMomoExpenses)}</span>
+                                            </div>
+                                            <Separator />
+                                            <div className="flex justify-between font-bold text-purple-700 text-base">
+                                                <span>Expected MoMo:</span>
+                                                <span>{formatCurrency(stats.expectedMomo)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                            <CardFooter className="bg-blue-50 dark:bg-blue-900/20 p-4">
+                                <div className="w-full flex justify-between items-center">
+                                    <span className="font-bold text-blue-700 text-lg">Total Expected:</span>
+                                    <span className="font-extrabold text-blue-800 text-2xl">{formatCurrency(adjustedExpectedCash + stats.expectedMomo)}</span>
+                                </div>
+                            </CardFooter>
+                        </Card>
+
+                        {/* Final Reconciliation Card */}
+                        <Card className="border-2">
+                             <CardHeader className="bg-green-50 dark:bg-green-900/20">
+                                <CardTitle className="flex items-center gap-2">
+                                    <FileCheck className="h-5 w-5 text-green-600" />
+                                    Final Reconciliation
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-6 text-center space-y-4">
+                                <div>
+                                    <p className="text-muted-foreground">Expected Revenue</p>
+                                    <p className="text-2xl font-bold">{formatCurrency(adjustedExpectedCash + stats.expectedMomo)}</p>
+                                </div>
+                                <TrendingDown className="text-muted-foreground mx-auto" />
+                                 <div>
+                                    <p className="text-muted-foreground">Counted Revenue</p>
+                                    <p className="text-2xl font-bold">{formatCurrency(totalCountedRevenue)}</p>
+                                </div>
+                            </CardContent>
+                            <CardFooter className="p-4 flex-col gap-2 items-center">
+                                 <h4 className="font-semibold text-lg">Final Status</h4>
+                                 {renderDifferenceBadge(totalDiscrepancy, 'text-lg px-4 py-2')}
+                            </CardFooter>
+                        </Card>
+                    </div>
                 </div>
                 </ScrollArea>
                 )}
                 
-                {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+                {error && <Alert variant="destructive" className="my-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
 
-                <DialogFooter className="pt-4 border-t">
-                    <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting || !stats} className="w-full h-12 text-lg font-bold">
-                        {isSubmitting ? 'Saving...' : 'Save Report'}
+                <DialogFooter className="pt-6 border-t">
+                    <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting || !stats} className="w-full h-16 text-xl font-bold">
+                        {isSubmitting ? <LoadingSpinner /> : 'Finalize & Save Report'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -672,7 +814,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     <div className="w-full p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
                                         <Label className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">Net Revenue</Label>
                                         <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.netRevenue)}</p>
-                                        <p className="text-xs text-muted-foreground">(All Payments - Expenses - Pardons)</p>
+                                        <p className="text-xs text-muted-foreground">(Payments - Expenses - Pardons + Settled Old Orders)</p>
                                     </div>
                                 </CardFooter>
                             </Card>
