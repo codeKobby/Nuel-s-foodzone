@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -173,13 +174,17 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const startDateTimestamp = Timestamp.fromDate(startDate);
             const endDateTimestamp = Timestamp.fromDate(endDate);
 
-            const allOrdersQuery = query(collection(db, "orders"));
+            // Consolidated queries
+            const periodOrdersQuery = query(
+                collection(db, "orders"), 
+                where("timestamp", ">=", startDateTimestamp), 
+                where("timestamp", "<=", endDateTimestamp)
+            );
             const miscQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
             const allUnpaidOrdersQuery = query(collection(db, "orders"), where("paymentStatus", "in", ["Unpaid", "Partially Paid"]));
 
-            
-            const [allOrdersSnapshot, miscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
-                getDocs(allOrdersQuery),
+            const [periodOrdersSnapshot, miscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
+                getDocs(periodOrdersQuery),
                 getDocs(miscQuery),
                 getDocs(allUnpaidOrdersSnapshot)
             ]);
@@ -196,25 +201,18 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 unpaidOrdersValue += order.balanceDue;
             });
             
-            allOrdersSnapshot.docs.forEach(doc => {
+            periodOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
-                const orderDate = order.timestamp.toDate();
-                const settledDate = order.settledOn?.toDate();
+                periodOrders.push(order);
 
-                if (orderDate >= startDate && orderDate <= endDate) {
-                    periodOrders.push(order);
+                if (order.pardonedAmount && order.pardonedAmount > 0) {
+                    totalPardonedAmount += order.pardonedAmount;
+                }
+                if (order.balanceDue < 0) {
+                    changeOwedForPeriod += Math.abs(order.balanceDue);
                 }
                 
-                if (orderDate >= startDate && orderDate <= endDate) {
-                    if (order.pardonedAmount && order.pardonedAmount > 0) {
-                        totalPardonedAmount += order.pardonedAmount;
-                    }
-                    if (order.balanceDue < 0) {
-                        changeOwedForPeriod += Math.abs(order.balanceDue);
-                    }
-                }
-                
-                if (order.status === 'Completed' && orderDate >= startDate && orderDate <= endDate) {
+                if (order.status === 'Completed') {
                     totalSalesToday += order.total;
                     order.items.forEach(item => {
                         const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
@@ -225,7 +223,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     });
                 }
                 
-                const paymentDate = order.lastPaymentTimestamp ? order.lastPaymentTimestamp.toDate() : orderDate;
+                const paymentDate = order.lastPaymentTimestamp ? order.lastPaymentTimestamp.toDate() : order.timestamp.toDate();
                 if (paymentDate >= startDate && paymentDate <= endDate) {
                     if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
                          const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
@@ -234,7 +232,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     }
                 }
                 
-                // If change was settled in this period, it's a cash outflow for this period.
+                const settledDate = order.settledOn?.toDate();
                 if (settledDate && settledDate >= startDate && settledDate <= endDate) {
                     cashSales -= order.changeGiven;
                 }
@@ -709,3 +707,4 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
