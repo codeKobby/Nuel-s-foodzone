@@ -611,7 +611,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     <StatCard icon={<Landmark className="text-blue-500"/>} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="Total cash received" />
                                     <StatCard icon={<CreditCard className="text-purple-500"/>} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} />
                                     <StatCard icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} title="Unpaid Orders (All Time)" value={formatCurrency(stats.unpaidOrdersValue)} description="Total outstanding balance"/>
-                                    <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Misc. Expenses (Cash)" value={formatCurrency(stats.miscCashExpenses)} />
+                                    <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Total Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} description="Cash and MoMo sources" />
                                     <StatCard icon={<Ban className="text-red-500" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} />
                                 </CardContent>
                                 <CardFooter>
@@ -707,5 +707,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
 
 
