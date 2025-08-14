@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -111,26 +112,33 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 const orderRef = doc(db, "orders", editingOrder.id);
                 const existingOrderSnap = await getDoc(orderRef);
                 const existingOrderData = existingOrderSnap.data() as Order;
-
+                
+                // This is an update. The amount paid is cumulative.
                 const newTotalPaid = existingOrderData.amountPaid + (isPaid ? finalAmountPaid : 0);
-                let newBalanceDue = total - newTotalPaid + changeGiven;
+
+                // Balance is the new total minus what has been paid cumulatively.
+                let newBalanceDue = total - newTotalPaid;
                 
                 if (pardonedAmount > 0) {
                     newBalanceDue = 0; // If deficit is pardoned, balance becomes 0
                 }
+                
+                // If change was given, subtract it from the balance (making it negative).
+                if (changeGiven > 0) {
+                    newBalanceDue -= changeGiven;
+                }
 
                 orderData.amountPaid = newTotalPaid;
                 orderData.balanceDue = newBalanceDue;
-
-                if (newTotalPaid === 0) {
-                     orderData.paymentStatus = 'Unpaid';
-                } else if (newBalanceDue <= 0) { 
-                    orderData.paymentStatus = 'Paid';
-                } else {
-                    orderData.paymentStatus = 'Partially Paid';
-                }
                 
-                orderData.status = 'Pending';
+                // Determine payment status based on the new balance
+                if (newBalanceDue <= 0) { // Paid in full or change owed
+                    orderData.paymentStatus = 'Paid';
+                } else if (newTotalPaid > 0) { // Partially paid
+                    orderData.paymentStatus = 'Partially Paid';
+                } else { // Nothing paid
+                    orderData.paymentStatus = 'Unpaid';
+                }
                 
                 await updateDoc(orderRef, orderData);
                 finalOrder = { ...existingOrderData, ...orderData, id: editingOrder.id, timestamp: existingOrderData.timestamp };
@@ -140,16 +148,21 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 let balanceDue = total;
                 
                 if (isPaid) {
-                     let amountReceived = finalAmountPaid;
+                    let amountReceived = finalAmountPaid;
                     if (pardonDeficit && amountReceived < total) {
                         amountReceived = total; // If deficit is pardoned, act as if full amount was paid
                     }
                     
                     // Balance due is what the customer owes.
                     // If they overpay, the balance becomes negative (change owed).
-                    balanceDue = total - amountReceived + changeGiven;
+                    balanceDue = total - amountReceived;
+                     
+                    // If change was given, subtract it from the balance.
+                     if (changeGiven > 0) {
+                        balanceDue -= changeGiven;
+                     }
                     
-                     if (amountReceived >= total) {
+                     if (balanceDue <= 0) {
                         paymentStatus = 'Paid';
                     } else {
                         paymentStatus = 'Partially Paid';
