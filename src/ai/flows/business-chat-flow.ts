@@ -92,8 +92,7 @@ const businessChatFlow = ai.defineFlow(
 
             const { text } = await ai.generate({
                 model,
-                history,
-                prompt,
+                messages: [...history, { role: 'user', content: [{ text: prompt }] }],
                 tools: [getBusinessDataTool, getMenuItemsTool, addMenuItemTool, updateMenuItemTool, deleteMenuItemTool],
                 system: `You are an expert business analyst and friendly assistant for a cafe called "Nuel's Foodzone Cafe".
 Your role is to answer questions from the business owner or manager based on sales data, and to help them manage the menu.
@@ -139,5 +138,12 @@ Use this to calculate date ranges for terms like:
 );
 
 export async function businessChat(input: z.infer<typeof BusinessChatInputSchema>): Promise<z.infer<typeof BusinessChatOutputSchema>> {
-    return businessChatFlow(input);
+    const historyWithPrompt = [...input.history, { role: 'user' as const, content: [{ text: input.prompt }] }];
+    
+    const response = await businessChatFlow({
+      history: input.history,
+      prompt: input.prompt,
+    });
+
+    return response;
 }

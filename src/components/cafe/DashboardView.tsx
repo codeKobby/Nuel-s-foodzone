@@ -79,7 +79,7 @@ interface DashboardStats {
 
 interface ChatMessage {
     role: 'user' | 'model';
-    content: string;
+    content: { text: string }[];
 }
 
 type ItemSortKey = 'count' | 'totalValue';
@@ -402,7 +402,7 @@ const DashboardView: React.FC = () => {
                 totalOrders: stats.totalOrders,
                 avgOrderValue: stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0,
                 itemPerformance: stats.itemPerformance.slice(0, 10), // Send top 10 items
-                cashDiscrepancy: stats.totalDiscrepancy,
+                cashDiscrepancy: stats.totalDiscrepancy ?? 0,
                 miscExpenses: stats.totalMiscExpenses,
             };
             const result = await analyzeBusiness(input);
@@ -428,7 +428,7 @@ const DashboardView: React.FC = () => {
     const handleSendMessage = async () => {
         if (!chatInput.trim() || isAiReplying) return;
 
-        const newUserMessage: ChatMessage = { role: 'user', content: chatInput };
+        const newUserMessage: ChatMessage = { role: 'user', content: [{ text: chatInput }] };
         const newHistory = [...chatHistory, newUserMessage];
         setChatHistory(newHistory);
         const currentInput = chatInput;
@@ -449,12 +449,12 @@ const DashboardView: React.FC = () => {
         }
 
         try {
-            const {text: response} = await businessChat({
-                history: newHistory.map(m => ({role: m.role, content: [{text: m.content}]})),
-                prompt: ''
+            const response = await businessChat({
+                history: newHistory.slice(0, -1), // Send history without the current prompt
+                prompt: currentInput,
             });
 
-            const newModelMessage: ChatMessage = { role: 'model', content: response };
+            const newModelMessage: ChatMessage = { role: 'model', content: [{ text: response }] };
             
             // Save the full exchange to Firestore
             const sessionRef = doc(db, "chatSessions", sessionId!);
@@ -462,7 +462,7 @@ const DashboardView: React.FC = () => {
 
         } catch (e) {
             console.error("Error with AI chat:", e);
-            const errorMessage: ChatMessage = { role: 'model', content: "Sorry, I encountered an error. Please try again." };
+            const errorMessage: ChatMessage = { role: 'model', content: [{ text: "Sorry, I encountered an error. Please try again." }] };
             setChatHistory(prev => [...prev, errorMessage]);
         } finally {
             setIsAiReplying(false);
@@ -548,7 +548,7 @@ const DashboardView: React.FC = () => {
                             )}
                             <div className={`rounded-lg px-4 py-2 max-w-sm ${message.role === 'model' ? 'bg-secondary' : 'bg-primary text-primary-foreground'}`}>
                                 <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">
-                                    {message.content}
+                                    {message.content[0].text}
                                 </ReactMarkdown>
                             </div>
                             {message.role === 'user' && (
