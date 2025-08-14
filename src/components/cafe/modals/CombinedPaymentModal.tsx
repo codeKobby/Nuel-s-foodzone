@@ -16,7 +16,6 @@ import { AlertTriangle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import { cn } from '@/lib/utils';
 
 
 interface CombinedPaymentModalProps {
@@ -28,6 +27,7 @@ interface CombinedPaymentModalProps {
 const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onClose, onOrderPlaced }) => {
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'momo'>('cash');
     const [amountPaidInput, setAmountPaidInput] = useState('');
+    const [changeGivenInput, setChangeGivenInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -40,10 +40,6 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         }, 0);
     }, [orders]);
     
-    const handleAmountPaidChange = (value: string) => {
-        setAmountPaidInput(value);
-    };
-    
     const amountPaidNum = parseFloat(amountPaidInput);
     const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
     const finalAmountPaid = paymentMethod === 'momo' ? totalToPay : (isAmountPaidEntered ? amountPaidNum : 0);
@@ -52,7 +48,6 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     const change = finalAmountPaid > totalToPay ? finalAmountPaid - totalToPay : 0;
     
     const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && deficit > 0;
-
 
     const processCombinedPayment = async ({ pardonDeficit = false }) => {
         if (paymentMethod === 'cash' && !isAmountPaidEntered) {
@@ -66,6 +61,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         try {
             const batch = writeBatch(db);
             const now = serverTimestamp();
+            const changeGiven = parseFloat(changeGivenInput) || 0;
 
             let amountToDistribute = finalAmountPaid;
             
@@ -108,9 +104,15 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                  const lastOrder = ordersToPay[ordersToPay.length - 1];
                  const lastOrderRef = doc(db, "orders", lastOrder.id);
                  
-                 if(amountToDistribute > 0) {
-                    batch.update(lastOrderRef, { balanceDue: -amountToDistribute }); // Negative balance due is change
-                 } 
+                 // Handle change
+                 const finalBalance = (totalToPay - finalAmountPaid + changeGiven) * -1;
+                 
+                 if (finalAmountPaid > totalToPay) {
+                    batch.update(lastOrderRef, { 
+                        balanceDue: finalBalance, 
+                        changeGiven: (lastOrder.changeGiven || 0) + changeGiven 
+                    });
+                 }
                  else if (pardonDeficit && remainingDeficit > 0) {
                     const lastOrderData = (await getDoc(lastOrderRef)).data() as Order;
                     batch.update(lastOrderRef, {
@@ -121,7 +123,6 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     });
                  }
             }
-
 
             await batch.commit();
             onOrderPlaced();
@@ -166,14 +167,20 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                         <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'secondary'}>Momo/Card</Button>
                     </div>
                     {paymentMethod === 'cash' && (
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                              <div>
                                 <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
-                                <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => handleAmountPaidChange(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="0.00" onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
                             </div>
                             
                             {change > 0 && (
-                                <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(change)}</p>
+                                 <div className="text-center">
+                                    <p className="font-semibold text-red-500">Change Due: {formatCurrency(change)}</p>
+                                    <div className="mt-2">
+                                        <Label htmlFor="changeGiven">Amount Given as Change</Label>
+                                        <Input id="changeGiven" type="number" value={changeGivenInput} onChange={(e) => setChangeGivenInput(e.target.value)} placeholder={formatCurrency(change)} className="text-center" />
+                                    </div>
+                                </div>
                             )}
                             {showDeficitOptions && (
                                 <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>

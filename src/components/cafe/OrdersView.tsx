@@ -40,52 +40,44 @@ interface OrderCardProps {
     isSelected: boolean;
     onSelectionChange: (orderId: string, isSelected: boolean) => void;
     onDetailsClick: (order: Order) => void;
+    onQuickPay: (order: Order) => void;
     onStatusUpdate: (id: string, status: 'Pending' | 'Completed') => void;
     onEdit: (order: Order) => void;
     onDelete: (order: Order) => void;
     onChangeDueClick: (order: Order) => void;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionChange, onDetailsClick, onStatusUpdate, onEdit, onDelete, onChangeDueClick }) => {
+const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionChange, onDetailsClick, onQuickPay, onStatusUpdate, onEdit, onDelete, onChangeDueClick }) => {
     
     const paymentStatusConfig = {
-        'Paid': {
-            variant: 'default',
-            className: 'bg-green-500 hover:bg-green-500 text-primary-foreground',
-        },
-        'Unpaid': {
-            variant: 'destructive',
-            className: 'bg-red-500 hover:bg-red-500 text-destructive-foreground',
-        },
-        'Partially Paid': {
-            variant: 'secondary',
-            className: 'bg-yellow-500 hover:bg-yellow-500 text-secondary-foreground',
-        },
+        'Paid': { variant: 'default', className: 'bg-green-500 hover:bg-green-500 text-primary-foreground' },
+        'Unpaid': { variant: 'destructive', className: 'bg-red-500 hover:bg-red-500 text-destructive-foreground' },
+        'Partially Paid': { variant: 'secondary', className: 'bg-yellow-500 hover:bg-yellow-500 text-secondary-foreground' },
     } as const;
 
-    
     const isBalanceOwedByCustomer = order.balanceDue > 0;
     const isChangeOwedToCustomer = order.balanceDue < 0;
-    
+    const isFullyPaid = order.paymentStatus === 'Paid' && order.balanceDue === 0;
+
     const itemSnippet = useMemo(() => {
         return order.items.map(item => `${item.quantity}x ${item.name}`).join(', ').substring(0, 100);
     }, [order.items]);
 
-
     return (
         <Card className={`flex flex-col justify-between transition hover:shadow-md ${isSelected ? 'border-primary ring-2 ring-primary' : ''} ${order.status === 'Completed' ? 'bg-card' : 'bg-card'}`}>
-             <CardHeader className="p-4">
+            <CardHeader className="p-4">
                 <div className="flex justify-between items-start">
-                     <div className="flex items-center space-x-3">
-                        <Checkbox
-                            id={`select-${order.id}`}
-                            checked={isSelected}
-                            onCheckedChange={(checked) => onSelectionChange(order.id, !!checked)}
-                            aria-label={`Select order ${order.simplifiedId}`}
-                            disabled={order.paymentStatus === 'Paid' && order.balanceDue === 0}
-                        />
-                        <div>
-                            <CardTitle className="cursor-pointer text-base" onClick={() => onSelectionChange(order.id, !isSelected)}>{order.simplifiedId}</CardTitle>
+                    <div className="flex items-center space-x-3">
+                        {!isFullyPaid && (
+                             <Checkbox
+                                id={`select-${order.id}`}
+                                checked={isSelected}
+                                onCheckedChange={(checked) => onSelectionChange(order.id, !!checked)}
+                                aria-label={`Select order ${order.simplifiedId}`}
+                            />
+                        )}
+                        <div className="flex-grow">
+                            <CardTitle className="cursor-pointer text-base" onClick={() => onDetailsClick(order)}>{order.simplifiedId}</CardTitle>
                             <CardDescription>
                                 <Badge variant="outline" className="mt-1">{order.orderType}</Badge>
                             </CardDescription>
@@ -93,7 +85,12 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                     </div>
                     <Badge variant={paymentStatusConfig[order.paymentStatus].variant} className={paymentStatusConfig[order.paymentStatus].className}>{order.paymentStatus}</Badge>
                 </div>
-                 {order.tag && <p className={cn("text-muted-foreground text-sm pt-2 flex items-center font-semibold")}><Tag size={14} className="inline mr-2"/>{order.tag}</p>}
+                {isBalanceOwedByCustomer && (
+                     <Button size="sm" variant="default" className="w-full mt-2" onClick={() => onQuickPay(order)}>
+                        <HandCoins size={16} className="mr-2"/> Quick Pay
+                    </Button>
+                )}
+                {order.tag && <p className={cn("text-muted-foreground text-sm pt-2 flex items-center font-semibold")}><Tag size={14} className="inline mr-2"/>{order.tag}</p>}
             </CardHeader>
             <CardContent className="p-4 flex-grow">
                 <p className="text-muted-foreground text-xs truncate" title={itemSnippet}>{itemSnippet}</p>
@@ -104,8 +101,8 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                     </p>
                 }
                  {isChangeOwedToCustomer && 
-                    <Button variant="link" className="p-0 h-auto text-sm text-red-500 flex items-center" onClick={() => onChangeDueClick(order)}>
-                        <Coins size={14} className="inline mr-2"/>Change Owed: {formatCurrency(Math.abs(order.balanceDue))}
+                    <Button variant="destructive" className="w-full mt-2" onClick={() => onChangeDueClick(order)}>
+                        <Coins size={16} className="mr-2"/>Settle Change: {formatCurrency(Math.abs(order.balanceDue))}
                     </Button>
                 }
                 <p className="text-xs text-muted-foreground mt-2 flex items-center"><CalendarDays size={12} className="inline mr-1.5" />{formatTimestamp(order.timestamp)}</p>
@@ -119,9 +116,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onSelectionCha
                         <Button onClick={() => onDelete(order)} variant="destructive" className="col-span-1"><Trash2 size={16} className="mr-2"/> Delete</Button>
                     </>
                 ) : (
-                    <>
                      <Button onClick={() => onDetailsClick(order)} variant="outline" className="col-span-2">Details</Button>
-                    </>
                 )}
             </CardFooter>
         </Card>
@@ -140,6 +135,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
     const [searchQuery, setSearchQuery] = useState('');
     const { loadOrderForEditing } = useContext(OrderEditingContext);
     const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+    const [showChangeDueOnly, setShowChangeDueOnly] = useState(false);
 
 
     useEffect(() => {
@@ -166,7 +162,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
         setSelectedOrderIds(prev => {
             const newSet = new Set(prev);
             const order = orders.find(o => o.id === orderId);
-             if (order?.paymentStatus === 'Paid' && order.balanceDue === 0) return prev; 
+            if (order?.paymentStatus === 'Paid' && order.balanceDue === 0) return prev; 
 
             if (isSelected) {
                 newSet.add(orderId);
@@ -175,6 +171,11 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
             }
             return newSet;
         });
+    };
+    
+     const handleQuickPay = (order: Order) => {
+        setSelectedOrderIds(new Set([order.id]));
+        setIsCombinedPaymentModalOpen(true);
     };
 
     const updateOrderStatus = async (orderId: string, newStatus: 'Pending' | 'Completed') => {
@@ -246,7 +247,11 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
     }, [orders, timeRange]);
 
     const finalFilteredOrders = useMemo(() => {
-        const baseOrders = searchQuery ? orders : filteredOrdersByTime;
+        let baseOrders = searchQuery ? orders : filteredOrdersByTime;
+
+        if (showChangeDueOnly) {
+            baseOrders = orders.filter(o => o.balanceDue < 0);
+        }
         
         const searchFiltered = searchQuery 
             ? baseOrders.filter(order => {
@@ -263,15 +268,14 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
             pending: groupOrdersByDate(searchFiltered.filter(o => o.status === 'Pending')),
             unpaid: groupOrdersByDate(searchFiltered.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0)),
             completed: groupOrdersByDate(searchFiltered.filter(o => o.status === 'Completed')),
-            changeDue: groupOrdersByDate(searchFiltered.filter(o => o.balanceDue < 0)),
         };
-    }, [orders, filteredOrdersByTime, searchQuery]);
+    }, [orders, filteredOrdersByTime, searchQuery, showChangeDueOnly]);
     
     const selectedOrders = useMemo(() => orders.filter(o => selectedOrderIds.has(o.id)), [orders, selectedOrderIds]);
     const pendingOrdersCount = useMemo(() => Object.values(finalFilteredOrders.pending).flat().length, [finalFilteredOrders.pending]);
     const unpaidOrdersCount = useMemo(() => Object.values(finalFilteredOrders.unpaid).flat().length, [finalFilteredOrders.unpaid]);
     const completedOrdersCount = useMemo(() => Object.values(finalFilteredOrders.completed).flat().length, [finalFilteredOrders.completed]);
-    const changeDueOrdersCount = useMemo(() => Object.values(finalFilteredOrders.changeDue).flat().length, [finalFilteredOrders.changeDue]);
+    const changeDueOrdersCount = useMemo(() => orders.filter(o => o.balanceDue < 0).length, [orders]);
 
 
     const renderGroupedOrderList = (groupedOrders: Record<string, Order[]>, emptyMessage: string) => {
@@ -296,6 +300,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                                     order={order}
                                     onDetailsClick={setSelectedOrder}
                                     onStatusUpdate={updateOrderStatus}
+                                    onQuickPay={handleQuickPay}
                                     isSelected={selectedOrderIds.has(order.id)}
                                     onSelectionChange={handleSelectionChange}
                                     onEdit={handleEditOrder}
@@ -328,7 +333,26 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                         />
                     </div>
                     <div className="flex items-center space-x-2 w-full md:w-auto">
-                        {selectedOrderIds.size > 0 && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button 
+                                    variant={showChangeDueOnly ? "default" : "outline"} 
+                                    size="icon" 
+                                    onClick={() => setShowChangeDueOnly(!showChangeDueOnly)}
+                                    className="relative"
+                                >
+                                    <Coins/>
+                                    {changeDueOrdersCount > 0 && 
+                                        <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 justify-center p-0">{changeDueOrdersCount}</Badge>
+                                    }
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Toggle Change Due Orders</p>
+                            </TooltipContent>
+                        </Tooltip>
+
+                        {selectedOrderIds.size > 1 && (
                              <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button variant="default" size="sm" className="relative flex-grow" onClick={() => setIsCombinedPaymentModalOpen(true)}>
@@ -348,11 +372,13 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                         </div>
                     </div>
                 </div>
+                {showChangeDueOnly ? (
+                    renderGroupedOrderList(groupOrdersByDate(orders.filter(o => o.balanceDue < 0)), "No orders with change due.")
+                ) : (
                 <Tabs defaultValue="pending" className="w-full">
-                  <TabsList className="grid w-full max-w-lg grid-cols-4">
+                  <TabsList className="grid w-full max-w-lg grid-cols-3">
                     <TabsTrigger value="pending">Pending ({pendingOrdersCount})</TabsTrigger>
                     <TabsTrigger value="unpaid">Unpaid ({unpaidOrdersCount})</TabsTrigger>
-                    <TabsTrigger value="changeDue">Change Due ({changeDueOrdersCount})</TabsTrigger>
                     <TabsTrigger value="completed">Completed ({completedOrdersCount})</TabsTrigger>
                   </TabsList>
                   <TabsContent value="pending">
@@ -361,17 +387,15 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                    <TabsContent value="unpaid">
                     {renderGroupedOrderList(finalFilteredOrders.unpaid, "No unpaid orders found.")}
                   </TabsContent>
-                   <TabsContent value="changeDue">
-                    {renderGroupedOrderList(finalFilteredOrders.changeDue, "No orders with change due found.")}
-                  </TabsContent>
                   <TabsContent value="completed">
                     {renderGroupedOrderList(finalFilteredOrders.completed, "No completed orders found.")}
                   </TabsContent>
                 </Tabs>
+                )}
 
                 {selectedOrder && <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} showActions={true} />}
                 {changeDueOrder && <PartialSettleModal order={changeDueOrder} onSettle={settleChange} onClose={() => setChangeDueOrder(null)} />}
-                {isCombinedPaymentModalOpen && <CombinedPaymentModal orders={selectedOrders} onOrderPlaced={handleCombinedPaymentSuccess} onClose={() => setIsCombinedPaymentModalOpen(false)} />}
+                {isCombinedPaymentModalOpen && <CombinedPaymentModal orders={selectedOrders} onOrderPlaced={handleCombinedPaymentSuccess} onClose={() => {setIsCombinedPaymentModalOpen(false); setSelectedOrderIds(new Set());} } />}
 
                 {orderToDelete && (
                      <AlertDialog open onOpenChange={() => setOrderToDelete(null)}>
