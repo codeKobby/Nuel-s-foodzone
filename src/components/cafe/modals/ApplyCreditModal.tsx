@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -146,7 +145,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
                             <AlertCircle className="h-4 w-4" />
                             <AlertTitle>Summary</AlertTitle>
                             <AlertDescription>
-                                Applying <span className="font-bold">{formatCurrency(creditToApply)}</span> credit to {selectedOrderIds.size} selected order(s) with a total balance of <span className="font-bold">{formatCurrency(selectedOrdersTotal)}</span>.
+                                Applying <span className="font-bold">{formatCurrency(creditToApply)}</span> credit to {selectedOrderIds.size} selected order(s) with a total balance of <span className="font-bold">{formatCurrency(selectedOrdersTotal)}</span>. Any remaining credit will be returned to the original order.
                             </AlertDescription>
                         </Alert>
                     )}

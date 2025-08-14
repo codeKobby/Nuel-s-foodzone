@@ -75,7 +75,7 @@ export interface ReconciliationReport {
     totalCountedRevenue: number;
 
     // Final result
-    totalDiscrepancy: number;
+    totalDiscrepancy: number; // This is the total difference, can be surplus or deficit
     notes: string;
 
     // Change Owed Handling
@@ -102,4 +102,3 @@ export interface OrderEditingContextType {
     loadOrderForEditing: (order: Order) => void;
     clearEditingOrder: () => void;
 }
-

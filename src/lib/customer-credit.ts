@@ -27,10 +27,12 @@ export async function applyChangeAsCreditToOrders(sourceOrderId: string, targetO
 
             let availableCredit = Math.abs(sourceOrderDoc.data().balanceDue);
             
+            // Mark the source order's balance as settled (now 0)
+            // and update changeGiven to reflect the full amount being used as credit
             transaction.update(sourceOrderRef, {
                 balanceDue: 0,
-                changeGiven: availableCredit,
-                creditSource: [...(sourceOrderDoc.data().creditSource || []), `Applied to other orders on ${new Date().toLocaleDateString()}`]
+                changeGiven: (sourceOrderDoc.data().changeGiven || 0) + availableCredit,
+                notes: `${(sourceOrderDoc.data().notes || '')} Credit of ${availableCredit.toFixed(2)} applied to other orders on ${new Date().toLocaleDateString()}.`.trim()
             });
 
             for (const targetDoc of targetOrderDocs) {
@@ -49,21 +51,35 @@ export async function applyChangeAsCreditToOrders(sourceOrderId: string, targetO
 
                 const newAmountPaid = targetOrderData.amountPaid + creditToApply;
                 const newBalanceDue = balanceToPay - creditToApply;
-                const newPaymentStatus = newBalanceDue <= 0 ? 'Paid' : 'Partially Paid';
-                const newStatus = newBalanceDue <= 0 ? 'Completed' : targetOrderData.status;
+                let newPaymentStatus = targetOrderData.paymentStatus;
 
+                if (newBalanceDue <= 0) {
+                    newPaymentStatus = 'Paid';
+                } else {
+                    newPaymentStatus = 'Partially Paid';
+                }
 
                 transaction.update(targetDoc.ref, {
                     amountPaid: newAmountPaid,
                     balanceDue: newBalanceDue,
                     paymentStatus: newPaymentStatus,
-                    status: newStatus,
                     lastPaymentTimestamp: serverTimestamp(),
                     lastPaymentAmount: creditToApply,
-                    creditSource: [...(targetOrderData.creditSource || []), `Credit from #${sourceOrderDoc.data().simplifiedId}`]
+                    paymentMethod: 'momo', // Treat credit like a digital payment
+                    notes: `${(targetOrderData.notes || '')} Credit from #${sourceOrderDoc.data().simplifiedId} applied.`.trim()
                 });
 
                 availableCredit -= creditToApply;
+            }
+            
+            // If there's any credit left over after paying off target orders, update the source order again
+            // to give the remaining credit back to the customer.
+            if (availableCredit > 0) {
+                 transaction.update(sourceOrderRef, {
+                    balanceDue: -availableCredit, // The remaining change is now owed
+                    changeGiven: (sourceOrderDoc.data().changeGiven || 0) + (Math.abs(sourceOrderDoc.data().balanceDue) - availableCredit),
+                    notes: `${(sourceOrderDoc.data().notes || '')} Remaining credit of ${availableCredit.toFixed(2)} is now due as change.`.trim()
+                 });
             }
         });
 
