@@ -29,6 +29,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
     const [orderTag, setOrderTag] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'momo'>('cash');
     const [amountPaidInput, setAmountPaidInput] = useState('');
+    const [changeGivenInput, setChangeGivenInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +80,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
         const { isPaid, pardonDeficit = false } = options;
         
         const pardonedAmount = isPaid && pardonDeficit && paymentMethod === 'cash' ? total - finalAmountPaid : 0;
+        const changeGiven = isPaid && paymentMethod === 'cash' ? parseFloat(changeGivenInput) || 0 : 0;
 
         const orderData: any = {
             tag: orderTag,
@@ -87,7 +89,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
             total,
             paymentMethod: isPaid ? paymentMethod : 'Unpaid',
             pardonedAmount: (editingOrder?.pardonedAmount || 0) + pardonedAmount,
-            changeGiven: editingOrder?.changeGiven || 0,
+            changeGiven: (editingOrder?.changeGiven || 0) + changeGiven,
             fulfilledItems: editingOrder?.fulfilledItems || [],
             creditSource: editingOrder?.creditSource || [],
             notes: editingOrder?.notes || '',
@@ -111,7 +113,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 const existingOrderData = existingOrderSnap.data() as Order;
 
                 const newTotalPaid = existingOrderData.amountPaid + (isPaid ? finalAmountPaid : 0);
-                let newBalanceDue = total - newTotalPaid;
+                let newBalanceDue = total - newTotalPaid + changeGiven;
                 
                 if (pardonedAmount > 0) {
                     newBalanceDue = 0; // If deficit is pardoned, balance becomes 0
@@ -143,7 +145,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                         amountReceived = total; // If deficit is pardoned, act as if full amount was paid
                     }
                     
-                    balanceDue = total - amountReceived; // Positive if deficit, negative if change
+                    // Balance due is what the customer owes.
+                    // If they overpay, the balance becomes negative (change owed).
+                    balanceDue = total - amountReceived + changeGiven;
                     
                      if (amountReceived >= total) {
                         paymentStatus = 'Paid';
@@ -154,7 +158,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                 
                 orderData.paymentStatus = paymentStatus;
                 orderData.amountPaid = isPaid ? finalAmountPaid : 0; // Log the actual amount from customer
-                orderData.balanceDue = balanceDue; // This will be negative if change is due
+                orderData.balanceDue = balanceDue; // This will be negative if change is due and not fully given
                 orderData.status = 'Pending';
 
 
@@ -194,7 +198,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 
     return (
         <Dialog open onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-md animate-fade-in-up">
+            <DialogContent className="sm:max-w-md w-[95vw] rounded-lg">
                 {step === 1 && (
                     <>
                         <DialogHeader>
@@ -236,11 +240,19 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
                             </div>
                            
                             {paymentMethod === 'cash' && (
-                            <div className="space-y-2">
-                                <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
-                                <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Enter amount..." onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
-                                 {change > 0 && (
-                                    <p className="font-semibold text-red-500 text-center">Change Due: {formatCurrency(change)}</p>
+                            <div className="space-y-4">
+                                <div>
+                                    <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
+                                    <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="Enter amount..." onFocus={(e) => e.target.select()} autoFocus className="text-lg h-12" />
+                                </div>
+                                {change > 0 && (
+                                    <div className="text-center">
+                                        <p className="font-semibold text-red-500">Change Due: {formatCurrency(change)}</p>
+                                        <div className="mt-2">
+                                            <Label htmlFor="changeGiven">Amount Given as Change</Label>
+                                            <Input id="changeGiven" type="number" value={changeGivenInput} onChange={(e) => setChangeGivenInput(e.target.value)} placeholder={formatCurrency(change)} className="text-center" />
+                                        </div>
+                                    </div>
                                 )}
                                 {showDeficitOptions && (
                                     <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>
@@ -276,3 +288,4 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ total, orderItems
 };
 
 export default OrderOptionsModal;
+
