@@ -482,18 +482,18 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             {/* Cash Denominations */}
                             <div className="space-y-4">
                                 <Label className="text-lg font-semibold">Cash by Denomination</Label>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {cashDenominations.map(den => (
                                         <div key={den} className="flex items-center gap-3 p-2 bg-secondary rounded-md">
-                                            <Label htmlFor={`den-${den}`} className="w-20 font-medium">{`GH₵${den}`}</Label>
-                                            <span className="text-muted-foreground">×</span>
+                                            <Label htmlFor={`den-${den}`} className="w-20 font-medium text-lg">{`GH₵${den}`}</Label>
+                                            <span className="text-muted-foreground text-lg">×</span>
                                             <Input 
                                                 id={`den-${den}`} 
                                                 type="number" 
                                                 value={denominationQuantities[den]} 
                                                 onChange={e => handleDenominationChange(e.target.value, String(den))} 
                                                 placeholder="0"
-                                                className="flex-1 h-10"
+                                                className="flex-1 h-12 text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
                                     ))}
