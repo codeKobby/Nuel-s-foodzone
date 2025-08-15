@@ -35,7 +35,6 @@ interface ToastContextType {
   error: (title: string, description?: string) => void;
   warning: (title: string, description?: string) => void;
   info: (title: string, description?: string) => void;
-  networkStatus: (isOnline: boolean) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -49,20 +48,19 @@ export const useToast = () => {
 };
 
 const ToastIcon: React.FC<{ type: Toast['type'] }> = ({ type }) => {
-  const iconClassName = cn('h-5 w-5');
-
-  switch (type) {
-    case 'success':
-      return <CheckCircleIcon className={cn(iconClassName, 'text-green-500')} />;
-    case 'error':
-      return <XCircleIcon className={cn(iconClassName, 'text-red-500')} />;
-    case 'warning':
-      return <AlertTriangleIcon className={cn(iconClassName, 'text-yellow-500')} />;
-    case 'info':
-      return <InfoIcon className={cn(iconClassName, 'text-blue-500')} />;
-    default:
-      return null;
-  }
+    const iconClassName = cn('h-5 w-5');
+    switch (type) {
+        case 'success':
+            return <CheckCircleIcon className={cn(iconClassName, 'text-green-500')} />;
+        case 'error':
+            return <XCircleIcon className={cn(iconClassName, 'text-red-500')} />;
+        case 'warning':
+            return <AlertTriangleIcon className={cn(iconClassName, 'text-yellow-500')} />;
+        case 'info':
+            return <InfoIcon className={cn(iconClassName, 'text-blue-500')} />;
+        default:
+            return null;
+    }
 };
 
 const ToastComponent: React.FC<{ 
@@ -78,6 +76,11 @@ const ToastComponent: React.FC<{
     return () => clearTimeout(timer);
   }, []);
 
+  const handleDismiss = useCallback(() => {
+    setIsExiting(true);
+    setTimeout(() => onDismiss(toast.id), 300);
+  }, [onDismiss, toast.id]);
+
   useEffect(() => {
     if (!toast.persistent && toast.duration !== 0) {
       const timer = setTimeout(() => {
@@ -85,12 +88,8 @@ const ToastComponent: React.FC<{
       }, toast.duration || 5000);
       return () => clearTimeout(timer);
     }
-  }, [toast.duration, toast.persistent, toast.id, onDismiss]);
+  }, [toast.duration, toast.persistent, toast.id, handleDismiss]);
 
-  const handleDismiss = useCallback(() => {
-    setIsExiting(true);
-    setTimeout(() => onDismiss(toast.id), 300);
-  }, [onDismiss, toast.id]);
 
   const borderColors = {
     success: 'border-l-green-500 bg-green-50 dark:bg-green-950/20',
@@ -172,6 +171,7 @@ export const ToastContainer: React.FC<{ toasts: Toast[]; onDismiss: (id: string)
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [isOnline, setIsOnline] = useState(true);
+  const [showNetworkStatus, setShowNetworkStatus] = useState(false);
 
   // Network status monitoring
   useEffect(() => {
@@ -222,23 +222,17 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     toast({ title, description, type: 'info' });
   }, [toast]);
 
-  const networkStatus = useCallback((online: boolean) => {
-    if (online) {
-      success('Back Online', 'Connection restored. Your data is being synchronized.');
-    } else {
-      warning('Connection Lost', 'Working offline. Changes will sync when connection is restored.');
-    }
-  }, [success, warning]);
-
   // Auto-show network status changes
   useEffect(() => {
-    const hasToggledBefore = typeof window !== 'undefined' ? localStorage.getItem('hasToggledNetwork') : null;
-    if (hasToggledBefore) {
-      networkStatus(isOnline);
-    } else if (typeof window !== 'undefined') {
-      localStorage.setItem('hasToggledNetwork', 'true');
+    if (!isOnline) {
+      setShowNetworkStatus(true);
+    } else {
+      // If we come back online, show the status briefly then hide it
+      setShowNetworkStatus(true);
+      const timer = setTimeout(() => setShowNetworkStatus(false), 4000);
+      return () => clearTimeout(timer);
     }
-  }, [isOnline, networkStatus]);
+  }, [isOnline]);
 
   const contextValue: ToastContextType = {
     toasts,
@@ -248,7 +242,6 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     error,
     warning,
     info,
-    networkStatus,
   };
 
   return (
@@ -256,28 +249,30 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {children}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       
-      <div className="fixed bottom-4 left-4 z-40">
-        <div
-          className={cn(
-            'flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium shadow-lg transition-all duration-500',
-            isOnline
-              ? 'bg-green-500 text-white'
-              : 'bg-red-500 text-white animate-pulse'
-          )}
-        >
-          {isOnline ? (
-            <>
-              <WifiIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Online</span>
-            </>
-          ) : (
-            <>
-              <WifiOffIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Offline</span>
-            </>
-          )}
+      {showNetworkStatus && (
+        <div className="fixed bottom-4 left-4 z-40">
+            <div
+            className={cn(
+                'flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium shadow-lg transition-all duration-500 animate-fade-in-up',
+                isOnline
+                ? 'bg-green-500 text-white'
+                : 'bg-red-500 text-white animate-pulse'
+            )}
+            >
+            {isOnline ? (
+                <>
+                <WifiIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Online</span>
+                </>
+            ) : (
+                <>
+                <WifiOffIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Offline</span>
+                </>
+            )}
+            </div>
         </div>
-      </div>
+      )}
     </ToastContext.Provider>
   );
 };

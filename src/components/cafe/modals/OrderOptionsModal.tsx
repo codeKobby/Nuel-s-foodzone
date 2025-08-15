@@ -63,7 +63,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     
     let newBalance = total - finalAmountPaid;
     if (changeGivenNum > 0) {
-      newBalance = total - finalAmountPaid - changeGivenNum;
+      // This is incorrect, change given doesn't affect the balance due from the total, it's what you give back
+      // The balance is simply what they owe from the total vs what they paid.
+      newBalance = total - finalAmountPaid
     }
 
     const deficit = newBalance > 0 ? newBalance : 0;
@@ -124,6 +126,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         pardonedAmount: (editingOrder?.pardonedAmount || 0) + pardonedAmount,
         notes: editingOrder?.notes || '',
         status: editingOrder?.status || 'Pending',
+        fulfilledItems: editingOrder?.fulfilledItems || [],
+        creditSource: editingOrder?.creditSource || [],
       };
       
       if (isPaid) {
@@ -140,20 +144,22 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
       if (editingOrder) {
           const orderRef = doc(db, "orders", editingOrder.id);
           const finalAmountPaid = editingOrder.amountPaid + (isPaid ? balances.newPaymentAmount : 0);
-          const finalChangeGiven = (editingOrder.changeGiven || 0) + (parseFloat(changeGivenInput) || 0);
+          const changeGivenNum = parseFloat(changeGivenInput) || 0;
+          const finalChangeGiven = (editingOrder.changeGiven || 0) + changeGivenNum;
           
           let finalBalance = total - finalAmountPaid;
-          if (finalChangeGiven > editingOrder.changeGiven) {
-              finalBalance -= (parseFloat(changeGivenInput) || 0);
-          }
           if(pardonDeficit){
               finalBalance = 0;
+          } else if (finalBalance < 0) {
+            // Only update change given if change is actually due
+            orderData.changeGiven = finalChangeGiven;
+          } else {
+            orderData.changeGiven = editingOrder.changeGiven || 0;
           }
-
+          
           orderData.amountPaid = finalAmountPaid;
           orderData.balanceDue = finalBalance;
-          orderData.changeGiven = finalChangeGiven;
-
+          
           if (finalBalance <= 0) {
               orderData.paymentStatus = 'Paid';
           } else {
@@ -167,12 +173,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           const changeGiven = parseFloat(changeGivenInput) || 0;
           
           orderData.amountPaid = isPaid ? newPaymentAmount : 0;
-          orderData.changeGiven = changeGiven;
+          orderData.changeGiven = isPaid && newPaymentAmount > total ? changeGiven : 0;
           
           let finalBalance = total - orderData.amountPaid;
-          if (changeGiven > 0) {
-             finalBalance -= changeGiven;
-          }
            if (pardonDeficit) {
               finalBalance = 0;
           }
@@ -201,7 +204,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               transaction.set(newOrderRef, newOrderWithId);
               transaction.set(counterRef, { count: newCount }, { merge: true });
               
-              finalOrderForPopup = { ...newOrderWithId, id: newOrderRef.id, timestamp: Timestamp.now() };
+              finalOrderForPopup = { ...newOrderWithId, id: newOrderRef.id, timestamp: Timestamp.now(), balanceDue: finalBalance };
           });
       }
       
@@ -489,4 +492,4 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   );
 };
 
-    
+export default OrderOptionsModal;
