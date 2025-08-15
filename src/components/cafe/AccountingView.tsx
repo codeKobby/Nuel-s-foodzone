@@ -263,6 +263,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             todayOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 todayOrders.push(order);
+                totalSales += order.total; // Sum up total value of all orders created today
 
                 // Calculate pardoned amounts
                 if (order.pardonedAmount && order.pardonedAmount > 0) {
@@ -276,7 +277,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 
                 // Calculate total sales and items from completed orders
                 if (order.status === 'Completed') {
-                    totalSales += order.total;
                     order.items.forEach(item => {
                         totalItemsSold += item.quantity;
                         const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
@@ -750,6 +750,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             {stats && isAdvancedModalOpen && (
                 <AdvancedReconciliationModal
                     orders={stats.orders}
+                    expectedTotal={stats.totalSales}
                     onClose={() => setIsAdvancedModalOpen(false)}
                 />
             )}
