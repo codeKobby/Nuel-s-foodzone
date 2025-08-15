@@ -2,7 +2,7 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
-import { ToastProvider } from '@/hooks/use-toast';
+import { ToastProvider } from '@/hooks/use-toast.tsx';
 
 export const metadata: Metadata = {
   title: "Nuel's Foodzone Cafe",

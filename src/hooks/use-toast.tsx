@@ -29,7 +29,7 @@ interface Toast {
 
 interface ToastContextType {
   toasts: Toast[];
-  toast: (toast: Omit<Toast, 'id'>) => void;
+  toast: (toast: Omit<Toast, 'id' | 'type'> & { type?: Toast['type'] }) => void;
   dismissToast: (id: string) => void;
   success: (title: string, description?: string) => void;
   error: (title: string, description?: string) => void;
@@ -49,24 +49,17 @@ export const useToast = () => {
 };
 
 const ToastIcon: React.FC<{ type: Toast['type'] }> = ({ type }) => {
-  const colorClasses = {
-    success: 'text-green-500',
-    error: 'text-red-500',
-    warning: 'text-yellow-500',
-    info: 'text-blue-500',
-  };
-  
-  const iconClassName = cn('h-5 w-5', colorClasses[type]);
+  const iconClassName = cn('h-5 w-5');
 
   switch (type) {
     case 'success':
-      return <CheckCircleIcon className={iconClassName} />;
+      return <CheckCircleIcon className={cn(iconClassName, 'text-green-500')} />;
     case 'error':
-      return <XCircleIcon className={iconClassName} />;
+      return <XCircleIcon className={cn(iconClassName, 'text-red-500')} />;
     case 'warning':
-      return <AlertTriangleIcon className={iconClassName} />;
+      return <AlertTriangleIcon className={cn(iconClassName, 'text-yellow-500')} />;
     case 'info':
-      return <InfoIcon className={iconClassName} />;
+      return <InfoIcon className={cn(iconClassName, 'text-blue-500')} />;
     default:
       return null;
   }
@@ -92,12 +85,12 @@ const ToastComponent: React.FC<{
       }, toast.duration || 5000);
       return () => clearTimeout(timer);
     }
-  }, [toast.duration, toast.persistent, toast.id]);
+  }, [toast.duration, toast.persistent, toast.id, onDismiss]);
 
-  const handleDismiss = () => {
+  const handleDismiss = useCallback(() => {
     setIsExiting(true);
     setTimeout(() => onDismiss(toast.id), 300);
-  };
+  }, [onDismiss, toast.id]);
 
   const borderColors = {
     success: 'border-l-green-500 bg-green-50 dark:bg-green-950/20',
@@ -199,9 +192,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const generateId = () => Math.random().toString(36).substring(2, 9);
 
-  const toast = useCallback((toastData: Omit<Toast, 'id'>) => {
+  const toast = useCallback((toastData: Omit<Toast, 'id' | 'type'> & { type?: Toast['type'] }) => {
     const id = generateId();
     const newToast: Toast = {
+      type: 'info',
       ...toastData,
       id,
     };
@@ -262,7 +256,6 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {children}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       
-      {/* Network Status Indicator */}
       <div className="fixed bottom-4 left-4 z-40">
         <div
           className={cn(

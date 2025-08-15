@@ -28,7 +28,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { updatePassword } from '@/lib/auth-tools';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast.tsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { initialMenuData } from '@/data/initial-data';
 
@@ -174,7 +174,7 @@ const AdminView: React.FC = () => {
             console.error("Error syncing initial menu data:", e);
             setError("Failed to sync initial menu data.");
             toast({
-                variant: 'destructive',
+                type: 'error',
                 title: "Sync Failed",
                 description: "Could not sync the initial menu data.",
             });
@@ -186,11 +186,11 @@ const AdminView: React.FC = () => {
     const handlePasswordUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
         if (newPassword !== confirmPassword) {
-            toast({ variant: 'destructive', title: "Passwords do not match." });
+            toast({ type: 'error', title: "Passwords do not match." });
             return;
         }
         if (newPassword.length < 6) {
-            toast({ variant: 'destructive', title: "Password must be at least 6 characters." });
+            toast({ type: 'error', title: "Password must be at least 6 characters." });
             return;
         }
         setIsUpdatingPassword(true);
@@ -201,7 +201,7 @@ const AdminView: React.FC = () => {
         });
         
         toast({
-            variant: result.success ? 'default' : 'destructive',
+            type: result.success ? 'success' : 'error',
             title: result.success ? "Success" : "Error",
             description: result.message,
         });

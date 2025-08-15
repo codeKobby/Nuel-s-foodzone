@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast.tsx';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 interface FulfillItemsModalProps {
@@ -51,7 +51,7 @@ const FulfillItemsModal: React.FC<FulfillItemsModalProps> = ({ order, onClose })
 
         if (itemsToMarkAsFulfilled.length === 0) {
             toast({
-                variant: "destructive",
+                type: "warning",
                 title: "No items selected",
                 description: "Please select at least one item to fulfill.",
             });
@@ -71,6 +71,7 @@ const FulfillItemsModal: React.FC<FulfillItemsModalProps> = ({ order, onClose })
             });
 
             toast({
+                type: 'success',
                 title: "Items Fulfilled",
                 description: `${itemsToMarkAsFulfilled.length} item(s) have been marked as fulfilled.`,
             });
@@ -78,7 +79,7 @@ const FulfillItemsModal: React.FC<FulfillItemsModalProps> = ({ order, onClose })
         } catch (error) {
             console.error("Error fulfilling items:", error);
             toast({
-                variant: "destructive",
+                type: "error",
                 title: "Fulfillment Failed",
                 description: "Could not update the order. Please try again.",
             });

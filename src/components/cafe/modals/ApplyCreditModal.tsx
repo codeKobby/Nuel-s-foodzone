@@ -16,7 +16,7 @@ import { Search, AlertCircle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { applyChangeAsCreditToOrders } from '@/lib/customer-credit';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast.tsx';
 
 interface ApplyCreditModalProps {
     sourceOrder: Order;
@@ -86,7 +86,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
         toast({
             title: result.success ? "Success" : "Error",
             description: result.message,
-            variant: result.success ? "default" : "destructive",
+            type: result.success ? "success" : "error",
         });
 
         if (result.success) {
