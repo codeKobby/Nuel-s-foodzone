@@ -401,7 +401,7 @@ const DashboardView: React.FC = () => {
                 netRevenue: stats.netRevenue,
                 totalOrders: stats.totalOrders,
                 avgOrderValue: stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0,
-                itemPerformance: stats.itemPerformance.slice(0, 10), // Send top 10 items
+                itemPerformance: stats.itemPerformance.slice(0, 10).map(item => ({ name: item.name, count: item.count })),
                 cashDiscrepancy: stats.totalDiscrepancy ?? 0,
                 miscExpenses: stats.totalMiscExpenses,
             };
@@ -500,7 +500,7 @@ const DashboardView: React.FC = () => {
             if (itemSortDirection === 'asc') {
                 return a[itemSortKey] - b[itemSortKey];
             } else {
-                return b[itemSortKey] - a[itemSortKey];
+                return b[itemSortKey];
             }
         });
     }, [stats, itemSearchQuery, itemSortKey, itemSortDirection]);
