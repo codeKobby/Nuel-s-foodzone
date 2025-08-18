@@ -162,12 +162,16 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           
           if (finalBalance <= 0) {
               orderData.paymentStatus = 'Paid';
-          } else {
+          } else if (finalAmountPaid > 0) {
               orderData.paymentStatus = 'Partially Paid';
+          } else {
+              orderData.paymentStatus = 'Unpaid';
           }
           
           await updateDoc(orderRef, orderData);
-          finalOrderForPopup = { ...editingOrder, ...orderData, id: editingOrder.id, timestamp: editingOrder.timestamp };
+          const docSnap = await getDoc(orderRef);
+          finalOrderForPopup = { id: docSnap.id, ...docSnap.data() } as Order;
+
       } else {
           const { newPaymentAmount, change } = balances;
           const changeGiven = parseFloat(changeGivenInput) || 0;
@@ -208,7 +212,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           });
       }
       
-      // @ts-ignore
       onOrderPlaced(finalOrderForPopup);
       
     } catch (e) {
