@@ -384,7 +384,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
       today.setHours(0, 0, 0, 0);
       const todayTimestamp = today.getTime();
       baseOrders = baseOrders.filter(o => 
-        o.timestamp && o.timestamp.toMillis() >= todayTimestamp
+        o.timestamp && o.timestamp.toDate().getTime() >= todayTimestamp
       );
     }
 
@@ -434,6 +434,21 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
     };
   }, [orders, filters, searchQuery]);
 
+  // Total counts, independent of filters
+  const totalCounts = useMemo(() => ({
+    unpaid: orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0).length,
+    changeDue: orders.filter(o => o.balanceDue < 0).length,
+  }), [orders]);
+  
+  // Filtered counts for tabs
+  const filteredCounts = useMemo(() => ({
+    pending: Object.values(filteredOrders.pending).flat().length,
+    unpaid: Object.values(filteredOrders.unpaid).flat().length,
+    completed: Object.values(filteredOrders.completed).flat().length,
+    changeDue: Object.values(filteredOrders.changeDue).flat().length,
+  }), [filteredOrders]);
+
+
   // Computed values
   const selectedOrders = useMemo(() => 
     orders.filter(o => selectedOrderIds.has(o.id)), 
@@ -444,13 +459,6 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
     selectedOrders.reduce((sum, order) => sum + Math.abs(order.balanceDue), 0), 
     [selectedOrders]
   );
-
-  const counts = useMemo(() => ({
-    pending: Object.values(filteredOrders.pending).flat().length,
-    unpaid: Object.values(filteredOrders.unpaid).flat().length,
-    completed: Object.values(filteredOrders.completed).flat().length,
-    changeDue: Object.values(filteredOrders.changeDue).flat().length,
-  }), [filteredOrders]);
 
   const clearFilters = () => {
     setFilters({
@@ -536,15 +544,15 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                       className="relative"
                     >
                       <Coins className="h-4 w-4" />
-                      {counts.changeDue > 0 && (
+                      {totalCounts.changeDue > 0 && (
                         <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 text-xs p-0 flex items-center justify-center">
-                          {counts.changeDue}
+                          {totalCounts.changeDue}
                         </Badge>
                       )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Change Due ({counts.changeDue})</p>
+                    <p>Change Due ({totalCounts.changeDue})</p>
                   </TooltipContent>
                 </Tooltip>
 
@@ -558,15 +566,15 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                       className="relative"
                     >
                       <Clock className="h-4 w-4" />
-                      {counts.unpaid > 0 && (
+                      {totalCounts.unpaid > 0 && (
                         <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 text-xs p-0 flex items-center justify-center">
-                          {counts.unpaid}
+                          {totalCounts.unpaid}
                         </Badge>
                       )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Unpaid Orders ({counts.unpaid})</p>
+                    <p>Unpaid Orders ({totalCounts.unpaid})</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -676,13 +684,13 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
             <Tabs defaultValue="pending" className="h-full flex flex-col">
               <TabsList className="grid w-full max-w-2xl grid-cols-3 mx-4 mt-4">
                 <TabsTrigger value="pending" className="text-xs sm:text-sm">
-                  Pending ({counts.pending})
+                  Pending ({filteredCounts.pending})
                 </TabsTrigger>
                 <TabsTrigger value="unpaid" className="text-xs sm:text-sm">
-                  Unpaid ({counts.unpaid})
+                  Unpaid ({filteredCounts.unpaid})
                 </TabsTrigger>
                 <TabsTrigger value="completed" className="text-xs sm:text-sm">
-                  Completed ({counts.completed})
+                  Completed ({filteredCounts.completed})
                 </TabsTrigger>
               </TabsList>
               
@@ -759,4 +767,4 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 
 export default OrdersView;
 
-    
+
