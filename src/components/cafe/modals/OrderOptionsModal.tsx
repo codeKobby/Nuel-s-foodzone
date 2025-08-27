@@ -63,7 +63,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     
     let newBalance = total - finalAmountPaid;
     if (changeGivenNum > 0) {
-      // This is incorrect, change given doesn't affect the balance due from the total, it's what you give back
       // The balance is simply what they owe from the total vs what they paid.
       newBalance = total - finalAmountPaid
     }
@@ -151,7 +150,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           if(pardonDeficit){
               finalBalance = 0;
           } else if (finalBalance < 0) {
-            // Only update change given if change is actually due
             orderData.changeGiven = finalChangeGiven;
           } else {
             orderData.changeGiven = editingOrder.changeGiven || 0;
@@ -186,25 +184,27 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
           orderData.balanceDue = finalBalance;
           
-          if (finalBalance <= 0 && isPaid) {
-              orderData.paymentStatus = 'Paid';
+          if (isPaid && finalBalance <= 0) {
+            orderData.paymentStatus = 'Paid';
           } else if (isPaid && finalBalance > 0) {
-              orderData.paymentStatus = 'Partially Paid';
+            orderData.paymentStatus = 'Partially Paid';
           } else {
-              orderData.paymentStatus = 'Unpaid';
+            orderData.paymentStatus = 'Unpaid';
           }
 
           const counterRef = doc(db, "counters", "orderIdCounter");
           const newOrderRef = doc(collection(db, "orders"));
           
-          const newOrderWithTimestamp = { ...orderData, timestamp: serverTimestamp() };
-
           await runTransaction(db, async (transaction) => {
               const counterDoc = await transaction.get(counterRef);
               const newCount = (counterDoc.exists() ? counterDoc.data().count : 0) + 1;
               const simplifiedId = generateSimpleOrderId(newCount);
               
-              const newOrderWithId = { ...newOrderWithTimestamp, simplifiedId };
+              const newOrderWithId = { 
+                ...orderData, 
+                simplifiedId,
+                timestamp: serverTimestamp(),
+              };
               transaction.set(newOrderRef, newOrderWithId);
               transaction.set(counterRef, { count: newCount }, { merge: true });
               
@@ -496,3 +496,5 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 };
 
 export default OrderOptionsModal;
+
+    
