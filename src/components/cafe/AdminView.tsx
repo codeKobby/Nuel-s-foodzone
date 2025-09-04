@@ -6,7 +6,7 @@ import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, getDocs, wri
 import { db } from '@/lib/firebase';
 import type { MenuItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { Edit, Trash2, PlusCircle, Search, AlertCircle, KeyRound, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Edit, Trash2, PlusCircle, Search, AlertCircle, KeyRound, ShieldCheck, RefreshCw, Loader } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,6 +70,65 @@ const AdminForm = ({
     </form>
 );
 
+const SecuritySettings = () => {
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const { toast } = useToast();
+
+    const handlePasswordUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newPassword !== confirmPassword) {
+            toast({ type: 'error', title: "Passwords do not match." });
+            return;
+        }
+        if (newPassword.length < 6) {
+            toast({ type: 'error', title: "Password must be at least 6 characters." });
+            return;
+        }
+        setIsUpdatingPassword(true);
+        const result = await updatePassword({
+            role: 'manager',
+            currentPassword: currentPassword,
+            newPassword: newPassword,
+        });
+        
+        toast({
+            type: result.success ? 'success' : 'error',
+            title: result.success ? "Success" : "Error",
+            description: result.message,
+        });
+
+        if (result.success) {
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+        }
+        setIsUpdatingPassword(false);
+    };
+
+    return (
+         <form onSubmit={handlePasswordUpdate} className="space-y-4">
+            <div>
+                <Label htmlFor="current-password">Current Password</Label>
+                <Input type="password" id="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+            </div>
+            <div>
+                <Label htmlFor="new-password">New Password</Label>
+                <Input type="password" id="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+            </div>
+            <div>
+                <Label htmlFor="confirm-password">Confirm New Password</Label>
+                <Input type="password" id="confirm-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+            </div>
+            <Button type="submit" className="w-full" disabled={isUpdatingPassword}>
+                {isUpdatingPassword ? <><Loader className="animate-spin mr-2"/>Updating...</> : <><KeyRound className="mr-2"/>Update Password</>}
+            </Button>
+        </form>
+    )
+}
+
 
 const AdminView: React.FC = () => {
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -78,16 +137,11 @@ const AdminView: React.FC = () => {
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
     const [formState, setFormState] = useState({ name: '', price: '', category: '', stock: '' });
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<MenuItem | null>(null);
-    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [isMenuSheetOpen, setIsMenuSheetOpen] = useState(false);
+    const [isSecuritySheetOpen, setIsSecuritySheetOpen] = useState(false);
     const isMobile = useIsMobile();
     const [searchQuery, setSearchQuery] = useState('');
     const [isSyncing, setIsSyncing] = useState(false);
-    
-    // Password state
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
     const { toast } = useToast();
 
 
@@ -102,7 +156,7 @@ const AdminView: React.FC = () => {
 
     useEffect(() => {
         if (editingItem) {
-            setIsSheetOpen(true);
+            setIsMenuSheetOpen(true);
         }
     }, [editingItem]);
     
@@ -111,7 +165,7 @@ const AdminView: React.FC = () => {
     const clearForm = () => {
         setFormState({ name: '', price: '', category: '', stock: '' });
         setEditingItem(null);
-        setIsSheetOpen(false);
+        setIsMenuSheetOpen(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -121,7 +175,8 @@ const AdminView: React.FC = () => {
             name: formState.name, 
             price: parseFloat(formState.price), 
             category: formState.category, 
-            stock: parseInt(formState.stock, 10) || 0 
+            stock: parseInt(formState.stock, 10) || 0,
+            requiresChoice: false,
         };
         try {
             if (editingItem) {
@@ -139,7 +194,7 @@ const AdminView: React.FC = () => {
     };
 
     const handleDelete = async (itemId: string) => {
-        try { await deleteDoc(doc(db, "menuItems", itemId)); } catch (e) { setError("Failed to delete menu item."); }
+        try { await deleteDoc(doc(db, "menuItems", itemId)); } catch (e) { setError("Failed to delete expense."); }
         setShowDeleteConfirm(null);
     };
     
@@ -183,37 +238,6 @@ const AdminView: React.FC = () => {
         }
     };
 
-    const handlePasswordUpdate = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newPassword !== confirmPassword) {
-            toast({ type: 'error', title: "Passwords do not match." });
-            return;
-        }
-        if (newPassword.length < 6) {
-            toast({ type: 'error', title: "Password must be at least 6 characters." });
-            return;
-        }
-        setIsUpdatingPassword(true);
-        const result = await updatePassword({
-            role: 'manager',
-            currentPassword: currentPassword,
-            newPassword: newPassword,
-        });
-        
-        toast({
-            type: result.success ? 'success' : 'error',
-            title: result.success ? "Success" : "Error",
-            description: result.message,
-        });
-
-        if (result.success) {
-            setCurrentPassword('');
-            setNewPassword('');
-            setConfirmPassword('');
-        }
-        setIsUpdatingPassword(false);
-    };
-
     const groupedMenu = useMemo(() => {
         const filteredItems = menuItems.filter(item =>
             item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -244,25 +268,40 @@ const AdminView: React.FC = () => {
                             />
                         </div>
                         {isMobile && (
-                            <Sheet open={isSheetOpen} onOpenChange={(open) => { setIsSheetOpen(open); if (!open) clearForm(); }}>
-                                <SheetTrigger asChild>
-                                    <Button size="icon" className="flex-shrink-0"><PlusCircle /></Button>
-                                </SheetTrigger>
-                                <SheetContent side="bottom" className="h-[85vh]">
-                                    <SheetHeader>
-                                        <SheetTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</SheetTitle>
-                                    </SheetHeader>
-                                    <div className="p-4 overflow-y-auto">
-                                    <AdminForm 
-                                        editingItem={editingItem}
-                                        formState={formState}
-                                        handleFormChange={handleFormChange}
-                                        handleSubmit={handleSubmit}
-                                        onCancel={clearForm}
-                                    />
-                                    </div>
-                                </SheetContent>
-                            </Sheet>
+                            <>
+                                <Sheet open={isMenuSheetOpen} onOpenChange={(open) => { setIsMenuSheetOpen(open); if (!open) clearForm(); }}>
+                                    <SheetTrigger asChild>
+                                        <Button size="icon" className="flex-shrink-0"><PlusCircle /></Button>
+                                    </SheetTrigger>
+                                    <SheetContent side="bottom" className="h-[85vh]">
+                                        <SheetHeader>
+                                            <SheetTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</SheetTitle>
+                                        </SheetHeader>
+                                        <div className="p-4 overflow-y-auto">
+                                        <AdminForm 
+                                            editingItem={editingItem}
+                                            formState={formState}
+                                            handleFormChange={handleFormChange}
+                                            handleSubmit={handleSubmit}
+                                            onCancel={clearForm}
+                                        />
+                                        </div>
+                                    </SheetContent>
+                                </Sheet>
+                                <Sheet open={isSecuritySheetOpen} onOpenChange={setIsSecuritySheetOpen}>
+                                    <SheetTrigger asChild>
+                                        <Button size="icon" variant="outline" className="flex-shrink-0"><ShieldCheck /></Button>
+                                    </SheetTrigger>
+                                    <SheetContent side="bottom" className="h-auto">
+                                        <SheetHeader>
+                                            <SheetTitle className="text-2xl">Security</SheetTitle>
+                                        </SheetHeader>
+                                        <div className="p-4 overflow-y-auto">
+                                            <SecuritySettings />
+                                        </div>
+                                    </SheetContent>
+                                </Sheet>
+                            </>
                         )}
                     </div>
                 </div>
@@ -342,23 +381,7 @@ const AdminView: React.FC = () => {
                                 <CardDescription>Update your account password.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <form onSubmit={handlePasswordUpdate} className="space-y-4">
-                                     <div>
-                                        <Label htmlFor="current-password">Current Password</Label>
-                                        <Input type="password" id="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="new-password">New Password</Label>
-                                        <Input type="password" id="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="confirm-password">Confirm New Password</Label>
-                                        <Input type="password" id="confirm-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-                                    </div>
-                                    <Button type="submit" className="w-full" disabled={isUpdatingPassword}>
-                                        {isUpdatingPassword ? <><Loader className="animate-spin mr-2"/>Updating...</> : <><KeyRound className="mr-2"/>Update Password</>}
-                                    </Button>
-                                </form>
+                                <SecuritySettings />
                             </CardContent>
                         </TabsContent>
                      </Tabs>
@@ -386,5 +409,3 @@ const AdminView: React.FC = () => {
 };
 
 export default AdminView;
-
-    
