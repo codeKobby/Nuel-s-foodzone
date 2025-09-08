@@ -1,43 +1,46 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Default deny all access
-    match /{document=**} {
-      allow read, write: if false;
-    }
 
-    // Allow public read for menu items
-    match /menuItems/{menuItem} {
+    // Allow public read for the menu
+    match /menuItems/{itemId} {
       allow read: if true;
-      allow write: if false; // Writes handled by server-side logic
-    }
-    
-    // Allow read for credentials by server-side logic only
-    match /credentials/{role} {
-        allow read, write: if false; // Server-side bypasses this
+      allow write: if false; // Disallow client writes
     }
 
-    // Allow read for counters by server-side logic only
-    match /counters/{counter} {
-        allow read, write: if false; // Server-side bypasses this
-    }
-
-    // Allow authenticated users to read and create/update/delete their own data
+    // Allow authenticated users to read business data
     match /orders/{orderId} {
       allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null; // All writes are server-side
+      allow write: if false;
     }
-
+    
     match /miscExpenses/{expenseId} {
       allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null; // All writes are server-side
+      allow write: if false;
     }
 
     match /reconciliationReports/{reportId} {
       allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null; // All writes are server-side
+      allow write: if false;
+    }
+    
+    // Allow authenticated reads for credentials (for password verification)
+    match /credentials/{role} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Allow authenticated reads for the order ID counter
+    match /counters/{counterId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Deny access to any other collection by default
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
