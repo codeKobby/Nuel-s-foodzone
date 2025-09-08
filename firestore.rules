@@ -1,18 +1,16 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default to deny all reads and writes
+    // Default deny all access to all documents
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Allow authenticated users to read menu items
-    match /menuItems/{item} {
+    // Allow authenticated users to read data required for the app to function
+    match /menuItems/{itemId} {
       allow read: if request.auth != null;
     }
 
-    // Allow authenticated users to create, read, update, and delete orders and expenses
     match /orders/{orderId} {
       allow read, write, delete: if request.auth != null;
     }
@@ -20,19 +18,18 @@ service cloud.firestore {
     match /miscExpenses/{expenseId} {
       allow read, write, delete: if request.auth != null;
     }
-    
-    // Allow authenticated users to read reports
+
     match /reconciliationReports/{reportId} {
-       allow read: if request.auth != null;
+      allow read: if request.auth != null;
     }
 
-    // Allow read/write on counters and credentials for app functionality
+    // Allow read/write for counters and credentials for app functionality
     match /counters/{counterId} {
-        allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
-    
-    match /credentials/{role} {
-        allow read, write: if request.auth != null;
+
+    match /credentials/{credentialId} {
+      allow read, write: if request.auth != null;
     }
   }
 }
