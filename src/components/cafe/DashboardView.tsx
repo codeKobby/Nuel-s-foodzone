@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -13,6 +14,8 @@ import type {
     ChangeFund,
     OrderAgeAnalysis,
     BusinessMetrics,
+    DashboardStats,
+    ChatMessage
 } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, ArrowDownUp, SortAsc, SortDesc, Ban, Package, AlertTriangle, Clock, Eye, History, Calculator } from 'lucide-react';
@@ -47,43 +50,24 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from '@/components/ui/separator';
+import { analyzeBusiness } from '@/ai/flows/analyze-business-flow';
+import { businessChat } from '@/ai/flows/business-chat-flow';
+import { useToast } from '@/hooks/use-toast';
 
-interface DashboardStats {
-  totalSales: number;
-  netRevenueFromNewSales: number;
-  totalNetRevenue: number;
-  previousDayCollections: number;
-  cashSales: number;
-  momoSales: number;
-  changeFundImpact: number;
-  changeFundHealth: 'healthy' | 'low' | 'excessive';
-  totalOrders: number;
-  totalItemsSold: number;
-  unpaidOrdersValue: number;
-  overdueOrdersCount: number;
-  totalMiscExpenses: number;
-  totalPardonedAmount: number;
-  totalVariance: number;
-  totalSurplus: number;
-  totalDeficit: number;
-  enhancedReports: EnhancedReconciliationReport[];
-  dailyStats: EnhancedPeriodStats[];
-  salesData: { date: string; newSales: number; collections: number; netRevenue: number }[];
-  itemPerformance: { name: string; count: number; totalValue: number }[];
-  businessMetrics: BusinessMetrics[];
-  orderAgeAnalysis: OrderAgeAnalysis[];
-  incompleteAccountingDays: string[];
-  pardonedOrders: Order[];
-}
-
-interface ChatMessage {
-  role: 'user' | 'model';
-  content: { text: string }[];
-}
 
 type ItemSortKey = 'count' | 'totalValue';
 type ItemSortDirection = 'asc' | 'desc';
@@ -257,6 +241,9 @@ const DashboardView: React.FC = () => {
   const [isChangeFundModalOpen, setIsChangeFundModalOpen] = useState(false);
   const [isOrderAgeModalOpen, setIsOrderAgeModalOpen] = useState(false);
   const [isIncompleteModalOpen, setIsIncompleteModalOpen] = useState(false);
+  const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
+  const [analysisContent, setAnalysisContent] = useState('');
+  const [isGeneratingAnalysis, setIsGeneratingAnalysis] = useState(false);
   
   // AI Features State
   const [activeChatSessionId, setActiveChatSessionId] = useState<string | null>(null);
@@ -272,6 +259,8 @@ const DashboardView: React.FC = () => {
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [itemSortKey, setItemSortKey] = useState<ItemSortKey>('count');
   const [itemSortDirection, setItemSortDirection] = useState<ItemSortDirection>('desc');
+  
+  const { toast } = useToast();
 
   // Mock data loading
   useEffect(() => {
@@ -308,6 +297,48 @@ const DashboardView: React.FC = () => {
     setDate({ from: fromDate, to: toDate });
     setActiveDatePreset(rangeType);
   };
+  
+    const handleRunAnalysis = async () => {
+    if (!stats || !date?.from) return;
+
+    setIsGeneratingAnalysis(true);
+    setIsAnalysisModalOpen(true);
+    setAnalysisContent('');
+
+    try {
+        const itemPerformance = stats.itemPerformance.map(({ name, count }) => ({ name, count }));
+        const avgOrderValue = stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0;
+        
+        const period = date.to 
+            ? `From ${format(date.from, 'MMMM do, yyyy')} to ${format(date.to, 'MMMM do, yyyy')}`
+            : `For ${format(date.from, 'MMMM do, yyyy')}`;
+
+        const input = {
+            period,
+            totalSales: stats.totalSales,
+            netRevenue: stats.totalNetRevenue,
+            totalOrders: stats.totalOrders,
+            avgOrderValue,
+            itemPerformance,
+            miscExpenses: stats.totalMiscExpenses,
+            cashDiscrepancy: stats.totalVariance ?? 0,
+        };
+
+        const result = await analyzeBusiness(input);
+        setAnalysisContent(result.analysis);
+    } catch (err) {
+        console.error("AI Analysis failed:", err);
+        setAnalysisContent("## Analysis Failed\n\nAn unexpected error occurred while generating the business analysis. Please check the console for more details.");
+        toast({
+            title: "AI Analysis Error",
+            description: "Could not generate the report. Please try again later.",
+            type: "error",
+        });
+    } finally {
+        setIsGeneratingAnalysis(false);
+    }
+  };
+
 
   const sortedItemSales = useMemo(() => {
     if (!stats) return [];
@@ -503,6 +534,10 @@ const DashboardView: React.FC = () => {
               />
             </PopoverContent>
           </Popover>
+           <Button onClick={handleRunAnalysis} className="w-full sm:w-auto">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Analyze
+            </Button>
         </div>
       </div>
 
@@ -784,9 +819,9 @@ const DashboardView: React.FC = () => {
                     <div className="space-y-3">
                       {stats.orderAgeAnalysis.map((order) => (
                         <div key={order.orderId} className="p-3 border rounded-lg">
-                          <div className="flex justify-between items-start mb-3">
+                          <div className="flex justify-between items-start">
                             <div>
-                              <h4 className="font-semibold text-lg">{order.orderNumber}</h4>
+                              <p className="font-medium">{order.orderNumber}</p>
                               <p className="text-sm text-muted-foreground">{order.customerName || 'Unknown Customer'}</p>
                               <p className="text-xs text-muted-foreground">{order.daysOverdue} days overdue</p>
                             </div>
@@ -796,13 +831,10 @@ const DashboardView: React.FC = () => {
                                   order.riskLevel === 'high' ? 'destructive' : 
                                   order.riskLevel === 'medium' ? 'default' : 'secondary'
                                 }
-                                className="text-sm"
                               >
                                 {formatCurrency(order.amount)}
                               </Badge>
-                              <p className="text-xs mt-1 capitalize font-medium">
-                                {order.riskLevel} risk
-                              </p>
+                              <p className="text-xs mt-1 capitalize">{order.riskLevel} risk</p>
                             </div>
                           </div>
                           <p className="text-xs text-blue-600 mt-2 italic">{order.recommendedAction}</p>
@@ -1293,6 +1325,35 @@ const DashboardView: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      {/* AI Analysis Modal */}
+      <Dialog open={isAnalysisModalOpen} onOpenChange={setIsAnalysisModalOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="text-primary h-5 w-5" />
+              AI Business Performance Analysis
+            </DialogTitle>
+            <DialogDescription>
+              An AI-generated report on your business performance for the selected period.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] mt-4">
+            <div className="p-4 prose dark:prose-invert max-w-none">
+              {isGeneratingAnalysis ? (
+                <div className="flex flex-col items-center justify-center h-48">
+                  <LoadingSpinner />
+                  <p className="mt-4 text-muted-foreground">Generating your report...</p>
+                </div>
+              ) : (
+                <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">
+                  {analysisContent}
+                </ReactMarkdown>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
       {/* AI Business Assistant */}
       <Sheet open={isChatSheetOpen} onOpenChange={setIsChatSheetOpen}>
         <SheetTrigger asChild>
@@ -1355,4 +1416,4 @@ const DashboardView: React.FC = () => {
   );
 };
 
-export default EnhancedDashboardView;
+export default DashboardView;
