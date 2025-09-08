@@ -3,46 +3,35 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user is signed in (including anonymous)
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    // Default deny all reads and writes
+    // Default deny all access
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Allow authenticated users to read and write orders
+    // Allow authenticated users to read data required for the app to function
+    match /menuItems/{item} {
+      allow read: if request.auth != null;
+    }
+
     match /orders/{orderId} {
-      allow read, create, update, delete: if isSignedIn();
+      allow read, create, update, delete: if request.auth != null;
     }
-    
-    // Allow authenticated users to read and write misc expenses
+
     match /miscExpenses/{expenseId} {
-      allow read, create, update, delete: if isSignedIn();
+      allow read, create, update, delete: if request.auth != null;
     }
 
-    // Allow authenticated users to read and write reconciliation reports
     match /reconciliationReports/{reportId} {
-      allow read, create, update: if isSignedIn();
-    }
-    
-    // Allow anyone to read menu items
-    match /menuItems/{itemId} {
-      allow read: if true;
-      allow write: if isSignedIn(); // Only managers (via tool) should write, but rule is for any auth user
+      allow read, create: if request.auth != null;
     }
 
-    // Allow authenticated users to read/write credentials (for password checks/updates)
-    match /credentials/{role} {
-       allow read, write: if isSignedIn();
+    // Allow client to read and write to counters and credentials
+    match /counters/{counter} {
+      allow read, write: if request.auth != null;
     }
-    
-    // Allow authenticated users to read/write counters (for new order IDs)
-    match /counters/{counterId} {
-       allow read, write: if isSignedIn();
+
+    match /credentials/{role} {
+      allow read, write: if request.auth != null;
     }
   }
 }
