@@ -9,7 +9,6 @@ import { formatCurrency } from '@/lib/utils';
 import { Edit, Trash2, PlusCircle, Search, AlertCircle, KeyRound, ShieldCheck, RefreshCw, Loader } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,12 +69,11 @@ const AdminForm = ({
     </form>
 );
 
-const SecuritySettings = () => {
+const SecuritySettings = ({ toast }: { toast: any }) => {
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-    const { toast } = useToast();
 
     const handlePasswordUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -297,7 +295,7 @@ const AdminView: React.FC = () => {
                                             <SheetTitle className="text-2xl">Security</SheetTitle>
                                         </SheetHeader>
                                         <div className="p-4 overflow-y-auto">
-                                            <SecuritySettings />
+                                            <SecuritySettings toast={toast} />
                                         </div>
                                     </SheetContent>
                                 </Sheet>
@@ -381,7 +379,7 @@ const AdminView: React.FC = () => {
                                 <CardDescription>Update your account password.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <SecuritySettings />
+                                <SecuritySettings toast={toast} />
                             </CardContent>
                         </TabsContent>
                      </Tabs>
