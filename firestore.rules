@@ -4,43 +4,45 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow public read for the menu
-    match /menuItems/{itemId} {
-      allow read: if true;
-      allow write: if false; // Disallow client writes
+    // Helper function to check if a user is signed in (including anonymous)
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Allow authenticated users to read business data
-    match /orders/{orderId} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-    
-    match /miscExpenses/{expenseId} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-
-    match /reconciliationReports/{reportId} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-    
-    // Allow authenticated reads for credentials (for password verification)
-    match /credentials/{role} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-
-    // Allow authenticated reads for the order ID counter
-    match /counters/{counterId} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-
-    // Deny access to any other collection by default
+    // Default deny all reads and writes
     match /{document=**} {
       allow read, write: if false;
+    }
+
+    // Allow authenticated users to read and write orders
+    match /orders/{orderId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+    
+    // Allow authenticated users to read and write misc expenses
+    match /miscExpenses/{expenseId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // Allow authenticated users to read and write reconciliation reports
+    match /reconciliationReports/{reportId} {
+      allow read, create, update: if isSignedIn();
+    }
+    
+    // Allow anyone to read menu items
+    match /menuItems/{itemId} {
+      allow read: if true;
+      allow write: if isSignedIn(); // Only managers (via tool) should write, but rule is for any auth user
+    }
+
+    // Allow authenticated users to read/write credentials (for password checks/updates)
+    match /credentials/{role} {
+       allow read, write: if isSignedIn();
+    }
+    
+    // Allow authenticated users to read/write counters (for new order IDs)
+    match /counters/{counterId} {
+       allow read, write: if isSignedIn();
     }
   }
 }
