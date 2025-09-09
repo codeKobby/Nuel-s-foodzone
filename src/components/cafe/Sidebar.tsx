@@ -2,7 +2,7 @@
 "use client";
 
 import Image from 'next/image';
-import { Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase, Scale, LogOut, Package } from 'lucide-react';
+import { Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase, Scale, LogOut, Package, Users } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import logo from '@/app/logo.png';
 import { useRouter } from 'next/navigation';
@@ -50,7 +50,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
     const navItemsConfig = {
         manager: [
             { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
-            { id: 'admin', icon: Settings, label: 'Admin' },
+            { id: 'admin', icon: Settings, label: 'Admin Panel' },
+            { id: 'accounts', icon: Users, label: 'Cashier Accounts' },
         ],
         cashier: [
             { id: 'pos', icon: Home, label: 'POS' },

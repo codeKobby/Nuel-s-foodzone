@@ -1,13 +1,13 @@
 
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useContext } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Menu, LogOut, Package } from 'lucide-react';
+import { Menu, LogOut, Package, Users } from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/app/logo.png';
 
@@ -16,6 +16,7 @@ import PosView from '@/components/cafe/PosView';
 import OrdersView from '@/components/cafe/OrdersView';
 import DashboardView from '@/components/cafe/DashboardView';
 import AdminView from '@/components/cafe/AdminView';
+import AccountsView from '@/components/cafe/AccountsView';
 import MiscView from '@/components/cafe/MiscView';
 import AccountingView from '@/components/cafe/AccountingView';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -26,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { OrderEditingProvider } from '@/context/OrderEditingContext';
+import { AuthContext } from '@/context/AuthContext';
 
 const MobileNav = ({
     activeView,
@@ -49,7 +51,8 @@ const MobileNav = ({
     const navItemsConfig = {
         manager: [
             { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
-            { id: 'admin', icon: Settings, label: 'Admin' },
+            { id: 'admin', icon: Settings, label: 'Admin Panel' },
+            { id: 'accounts', icon: Users, label: 'Cashier Accounts' },
         ],
         cashier: [
             { id: 'pos', icon: Home, label: 'POS' },
@@ -127,16 +130,16 @@ const MobileNav = ({
 
 
 function CafePage() {
-    const searchParams = useSearchParams();
     const router = useRouter();
-    const role = searchParams.get('role') as 'manager' | 'cashier';
+    const { session, logout, isLoading: isAuthLoading } = useContext(AuthContext);
+    const role = session?.role;
 
     const defaultViews = {
         manager: 'dashboard',
         cashier: 'pos',
     };
 
-    const [activeView, setActiveView] = useState(defaultViews[role] || 'pos');
+    const [activeView, setActiveView] = useState('');
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [authError, setAuthError] = useState<string | null>(null);
     const [theme, setTheme] = useState('light');
@@ -144,6 +147,8 @@ function CafePage() {
     const isMobile = useIsMobile();
 
     useEffect(() => {
+        if (isAuthLoading) return;
+        
         if (!role || !['manager', 'cashier'].includes(role)) {
             router.push('/');
             return;
@@ -186,7 +191,7 @@ function CafePage() {
             }
         });
         return () => unsubscribe();
-    }, [role, router]);
+    }, [role, router, isAuthLoading]);
     
     const toggleTheme = () => {
         const newTheme = theme === 'light' ? 'dark' : 'light';
@@ -198,6 +203,7 @@ function CafePage() {
     };
 
     const handleLogout = () => {
+        logout();
         router.push('/');
     };
     
@@ -221,12 +227,13 @@ function CafePage() {
             case 'accounting': return role === 'cashier' ? <AccountingView setActiveView={setActiveView}/> : null;
             case 'misc': return role === 'cashier' ? <MiscView /> : null;
             case 'admin': return role === 'manager' ? <AdminView /> : null;
+            case 'accounts': return role === 'manager' ? <AccountsView /> : null;
             case 'stock': return role === 'cashier' ? <StockView /> : null;
             default: return null;
         }
     };
 
-    if (!isAuthReady || !role) {
+    if (!isAuthReady || isAuthLoading || !role) {
         return (
             <div className="h-screen w-screen bg-background flex flex-col items-center justify-center">
                 <LoadingSpinner />

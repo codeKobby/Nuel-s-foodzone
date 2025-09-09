@@ -37,16 +37,18 @@ export interface Order {
   paymentMethod: 'cash' | 'momo' | 'Unpaid';
   paymentStatus: 'Paid' | 'Unpaid' | 'Partially Paid';
   amountPaid: number;
-  changeGiven: number; // This tracks cash that has been physically returned or settled.
-  balanceDue: number; // Positive if customer owes money, negative if change is owed to customer
-  pardonedAmount: number; // For tracking accepted deficits
+  changeGiven: number; 
+  balanceDue: number; 
+  pardonedAmount: number;
   status: 'Pending' | 'Completed';
   timestamp: Timestamp;
-  creditSource?: string[]; // Note for traceability, e.g., "Converted to credit for [customerTag]"
+  creditSource?: string[];
   lastPaymentTimestamp?: Timestamp;
   lastPaymentAmount?: number;
-  settledOn?: Timestamp; // The date when an outstanding balance/change was fully settled.
+  settledOn?: Timestamp;
   notes?: string;
+  cashierId: string;
+  cashierName: string;
 }
 
 export interface MiscExpense {
@@ -56,32 +58,46 @@ export interface MiscExpense {
   source: 'cash' | 'momo';
   timestamp: Timestamp;
   settled: boolean;
+  cashierId: string;
+  cashierName: string;
 }
 
 export interface ReconciliationReport {
     id: string;
     timestamp: Timestamp;
     period: string;
-    totalSales: number; // For context, but not part of main calculation
-    
-    // Expected figures
+    totalSales: number;
     expectedCash: number;
     expectedMomo: number;
     totalExpectedRevenue: number;
-
-    // Counted figures
     countedCash: number;
     countedMomo: number;
     totalCountedRevenue: number;
-
-    // Final result
-    totalDiscrepancy: number; // This is the total difference, can be surplus or deficit
+    totalDiscrepancy: number;
     notes: string;
-
-    // Change Owed Handling
     changeOwedForPeriod: number;
     changeOwedSetAside: boolean;
+    cashierId: string;
+    cashierName: string;
 }
+
+export interface CashierAccount {
+    id: string;
+    fullName: string;
+    username: string;
+    passwordHash: string;
+    isTemporaryPassword?: boolean;
+    createdAt: Timestamp;
+    status: 'active' | 'revoked';
+}
+
+export interface UserSession {
+    uid: string;
+    role: 'manager' | 'cashier';
+    fullName?: string;
+    username?: string;
+}
+
 
 export interface ChatMessage {
     role: 'user' | 'model';

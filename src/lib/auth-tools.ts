@@ -4,18 +4,17 @@
  * @fileOverview This file contains server-side functions for authentication.
  * Using "use server" allows these to be called from client components for secure operations.
  */
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { createHash } from 'crypto';
 import type { VerifyPasswordInput, UpdatePasswordInput } from '@/ai/schemas';
 
 const DEFAULT_PASSWORDS = {
     manager: 'Graceland18',
-    cashier: 'password', // Default for cashier if ever needed
 };
 
 // Hashes a password using SHA256.
-function hashPassword(password: string): string {
+export async function hashPassword(password: string): Promise<string> {
     return createHash('sha256').update(password).digest('hex');
 }
 
@@ -29,18 +28,15 @@ export async function verifyPassword(input: VerifyPasswordInput): Promise<boolea
 
     try {
         const docSnap = await getDoc(credentialRef);
+        const hashedPassword = await hashPassword(password);
 
         if (docSnap.exists()) {
-            // Document exists, compare password with stored hash
             const storedHash = docSnap.data().passwordHash;
-            return storedHash === hashPassword(password);
+            return storedHash === hashedPassword;
         } else {
-            // Document doesn't exist, this is likely the first run.
-            // Check against the default password.
-            const defaultPassword = DEFAULT_PASSWORDS[role];
+            const defaultPassword = DEFAULT_PASSWORDS[role as keyof typeof DEFAULT_PASSWORDS];
             if (password === defaultPassword) {
-                // Password is correct, so create the hash in the database for future logins
-                const newHash = hashPassword(defaultPassword);
+                const newHash = await hashPassword(defaultPassword);
                 await setDoc(credentialRef, { passwordHash: newHash });
                 return true;
             }
@@ -48,7 +44,6 @@ export async function verifyPassword(input: VerifyPasswordInput): Promise<boolea
         }
     } catch (error) {
         console.error("Error verifying password:", error);
-        // In case of error, deny access.
         return false;
     }
 }
@@ -60,21 +55,51 @@ export async function verifyPassword(input: VerifyPasswordInput): Promise<boolea
 export async function updatePassword(input: UpdatePasswordInput): Promise<{ success: boolean, message: string }> {
     const { role, currentPassword, newPassword } = input;
 
-    // First, verify the current password is correct.
     const isAuthorized = await verifyPassword({ role, password: currentPassword });
 
     if (!isAuthorized) {
         return { success: false, message: "Incorrect current password." };
     }
 
-    // If authorized, update to the new password hash.
     try {
         const credentialRef = doc(db, "credentials", role);
-        const newHash = hashPassword(newPassword);
+        const newHash = await hashPassword(newPassword);
         await setDoc(credentialRef, { passwordHash: newHash });
         return { success: true, message: "Password updated successfully." };
     } catch (error) {
         console.error("Error updating password:", error);
         return { success: false, message: "An unexpected error occurred while updating the password." };
     }
+}
+
+/**
+ * Generates a unique username based on the full name.
+ * e.g., "John Doe" -> "john". If "john" exists, it tries "john1", "john2", etc.
+ */
+export async function generateUniqueUsername(fullName: string): Promise<string> {
+    const firstName = fullName.split(' ')[0].toLowerCase();
+    let username = firstName;
+    let counter = 1;
+
+    while (true) {
+        const q = query(collection(db, "cashierAccounts"), where("username", "==", username));
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.empty) {
+            return username; // Username is unique
+        }
+        username = `${firstName}${counter}`;
+        counter++;
+    }
+}
+
+/**
+ * Generates a random, secure one-time password.
+ */
+export async function generateOneTimePassword(length: number = 8): Promise<string> {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let password = '';
+    for (let i = 0; i < length; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
 }

@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -9,26 +9,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowRight, ShieldCheck, ShoppingCart, Loader } from 'lucide-react';
 import logo from '@/app/logo.png';
 import PasswordModal from '@/components/cafe/modals/PasswordModal';
+import { AuthContext } from '@/context/AuthContext';
 
 export default function RoleSelectionPage() {
   const [loadingRole, setLoadingRole] = useState<'manager' | 'cashier' | null>(null);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showManagerPasswordModal, setShowManagerPasswordModal] = useState(false);
+  const { login } = useContext(AuthContext);
   const router = useRouter();
 
-  const handleCashierNavigation = () => {
-    setLoadingRole('cashier');
-    router.push(`/main?role=cashier`);
-  };
-  
   const handleManagerNavigation = () => {
-      setShowPasswordModal(true);
+    setShowManagerPasswordModal(true);
   }
 
-  const onPasswordSuccess = () => {
+  const onManagerPasswordSuccess = () => {
     setLoadingRole('manager');
-    setShowPasswordModal(false);
+    login({ role: 'manager' });
+    setShowManagerPasswordModal(false);
     router.push(`/main?role=manager`);
   }
+
+  const handleCashierLogin = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoadingRole('cashier');
+    const formData = new FormData(event.currentTarget);
+    const username = formData.get('username') as string;
+    const password = formData.get('password') as string;
+    // Here you would typically call an async login function
+    // For now, we simulate success for UI flow
+    setTimeout(() => {
+        // In a real app: const user = await cashierLogin(username, password);
+        // if (user) {
+        //    login({ role: 'cashier', uid: user.id, fullName: user.fullName, username: user.username });
+        //    router.push(`/main?role=cashier`);
+        // } else { setLoadingRole(null); // Show error }
+        login({ role: 'cashier', uid: 'cashier-test-id', fullName: 'Test Cashier', username });
+        router.push(`/main?role=cashier`);
+    }, 1000);
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-secondary/50 dark:bg-background p-4 font-body">
@@ -42,8 +59,8 @@ export default function RoleSelectionPage() {
         <Card className="transform hover:scale-105 transition-transform duration-300 ease-in-out">
           <CardHeader className="text-center">
              <ShieldCheck className="h-12 w-12 mx-auto text-primary" />
-            <CardTitle className="text-2xl mt-4">Manager View</CardTitle>
-            <CardDescription>Access to dashboard and admin controls.</CardDescription>
+            <CardTitle className="text-2xl mt-4">Manager</CardTitle>
+            <CardDescription>Access dashboard, accounts, and admin controls.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button 
@@ -52,42 +69,36 @@ export default function RoleSelectionPage() {
               disabled={!!loadingRole}
             >
               {loadingRole === 'manager' ? (
-                <>
-                  <Loader className="mr-2 animate-spin" />
-                  Loading...
-                </>
+                <><Loader className="mr-2 animate-spin" /> Loading...</>
               ) : (
-                <>
-                  Login as Manager <ArrowRight className="ml-2" />
-                </>
+                <>Login as Manager <ArrowRight className="ml-2" /></>
               )}
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="transform hover:scale-105 transition-transform duration-300 ease-in-out">
+        <Card>
           <CardHeader className="text-center">
             <ShoppingCart className="h-12 w-12 mx-auto text-primary" />
-            <CardTitle className="text-2xl mt-4">Cashier View</CardTitle>
-            <CardDescription>Access to POS, Orders, and Accounting for daily operations.</CardDescription>
+            <CardTitle className="text-2xl mt-4">Cashier</CardTitle>
+            <CardDescription>Enter your credentials for daily operations.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              className="w-full text-lg h-12"
-              onClick={handleCashierNavigation}
-              disabled={!!loadingRole}
-            >
-               {loadingRole === 'cashier' ? (
-                <>
-                  <Loader className="mr-2 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                <>
-                  Login as Cashier <ArrowRight className="ml-2" />
-                </>
-              )}
-            </Button>
+            <form onSubmit={handleCashierLogin} className="space-y-4">
+              <input name="username" placeholder="Username" required className="w-full p-2 border rounded" />
+              <input name="password" type="password" placeholder="Password" required className="w-full p-2 border rounded" />
+              <Button 
+                type="submit"
+                className="w-full text-lg h-12"
+                disabled={!!loadingRole}
+              >
+                {loadingRole === 'cashier' ? (
+                  <><Loader className="mr-2 animate-spin" /> Logging in...</>
+                ) : (
+                  <>Login as Cashier <ArrowRight className="ml-2" /></>
+                )}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>
@@ -96,11 +107,11 @@ export default function RoleSelectionPage() {
         <p>A secure and efficient Point of Sale System.</p>
       </footer>
       
-      {showPasswordModal && (
+      {showManagerPasswordModal && (
         <PasswordModal 
             role="manager"
-            onSuccess={onPasswordSuccess}
-            onClose={() => setShowPasswordModal(false)}
+            onSuccess={onManagerPasswordSuccess}
+            onClose={() => setShowManagerPasswordModal(false)}
         />
       )}
     </div>
