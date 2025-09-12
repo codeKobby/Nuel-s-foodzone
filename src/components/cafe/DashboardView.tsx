@@ -14,13 +14,14 @@ import type {
     ChatMessage
 } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, Sparkles, User, Bot, Send, Calendar as CalendarIcon, AlertTriangle, Check, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, FileCheck, Clock, Eye, MessageSquare, Plus } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, Sparkles, User, Bot, Send, Calendar as CalendarIcon, AlertTriangle, Check, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, FileCheck, Clock, Eye, MessageSquare, Plus, ArrowDownUp as SortDesc, ArrowUpWideNarrow as SortAsc } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart"
-import { ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Line, Area } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig, CartesianGrid, ComposedChart, Line, Area } from "@/components/ui/chart"
+import { XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+
 import { DateRange } from "react-day-picker"
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, endOfToday, differenceInDays } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -167,8 +168,8 @@ const DashboardView: React.FC = () => {
 
             const [ordersSnapshot, expensesSnapshot, reportsSnapshot] = await Promise.all([
                 getDocs(ordersQuery),
-                getDocs(expensesSnapshot),
-                getDocs(reportsSnapshot),
+                getDocs(expensesQuery),
+                getDocs(reportsQuery),
             ]);
 
             const allOrders = ordersSnapshot.docs.map(d => ({...d.data(), id: d.id})) as Order[];
@@ -267,8 +268,7 @@ const DashboardView: React.FC = () => {
 
             setStats({
                 totalSales,
-                netRevenueFromNewSales: newSalesRevenue,
-                totalNetRevenue,
+                netRevenue: totalNetRevenue,
                 previousDayCollections: collections,
                 totalOrders,
                 totalItemsSold,
@@ -279,7 +279,7 @@ const DashboardView: React.FC = () => {
                 enhancedReports: periodReports,
                 salesData,
                 itemPerformance: Object.values(itemPerformance),
-            });
+            } as DashboardStats);
 
         } catch (err) {
             console.error(err);
@@ -334,7 +334,7 @@ const DashboardView: React.FC = () => {
         const input = {
             period,
             totalSales: stats.totalSales,
-            netRevenue: stats.totalNetRevenue,
+            netRevenue: stats.netRevenue,
             totalOrders: stats.totalOrders,
             avgOrderValue,
             itemPerformance,
@@ -504,7 +504,7 @@ const DashboardView: React.FC = () => {
         <TabsContent value="overview" className="mt-6 space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalOrders} orders in period`} />
-            <StatCard icon={<TrendingUp className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.totalNetRevenue)} description={`+${formatCurrency(stats.previousDayCollections)} from collections`} />
+            <StatCard icon={<TrendingUp className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description={`+${formatCurrency(stats.previousDayCollections)} from collections`} />
             <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Expenses" value={formatCurrency(stats.totalMiscExpenses)} description="Misc. cash/momo outs" />
             <StatCard 
               icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
@@ -531,7 +531,7 @@ const DashboardView: React.FC = () => {
                     content={({ payload, label }) => (
                       <ChartTooltipContent
                         label={label}
-                        payload={payload}
+                        payload={payload || []}
                         formatter={(value, name, props) => (
                           <div className="flex flex-col">
                             <span className="font-bold">{formatCurrency(value as number)}</span>
@@ -616,3 +616,5 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    
