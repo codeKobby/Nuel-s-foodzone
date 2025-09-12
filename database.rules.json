@@ -1,43 +1,84 @@
 
 {
   "rules": {
-    "users": {
-      "$uid": {
-        ".read": "$uid === request.auth.uid",
-        ".write": "$uid === request.auth.uid"
-      }
+    "// Default deny all reads and writes": {
+      ".read": false,
+      ".write": false
     },
+    
     "menuItems": {
-      ".read": "request.auth != null",
-      ".write": "request.auth != null"
+      "// Authenticated users can read the menu": {
+        ".read": "request.auth != null",
+      },
+      "// Only managers can create, update, or delete menu items": {
+        ".write": "get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'manager'"
+      },
+      "$itemId": {
+        ".write": "get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'manager'"
+      }
     },
+    
     "orders": {
-      ".read": "request.auth != null",
-      ".write": "request.auth != null"
+      "// Authenticated users can work with orders": {
+        ".read": "request.auth != null",
+        ".write": "request.auth != null"
+      }
     },
+    
     "miscExpenses": {
-      ".read": "request.auth != null",
-      ".write": "request.auth != null"
+      "// Authenticated users can log and view expenses": {
+        ".read": "request.auth != null",
+        ".write": "request.auth != null"
+      }
     },
+    
     "reconciliationReports": {
-      ".read": "request.auth != null",
-      ".write": "request.auth != null"
+      "// Authenticated users can manage reconciliation reports": {
+        ".read": "request.auth != null",
+        ".write": "request.auth != null"
+      }
     },
+    
     "counters": {
-      "orderIdCounter": {
-        ".read": "request.auth != null",
-        ".write": "request.auth != null"
+      "// Authenticated users can read and write to counters (for order IDs)": {
+        "orderIdCounter": {
+          ".read": "request.auth != null",
+          ".write": "request.auth != null"
+        }
       }
     },
+    
     "credentials": {
-      "manager": {
-        ".read": "request.auth != null",
-        ".write": "request.auth != null"
+      "// Authenticated managers can read and write credentials": {
+        ".read": "get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'manager'",
+        ".write": "get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'manager'"
       }
     },
+
     "cashierAccounts": {
-      ".read": "request.auth != null",
-      ".write": "request.auth != null"
+      "// Only managers can read the full list of cashier accounts": {
+        ".read": "get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'manager'",
+      },
+      "// Only managers can create new cashier accounts": {
+         ".write": "get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'manager'"
+      },
+      "$accountId": {
+        "// A manager can update/delete any cashier account": {
+           ".write": "get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'manager'",
+        },
+        "// A specific cashier can read their own account info": {
+           ".read": "resource.data.username == get(/databases/(default)/documents/users/$(request.auth.uid)).data.username"
+        }
+      }
+    },
+
+    "users": {
+      "// A user can read and write their own data (like their role)": {
+        "$uid": {
+          ".read": "request.auth != null && request.auth.uid == $uid",
+          ".write": "request.auth != null && request.auth.uid == $uid"
+        }
+      }
     }
   }
 }
