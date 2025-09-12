@@ -1,9 +1,9 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc, addDoc, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import type { 
     Order, 
     MiscExpense, 
@@ -18,13 +18,13 @@ import type {
     ChatMessage
 } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
-import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, ArrowDownUp, SortAsc, SortDesc, Ban, Package, AlertTriangle, Clock, Eye, History, Calculator } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, AlertCircle, Sparkles, User, Bot, Send, Calendar as CalendarIcon, FileWarning, Activity, UserCheck, MessageSquare, Plus, Trash2, FileCheck, Check, Briefcase, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, ArrowDownUp, SortAsc, SortDesc, Ban, Package, AlertTriangle, Clock, Eye, History, Calculator, Wifi, WifiOff } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart"
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Line, ComposedChart, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Line, ComposedChart, CartesianGrid, Area, AreaChart } from 'recharts';
 import { DateRange } from "react-day-picker"
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, endOfToday, differenceInDays, isToday } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -68,7 +68,6 @@ import { analyzeBusiness } from '@/ai/flows/analyze-business-flow';
 import { businessChat } from '@/ai/flows/business-chat-flow';
 import { useToast } from '@/hooks/use-toast';
 
-
 type ItemSortKey = 'count' | 'totalValue';
 type ItemSortDirection = 'asc' | 'desc';
 type PresetDateRange = 'today' | 'week' | 'month' | 'custom';
@@ -82,7 +81,8 @@ const StatCard: React.FC<{
   children?: React.ReactNode;
   variant?: 'default' | 'warning' | 'success' | 'danger';
   badge?: React.ReactNode;
-}> = ({ icon, title, value, description, onClick, children, variant = 'default', badge }) => {
+  trend?: { value: number; isPositive: boolean };
+}> = ({ icon, title, value, description, onClick, children, variant = 'default', badge, trend }) => {
   const getCardClasses = () => {
     const baseClasses = onClick ? 'cursor-pointer hover:shadow-md transition-all' : '';
     switch (variant) {
@@ -103,14 +103,21 @@ const StatCard: React.FC<{
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        <div className="flex items-end justify-between">
+          <div className="text-2xl font-bold">{value}</div>
+          {trend && (
+            <div className={`flex items-center text-sm ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}>
+              {trend.isPositive ? <TrendingUp className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
+              {Math.abs(trend.value)}%
+            </div>
+          )}
+        </div>
+        {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
         {children}
       </CardContent>
     </Card>
   );
 };
-
 
 const chartConfig = {
   newSales: {
@@ -125,12 +132,18 @@ const chartConfig = {
     label: "Net Revenue",
     color: "hsl(var(--chart-3))",
   },
+  expenses: {
+    label: "Expenses",
+    color: "hsl(var(--chart-4))",
+  }
 } satisfies ChartConfig;
 
 const DashboardView: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
   const [date, setDate] = useState<DateRange | undefined>({ 
     from: startOfWeek(new Date(), { weekStartsOn: 1 }), 
     to: endOfToday() 
@@ -163,8 +176,22 @@ const DashboardView: React.FC = () => {
   
   const { toast } = useToast();
 
+  // Check authentication status
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setIsAuthenticated(!!user);
+      setAuthChecking(false);
+      if (!user) {
+        setError("Authentication required. Please log in to access the dashboard.");
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
    useEffect(() => {
-    if (!date?.from) return;
+    if (authChecking || !isAuthenticated || !date?.from) return;
 
     setLoading(true);
 
@@ -236,11 +263,11 @@ const DashboardView: React.FC = () => {
             const totalVariance = periodReports.reduce((sum, r) => sum + r.totalDiscrepancy, 0);
 
             // Chart Data
-            const salesDataMap: Record<string, { newSales: number; collections: number; netRevenue: number }> = {};
+            const salesDataMap: Record<string, { newSales: number; collections: number; netRevenue: number; expenses: number }> = {};
             const daysInRange = differenceInDays(endDate, startDate) + 1;
             for (let i = 0; i < daysInRange; i++) {
                 const day = format(addDays(startDate, i), 'MMM d');
-                salesDataMap[day] = { newSales: 0, collections: 0, netRevenue: 0 };
+                salesDataMap[day] = { newSales: 0, collections: 0, netRevenue: 0, expenses: 0 };
             }
 
             allOrders.forEach(o => {
@@ -260,7 +287,7 @@ const DashboardView: React.FC = () => {
             });
             
              const salesData = Object.entries(salesDataMap).map(([date, values]) => ({
-                date, ...values, netRevenue: values.newSales + values.collections
+                date, ...values, netRevenue: values.newSales + values.collections - values.expenses
             }));
             
              const itemPerformance = ordersCreatedInPeriod
@@ -320,7 +347,7 @@ const DashboardView: React.FC = () => {
     };
 
     fetchDashboardData();
-  }, [date]);
+  }, [date, authChecking, isAuthenticated]);
 
   const setDateRange = (rangeType: PresetDateRange) => {
     const today = new Date();
@@ -521,7 +548,7 @@ const DashboardView: React.FC = () => {
     </div>
   );
 
-  if (loading) {
+  if (authChecking) {
     return (
       <div className="p-6 h-full flex items-center justify-center">
         <LoadingSpinner />
@@ -537,6 +564,14 @@ const DashboardView: React.FC = () => {
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+      </div>
+    );
+  }
+  
+  if (loading) {
+    return (
+      <div className="p-6 h-full flex items-center justify-center">
+        <LoadingSpinner />
       </div>
     );
   }
@@ -715,37 +750,42 @@ const DashboardView: React.FC = () => {
             <CardHeader>
               <CardTitle>Revenue Trend Analysis</CardTitle>
               <CardDescription>
-                Daily breakdown showing new sales vs. collections from old debt.
+                Daily breakdown showing new sales, collections, and expenses.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                <ComposedChart data={stats.salesData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <ComposedChart data={stats.salesData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
-                  <Tooltip
-                    content={<ChartTooltipContent
-                      formatter={(value, name, item) => (
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                            <div className={cn(
-                              "w-2 h-2 rounded-full",
-                              name === 'newSales' ? 'bg-[--color-newSales]' : 
-                              name === 'collections' ? 'bg-[--color-collections]' : 'bg-[--color-netRevenue]'
-                            )}></div>
-                            <span className="capitalize">
-                              {name === 'newSales' ? 'New Sales' : 
-                               name === 'collections' ? 'Collections' : 'Net Revenue'}: {formatCurrency(Number(value))}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    />}
+                  <XAxis dataKey="date" tickLine={false} axisLine={false} />
+                  <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `$${Number(value) / 1000}k`} />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dot" />}
                   />
-                  <Bar dataKey="newSales" fill="var(--color-newSales)" stackId="a" />
-                  <Bar dataKey="collections" fill="var(--color-collections)" stackId="a" />
-                  <Line type="monotone" dataKey="netRevenue" stroke="var(--color-netRevenue)" strokeWidth={3} dot={false} />
+                  <Area
+                    dataKey="collections"
+                    type="natural"
+                    fill="var(--color-collections)"
+                    fillOpacity={0.4}
+                    stroke="var(--color-collections)"
+                    stackId="a"
+                  />
+                  <Area
+                    dataKey="newSales"
+                    type="natural"
+                    fill="var(--color-newSales)"
+                    fillOpacity={0.4}
+                    stroke="var(--color-newSales)"
+                    stackId="a"
+                  />
+                   <Line
+                    dataKey="expenses"
+                    type="natural"
+                    stroke="var(--color-expenses)"
+                    strokeWidth={2}
+                    dot={false}
+                  />
                 </ComposedChart>
               </ChartContainer>
             </CardContent>
@@ -1479,5 +1519,3 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
-
-    
