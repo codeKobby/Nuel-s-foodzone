@@ -103,3 +103,4 @@ export async function generateOneTimePassword(length: number = 8): Promise<strin
     }
     return password;
 }
+
