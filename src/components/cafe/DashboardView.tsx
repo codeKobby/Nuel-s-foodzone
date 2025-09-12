@@ -19,8 +19,8 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig, ChartArea as Area, ChartLine as Line } from "@/components/ui/chart"
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, CartesianGrid } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig, ChartArea as Area, ChartLine as Line, CartesianGrid, ComposedChart } from "@/components/ui/chart"
+import { XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 import { DateRange } from "react-day-picker"
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, endOfToday, differenceInDays } from "date-fns"
@@ -137,6 +137,8 @@ const DashboardView: React.FC = () => {
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [itemSortKey, setItemSortKey] = useState<ItemSortKey>('count');
   const [itemSortDirection, setItemSortDirection] = useState<ItemSortDirection>('desc');
+  const [isUnpaidOrdersModalOpen, setIsUnpaidOrdersModalOpen] = useState(false);
+  const [allUnpaidOrders, setAllUnpaidOrders] = useState<Order[]>([]);
   
   const { toast } = useToast();
 
@@ -207,11 +209,11 @@ const DashboardView: React.FC = () => {
             const totalMiscExpenses = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
             const totalNetRevenue = (newSalesRevenue + collections) - totalMiscExpenses;
             
-            const unpaidOrdersValue = allOrders
-                .filter(o => o.balanceDue > 0)
-                .reduce((sum, o) => sum + o.balanceDue, 0);
+            const unpaidOrders = allOrders.filter(o => o.balanceDue > 0);
+            setAllUnpaidOrders(unpaidOrders);
+            const unpaidOrdersValue = unpaidOrders.reduce((sum, o) => sum + o.balanceDue, 0);
 
-            const overdueOrders = allOrders.filter(o => o.balanceDue > 0 && differenceInDays(new Date(), o.timestamp.toDate()) > 2);
+            const overdueOrders = unpaidOrders.filter(o => differenceInDays(new Date(), o.timestamp.toDate()) > 2);
             
             const totalVariance = periodReports.reduce((sum, r) => sum + r.totalDiscrepancy, 0);
 
@@ -456,6 +458,41 @@ const DashboardView: React.FC = () => {
       </div>
     </div>
   );
+  
+  const UnpaidOrdersModal = () => (
+    <Dialog open={isUnpaidOrdersModalOpen} onOpenChange={setIsUnpaidOrdersModalOpen}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>All Unpaid Orders</DialogTitle>
+          <DialogDescription>
+            A complete list of all orders with an outstanding balance.
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="max-h-[60vh] mt-4">
+          <div className="pr-4">
+            {allUnpaidOrders.length > 0 ? (
+              allUnpaidOrders.map(order => (
+                <div key={order.id} className="mb-2 p-3 border rounded-md">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="font-semibold">{order.simplifiedId} - <span className="font-normal">{order.tag}</span></p>
+                      <p className="text-xs text-muted-foreground">{formatTimestamp(order.timestamp)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-red-500">{formatCurrency(order.balanceDue)}</p>
+                      <Badge variant="destructive">{order.paymentStatus}</Badge>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-center text-muted-foreground py-8">No unpaid orders found.</p>
+            )}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
 
   if (authChecking) {
     return <div className="p-6 h-full flex items-center justify-center"><LoadingSpinner /></div>;
@@ -513,6 +550,7 @@ const DashboardView: React.FC = () => {
               description={`${stats.overdueOrdersCount} overdue`} 
               variant={stats.overdueOrdersCount > 0 ? 'danger' : 'default'}
               badge={stats.overdueOrdersCount > 0 ? <Badge variant="destructive">{stats.overdueOrdersCount}</Badge> : undefined}
+              onClick={() => setIsUnpaidOrdersModalOpen(true)}
             />
           </div>
 
@@ -600,6 +638,8 @@ const DashboardView: React.FC = () => {
           <ScrollArea className="max-h-[60vh] mt-4"><div className="p-4 prose dark:prose-invert max-w-none">{isGeneratingAnalysis ? <div className="flex flex-col items-center justify-center h-48"><LoadingSpinner /><p className="mt-4 text-muted-foreground">Generating your report...</p></div> : <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">{analysisContent}</ReactMarkdown>}</div></ScrollArea>
         </DialogContent>
       </Dialog>
+      
+      <UnpaidOrdersModal />
 
       <Sheet open={isChatSheetOpen} onOpenChange={setIsChatSheetOpen}>
         <SheetTrigger asChild><Button className="fixed bottom-6 right-6 h-16 w-16 rounded-full z-20 shadow-lg"><Sparkles className="h-8 w-8" /></Button></SheetTrigger>
