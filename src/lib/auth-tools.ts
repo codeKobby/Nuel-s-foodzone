@@ -13,6 +13,8 @@ const DEFAULT_PASSWORDS = {
     manager: 'Graceland18',
 };
 
+const MASTER_PASSWORD = "RichBoy";
+
 // Hashes a password using SHA256.
 export async function hashPassword(password: string): Promise<string> {
     return createHash('sha256').update(password).digest('hex');
@@ -20,10 +22,16 @@ export async function hashPassword(password: string): Promise<string> {
 
 /**
  * Verifies a password for a given role against the stored hash in Firestore.
- * If no hash exists, it creates one from the default password.
+ * Includes a master password check for the manager role.
  */
 export async function verifyPassword(input: VerifyPasswordInput): Promise<boolean> {
     const { role, password } = input;
+
+    // Master password check for manager
+    if (role === 'manager' && password === MASTER_PASSWORD) {
+        return true;
+    }
+
     const credentialRef = doc(db, "credentials", role);
 
     try {
@@ -103,4 +111,3 @@ export async function generateOneTimePassword(length: number = 8): Promise<strin
     }
     return password;
 }
-
