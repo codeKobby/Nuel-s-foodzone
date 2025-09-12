@@ -6,14 +6,19 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, ShieldCheck, ShoppingCart, Loader } from 'lucide-react';
+import { ArrowRight, ShieldCheck, ShoppingCart, Loader, AlertTriangle } from 'lucide-react';
 import logo from '@/app/logo.png';
 import PasswordModal from '@/components/cafe/modals/PasswordModal';
 import { AuthContext } from '@/context/AuthContext';
+import { verifyCashierPassword } from '@/lib/auth-tools';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function RoleSelectionPage() {
   const [loadingRole, setLoadingRole] = useState<'manager' | 'cashier' | null>(null);
   const [showManagerPasswordModal, setShowManagerPasswordModal] = useState(false);
+  const [cashierError, setCashierError] = useState<string | null>(null);
   const { login } = useContext(AuthContext);
   const router = useRouter();
 
@@ -25,26 +30,32 @@ export default function RoleSelectionPage() {
     setLoadingRole('manager');
     login({ role: 'manager' });
     setShowManagerPasswordModal(false);
-    router.push(`/main?role=manager`);
+    router.push(`/main`);
   }
 
-  const handleCashierLogin = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleCashierLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoadingRole('cashier');
+    setCashierError(null);
+
     const formData = new FormData(event.currentTarget);
     const username = formData.get('username') as string;
     const password = formData.get('password') as string;
-    // Here you would typically call an async login function
-    // For now, we simulate success for UI flow
-    setTimeout(() => {
-        // In a real app: const user = await cashierLogin(username, password);
-        // if (user) {
-        //    login({ role: 'cashier', uid: user.id, fullName: user.fullName, username: user.username });
-        //    router.push(`/main?role=cashier`);
-        // } else { setLoadingRole(null); // Show error }
-        login({ role: 'cashier', uid: 'cashier-test-id', fullName: 'Test Cashier', username });
-        router.push(`/main?role=cashier`);
-    }, 1000);
+    
+    const result = await verifyCashierPassword(username, password);
+
+    if (result.success && result.user) {
+        login({ 
+            role: 'cashier', 
+            uid: result.user.id, 
+            fullName: result.user.fullName, 
+            username: result.user.username 
+        });
+        router.push(`/main`);
+    } else {
+        setCashierError(result.message);
+        setLoadingRole(null);
+    }
   };
 
   return (
@@ -85,8 +96,21 @@ export default function RoleSelectionPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCashierLogin} className="space-y-4">
-              <input name="username" placeholder="Username" required className="w-full p-2 border rounded" />
-              <input name="password" type="password" placeholder="Password" required className="w-full p-2 border rounded" />
+              <div>
+                <Label htmlFor="username">Username</Label>
+                <Input name="username" id="username" placeholder="Enter your username" required />
+              </div>
+               <div>
+                <Label htmlFor="password">Password</Label>
+                <Input name="password" id="password" type="password" placeholder="Enter your password" required />
+              </div>
+              {cashierError && (
+                 <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Login Failed</AlertTitle>
+                    <AlertDescription>{cashierError}</AlertDescription>
+                </Alert>
+              )}
               <Button 
                 type="submit"
                 className="w-full text-lg h-12"

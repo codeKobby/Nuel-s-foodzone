@@ -8,6 +8,7 @@ import { doc, getDoc, setDoc, getDocs, collection, query, where } from 'firebase
 import { db } from './firebase';
 import { createHash } from 'crypto';
 import type { VerifyPasswordInput, UpdatePasswordInput } from '@/ai/schemas';
+import type { CashierAccount } from './types';
 
 const DEFAULT_PASSWORDS = {
     manager: 'Graceland18',
@@ -57,6 +58,40 @@ export async function verifyPassword(input: VerifyPasswordInput): Promise<boolea
 }
 
 /**
+ * Verifies a cashier's username and password.
+ */
+export async function verifyCashierPassword(username: string, password: string):Promise<{success: boolean, user: CashierAccount | null, message: string}> {
+    try {
+        const q = query(collection(db, "cashierAccounts"), where("username", "==", username));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            return { success: false, user: null, message: "Username not found." };
+        }
+
+        const userDoc = querySnapshot.docs[0];
+        const user = { id: userDoc.id, ...userDoc.data() } as CashierAccount;
+        
+        if (user.status === 'revoked') {
+             return { success: false, user: null, message: "This account has been revoked." };
+        }
+
+        const hashedPassword = await hashPassword(password);
+        
+        if (user.passwordHash === hashedPassword) {
+            return { success: true, user, message: "Login successful" };
+        } else {
+            return { success: false, user: null, message: "Incorrect password." };
+        }
+
+    } catch (error) {
+        console.error("Error verifying cashier password:", error);
+        return { success: false, user: null, message: "An unexpected error occurred." };
+    }
+}
+
+
+/**
  * Updates the password for a given role.
  * It first verifies the current password before setting the new one.
  */
@@ -85,9 +120,13 @@ export async function updatePassword(input: UpdatePasswordInput): Promise<{ succ
  * e.g., "John Doe" -> "john". If "john" exists, it tries "john1", "john2", etc.
  */
 export async function generateUniqueUsername(fullName: string): Promise<string> {
-    const firstName = fullName.split(' ')[0].toLowerCase();
+    const firstName = fullName.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
     let username = firstName;
     let counter = 1;
+
+    if (!username) { // Handle cases where the name has no letters/numbers
+        username = 'cashier';
+    }
 
     while (true) {
         const q = query(collection(db, "cashierAccounts"), where("username", "==", username));

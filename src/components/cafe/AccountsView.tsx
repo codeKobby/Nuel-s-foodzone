@@ -81,12 +81,12 @@ const AccountsView: React.FC = () => {
         
         try {
             const username = await generateUniqueUsername(fullName);
-            const oneTimePassword = generateOneTimePassword();
+            const oneTimePassword = await generateOneTimePassword();
             
             const newAccount: Omit<CashierAccount, 'id'> = {
                 fullName,
                 username,
-                passwordHash: hashPassword(oneTimePassword),
+                passwordHash: await hashPassword(oneTimePassword),
                 isTemporaryPassword: true,
                 createdAt: Timestamp.now(),
                 status: 'active',
@@ -119,9 +119,9 @@ const AccountsView: React.FC = () => {
     const handleResetPassword = async (account: CashierAccount) => {
         setIsProcessing(true);
         try {
-            const oneTimePassword = generateOneTimePassword();
+            const oneTimePassword = await generateOneTimePassword();
             await updateDoc(doc(db, "cashierAccounts", account.id), {
-                passwordHash: hashPassword(oneTimePassword),
+                passwordHash: await hashPassword(oneTimePassword),
                 isTemporaryPassword: true
             });
             setNewPasswordInfo({ username: account.username, otp: oneTimePassword });
