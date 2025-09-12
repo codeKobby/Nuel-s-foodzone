@@ -187,7 +187,7 @@ const DashboardView: React.FC = () => {
                 reportsSnapshot
             ] = await Promise.all([
                 getDocs(ordersInPeriodQuery),
-                getDocs(allUnpaidOrdersSnapshot),
+                getDocs(allUnpaidOrdersQuery),
                 getDocs(expensesQuery),
                 getDocs(reportsQuery),
             ]);
@@ -678,3 +678,5 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    
