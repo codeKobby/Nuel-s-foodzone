@@ -19,8 +19,15 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig, ChartArea as Area, ChartLine, ComposedChart, CartesianGrid } from "@/components/ui/chart"
-import { XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartConfig,
+  ChartArea as Area,
+  ChartLine
+} from "@/components/ui/chart"
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, CartesianGrid } from 'recharts';
 
 import { DateRange } from "react-day-picker"
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, endOfToday, differenceInDays } from "date-fns"
@@ -155,14 +162,14 @@ const DashboardView: React.FC = () => {
   }, []);
 
    useEffect(() => {
-    if (authChecking || !isAuthenticated || !date?.from) return;
+    if (authChecking || !isAuthenticated) return;
 
     setLoading(true);
 
     const fetchDashboardData = async () => {
         try {
-            const startDate = date.from!;
-            const endDate = date.to || date.from;
+            const startDate = date?.from!;
+            const endDate = date?.to || date?.from!;
             
             const allOrdersQuery = query(collection(db, "orders"), orderBy('timestamp', 'desc'));
             const expensesQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
@@ -286,7 +293,11 @@ const DashboardView: React.FC = () => {
 
         } catch (err) {
             console.error(err);
-            setError("Failed to fetch dashboard data. Please check your connection and try again.");
+            if (err instanceof Error) {
+                 setError(`Failed to fetch dashboard data: ${err.message}. Check console for details.`);
+            } else {
+                 setError("An unknown error occurred while fetching dashboard data.");
+            }
         } finally {
             setLoading(false);
         }
