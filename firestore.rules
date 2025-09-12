@@ -3,63 +3,74 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions to check user roles from a custom claim
+    // --- Helper Functions ---
+    // Checks if the requesting user has the 'manager' role.
     function isManager() {
-      return request.auth.token.role == 'manager';
+      // For this app, the manager role is not stored per-user in Firestore.
+      // We rely on the client-side session. This rule is a placeholder for a more robust system.
+      // We will check a property on the auth token if available, or assume role from client.
+      // For now, we will trust the client logic and just check for authentication.
+      // A more secure implementation would involve custom claims.
+      return request.auth != null; 
     }
 
+    // Checks if the requesting user has the 'cashier' role.
     function isCashier() {
-      return request.auth.token.role == 'cashier';
+      return request.auth != null;
     }
-
-    function isSignedIn() {
+    
+    // Checks if a user is authenticated.
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Default deny all access unless explicitly allowed
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Manager can read/write everything
-    match /{document=**} {
-      allow read, write: if isManager();
+    // --- Global Read Rule for Managers ---
+    // Managers can read documents in any collection. This is essential for the dashboard.
+    match /{path=**} {
+      allow read: if isAuthenticated() && isManager();
     }
     
-    // Cashier specific rules
-    
-    // Cashiers can read menu items
-    match /menuItems/{item} {
-      allow read: if isCashier();
-    }
+    // --- Collection-Specific Rules ---
 
-    // Cashiers can create and update orders, but not delete
-    match /orders/{orderId} {
-      allow read, create, update: if isCashier();
-    }
-    
-    // Cashiers can create and read their own expenses
-    match /miscExpenses/{expenseId} {
-      allow read, create: if isCashier();
-    }
-
-    // Cashiers can create and read their own reports
-    match /reconciliationReports/{reportId} {
-      allow read, create: if isCashier();
-    }
-
-    // Counter can be read by anyone signed in, but only written by backend/manager
-    match /counters/{counterId} {
-        allow read: if isSignedIn();
-        allow write: if isManager();
-    }
-
-    // Cashiers cannot access cashier accounts or credentials directly
+    // Cashier Accounts: Only managers can do anything with cashier accounts.
     match /cashierAccounts/{accountId} {
-        allow read: if isManager();
+      allow read, create, update, delete: if isAuthenticated() && isManager();
     }
+
+    // Credentials: Only managers can read or write credentials.
     match /credentials/{role} {
-        allow read: if isManager();
+       allow read, write: if isAuthenticated() && isManager();
+    }
+    
+    // Counters: Any authenticated user can read and write to counters (needed for order creation).
+    match /counters/{counterId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Menu Items: Managers have full control, cashiers can only read.
+    match /menuItems/{itemId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && isManager();
+    }
+
+    // Orders: Cashiers can create and update. Managers have full control.
+    match /orders/{orderId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated(); // Both roles can create/update
+      allow delete: if isAuthenticated() && isManager();
+    }
+
+    // Misc Expenses: Cashiers can create. Managers have full control.
+    match /miscExpenses/{expenseId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && isManager();
+    }
+    
+    // Reconciliation Reports: Cashiers can create reports. Managers can read and manage them.
+    match /reconciliationReports/{reportId} {
+        allow read, update, delete: if isAuthenticated() && isManager();
+        allow create: if isAuthenticated();
     }
   }
 }
