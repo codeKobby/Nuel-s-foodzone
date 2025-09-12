@@ -6,56 +6,32 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, ShieldCheck, ShoppingCart, Loader, AlertTriangle } from 'lucide-react';
+import { ArrowRight, ShieldCheck, ShoppingCart, Loader } from 'lucide-react';
 import logo from '@/app/logo.png';
 import PasswordModal from '@/components/cafe/modals/PasswordModal';
 import { AuthContext } from '@/context/AuthContext';
-import { verifyCashierPassword } from '@/lib/auth-tools';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 export default function RoleSelectionPage() {
   const [loadingRole, setLoadingRole] = useState<'manager' | 'cashier' | null>(null);
   const [showManagerPasswordModal, setShowManagerPasswordModal] = useState(false);
-  const [cashierError, setCashierError] = useState<string | null>(null);
   const { login } = useContext(AuthContext);
   const router = useRouter();
 
   const handleManagerNavigation = () => {
     setShowManagerPasswordModal(true);
-  }
+  };
 
   const onManagerPasswordSuccess = () => {
     setLoadingRole('manager');
     login({ role: 'manager' });
     setShowManagerPasswordModal(false);
     router.push(`/main`);
-  }
+  };
 
-  const handleCashierLogin = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleCashierLogin = () => {
     setLoadingRole('cashier');
-    setCashierError(null);
-
-    const formData = new FormData(event.currentTarget);
-    const username = formData.get('username') as string;
-    const password = formData.get('password') as string;
-    
-    const result = await verifyCashierPassword(username, password);
-
-    if (result.success && result.user) {
-        login({ 
-            role: 'cashier', 
-            uid: result.user.id, 
-            fullName: result.user.fullName, 
-            username: result.user.username 
-        });
-        router.push(`/main`);
-    } else {
-        setCashierError(result.message);
-        setLoadingRole(null);
-    }
+    login({ role: 'cashier', fullName: 'Cashier', username: 'cashier' });
+    router.push(`/main`);
   };
 
   return (
@@ -92,37 +68,20 @@ export default function RoleSelectionPage() {
           <CardHeader className="text-center">
             <ShoppingCart className="h-12 w-12 mx-auto text-primary" />
             <CardTitle className="text-2xl mt-4">Cashier</CardTitle>
-            <CardDescription>Enter your credentials for daily operations.</CardDescription>
+            <CardDescription>Access the Point of Sale for daily operations.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleCashierLogin} className="space-y-4">
-              <div>
-                <Label htmlFor="username">Username</Label>
-                <Input name="username" id="username" placeholder="Enter your username" required />
-              </div>
-               <div>
-                <Label htmlFor="password">Password</Label>
-                <Input name="password" id="password" type="password" placeholder="Enter your password" required />
-              </div>
-              {cashierError && (
-                 <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Login Failed</AlertTitle>
-                    <AlertDescription>{cashierError}</AlertDescription>
-                </Alert>
+            <Button 
+              onClick={handleCashierLogin}
+              className="w-full text-lg h-12"
+              disabled={!!loadingRole}
+            >
+              {loadingRole === 'cashier' ? (
+                <><Loader className="mr-2 animate-spin" /> Logging in...</>
+              ) : (
+                <>Login as Cashier <ArrowRight className="ml-2" /></>
               )}
-              <Button 
-                type="submit"
-                className="w-full text-lg h-12"
-                disabled={!!loadingRole}
-              >
-                {loadingRole === 'cashier' ? (
-                  <><Loader className="mr-2 animate-spin" /> Logging in...</>
-                ) : (
-                  <>Login as Cashier <ArrowRight className="ml-2" /></>
-                )}
-              </Button>
-            </form>
+            </Button>
           </CardContent>
         </Card>
       </div>

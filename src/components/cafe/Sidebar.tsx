@@ -51,7 +51,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
         manager: [
             { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
             { id: 'admin', icon: Settings, label: 'Admin Panel' },
-            { id: 'accounts', icon: Users, label: 'Cashier Accounts' },
         ],
         cashier: [
             { id: 'pos', icon: Home, label: 'POS' },

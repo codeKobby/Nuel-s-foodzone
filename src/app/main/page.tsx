@@ -16,7 +16,6 @@ import PosView from '@/components/cafe/PosView';
 import OrdersView from '@/components/cafe/OrdersView';
 import DashboardView from '@/components/cafe/DashboardView';
 import AdminView from '@/components/cafe/AdminView';
-import AccountsView from '@/components/cafe/AccountsView';
 import MiscView from '@/components/cafe/MiscView';
 import AccountingView from '@/components/cafe/AccountingView';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -52,7 +51,6 @@ const MobileNav = ({
         manager: [
             { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
             { id: 'admin', icon: Settings, label: 'Admin Panel' },
-            { id: 'accounts', icon: Users, label: 'Cashier Accounts' },
         ],
         cashier: [
             { id: 'pos', icon: Home, label: 'POS' },
@@ -235,7 +233,6 @@ function CafePage() {
             // Manager Views
             case 'dashboard': return isManager ? <DashboardView /> : null;
             case 'admin': return isManager ? <AdminView /> : null;
-            case 'accounts': return isManager ? <AccountsView /> : null;
             
             default: return null;
         }
