@@ -1,7 +1,8 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, doc, updateDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { MenuItem } from '@/lib/types';
@@ -13,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast.tsx';
 
 interface ConnectionStatus {
   isConnected: boolean;
@@ -63,12 +64,7 @@ const StockView: React.FC = () => {
                 setLoading(true);
                 
                 const menuRef = collection(db, "menuItems");
-                // Fixed: Only query for "Drinks" category, excluding "Breakfast Drinks"
-                const q = query(
-                    menuRef, 
-                    where("category", "==", "Drinks"),
-                    orderBy("name", "asc")
-                );
+                const q = query(menuRef, orderBy("name", "asc"));
                 
                 unsubscribe = onSnapshot(q, 
                     (snapshot) => {
@@ -87,10 +83,6 @@ const StockView: React.FC = () => {
                                 retryCount: 0
                             });
 
-                            toast({
-                                title: "Stock data updated",
-                                description: `${items.length} drinks loaded successfully`,
-                            });
                         } catch (err) {
                             console.error("Error processing snapshot:", err);
                             setError("Error processing stock data");
@@ -106,6 +98,8 @@ const StockView: React.FC = () => {
                             errorMessage = "Permission denied. Please check your authentication.";
                         } else if (err.code === 'unavailable') {
                             errorMessage = "Database temporarily unavailable. Retrying...";
+                        } else if (err.code === 'unimplemented') {
+                             errorMessage = "A query requires an index. Please create it in the Firebase console.";
                         } else if (err.message.includes('CORS')) {
                             errorMessage = "Network connection blocked. Please check your browser settings.";
                         }
@@ -187,15 +181,18 @@ const StockView: React.FC = () => {
         setError(null);
         setLoading(true);
         setConnectionStatus(prev => ({ ...prev, retryCount: 0 }));
-        // Trigger useEffect by clearing and resetting connection status
         window.location.reload();
     };
 
+    const drinkItems = useMemo(() => {
+        return menuItems.filter(item => item.category === 'Drinks');
+    }, [menuItems]);
+
     const filteredItems = useMemo(() => {
-        return menuItems.filter(item =>
+        return drinkItems.filter(item =>
             item.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
-    }, [menuItems, searchQuery]);
+    }, [drinkItems, searchQuery]);
 
     const lowStockItems = useMemo(() => {
         return filteredItems.filter(item => (item.stock ?? 0) <= 5);
@@ -237,7 +234,7 @@ const StockView: React.FC = () => {
                     <h2 className="text-2xl md:text-3xl font-bold">Drink Stock Management</h2>
                     <div className="flex items-center gap-4 mt-2">
                         <p className="text-sm text-muted-foreground">
-                            {menuItems.length} drinks • {lowStockItems.length} low stock • {outOfStockItems.length} out of stock
+                            {drinkItems.length} drinks • {lowStockItems.length} low stock • {outOfStockItems.length} out of stock
                         </p>
                         <div className="flex items-center gap-2">
                             {connectionStatus.isConnected ? (
@@ -282,18 +279,24 @@ const StockView: React.FC = () => {
             {error && (
                 <Alert variant="destructive" className="mb-6">
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Connection Error</AlertTitle>
+                    <AlertTitle>Error</AlertTitle>
                     <AlertDescription className="flex items-center justify-between">
                         <span>{error}</span>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={retryConnection}
-                            className="ml-4"
-                        >
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Retry
-                        </Button>
+                         {error.includes("index") ? (
+                            <a href="https://console.firebase.google.com/project/nuels-cafe/firestore/indexes" target="_blank" rel="noopener noreferrer">
+                                <Button variant="outline" size="sm" className="ml-4">Create Index</Button>
+                            </a>
+                        ) : (
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={retryConnection}
+                                className="ml-4"
+                            >
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Retry
+                            </Button>
+                        )}
                     </AlertDescription>
                 </Alert>
             )}
@@ -326,11 +329,6 @@ const StockView: React.FC = () => {
                         <CardTitle>Current Stock</CardTitle>
                         <CardDescription>
                             Update stock levels for drinks only. Changes are saved automatically in real-time.
-                            {connectionStatus.lastSync && (
-                                <span className="block mt-1 text-xs">
-                                    Last updated: {connectionStatus.lastSync.toLocaleString()}
-                                </span>
-                            )}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -355,7 +353,6 @@ const StockView: React.FC = () => {
                                     >
                                         <div className="flex-1 min-w-0">
                                             <p className="font-semibold truncate">{item.name}</p>
-                                            <p className="text-sm text-muted-foreground">{item.category}</p>
                                             <div className="flex items-center gap-2 mt-1">
                                                 {isOutOfStock && (
                                                     <Badge variant="destructive" className="text-xs">
@@ -429,3 +426,5 @@ const StockView: React.FC = () => {
 };
 
 export default StockView;
+
+    
