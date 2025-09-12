@@ -23,10 +23,8 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartConfig,
-  ChartArea as Area,
 } from "@/components/ui/chart"
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, CartesianGrid, Line as ChartLine } from 'recharts';
+import { Area, ComposedChart, CartesianGrid, XAxis, YAxis, Line as ChartLine } from 'recharts';
 
 import { DateRange } from "react-day-picker"
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, endOfToday, differenceInDays } from "date-fns"
@@ -576,7 +574,7 @@ const DashboardView: React.FC = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
-                  <Tooltip
+                  <ChartTooltip
                     content={({ payload, label }) => (
                       <ChartTooltipContent
                         label={label}
