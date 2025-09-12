@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc, Timestamp, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { MiscExpense, ReconciliationReport } from '@/lib/types';
@@ -30,6 +30,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { Separator } from '../ui/separator';
+import { AuthContext } from '@/context/AuthContext';
 
 const MiscExpenseForm = ({
     formState,
@@ -77,6 +78,7 @@ const MiscView: React.FC = () => {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const isMobile = useIsMobile();
     const [lastReconciliationDate, setLastReconciliationDate] = useState<Date | null>(null);
+    const { session } = useContext(AuthContext);
     
     const groupedExpenses = useMemo(() => groupOrdersByDate(expenses), [expenses]);
 
@@ -113,7 +115,9 @@ const MiscView: React.FC = () => {
             amount: parseFloat(formState.amount),
             source: source,
             settled: false,
-            timestamp: serverTimestamp()
+            timestamp: serverTimestamp(),
+            cashierId: session?.uid || 'unknown',
+            cashierName: session?.fullName || session?.username || 'Unknown',
         };
         try {
             await addDoc(collection(db, "miscExpenses"), data);

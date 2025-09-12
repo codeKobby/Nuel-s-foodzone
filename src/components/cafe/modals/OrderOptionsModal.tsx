@@ -68,14 +68,12 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     let newBalance = total - finalAmountPaid;
     
     const deficit = newBalance > 0 ? newBalance : 0;
-    let change = newBalance < 0 ? Math.abs(newBalance) : 0;
-     if (paymentMethod === 'cash' && newPaymentAmount > total) {
-      change = newPaymentAmount - total;
-      if (editingOrder) {
-         change = newPaymentAmount - (total - editingOrder.amountPaid);
+    let change = 0;
+     if (paymentMethod === 'cash' && newPaymentAmount > 0) {
+      const amountOwedNow = editingOrder ? total - editingOrder.amountPaid : total;
+      if(newPaymentAmount > amountOwedNow) {
+        change = newPaymentAmount - amountOwedNow;
       }
-    } else {
-        change = 0;
     }
 
     
@@ -136,7 +134,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         status: editingOrder?.status || 'Pending',
         fulfilledItems: editingOrder?.fulfilledItems || [],
         creditSource: editingOrder?.creditSource || [],
-        cashierId: session?.uid,
+        cashierId: session?.uid || 'unknown',
         cashierName: session?.fullName || session?.username || 'Unknown',
       };
       
@@ -162,6 +160,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               finalBalance = 0;
           }
           
+          if (finalAmountPaid > total && changeGivenNum > 0) {
+              finalBalance = -(changeGivenNum - (finalAmountPaid - total));
+          }
+          
           orderData.amountPaid = finalAmountPaid;
           orderData.balanceDue = finalBalance;
           orderData.changeGiven = finalChangeGiven;
@@ -179,7 +181,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           finalOrderForPopup = { id: docSnap.id, ...docSnap.data() } as Order;
 
       } else {
-          const { newPaymentAmount, change } = balances;
+          const { newPaymentAmount } = balances;
           const changeGiven = parseFloat(changeGivenInput) || 0;
           
           orderData.amountPaid = isPaid ? newPaymentAmount : 0;
@@ -188,6 +190,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           let finalBalance = total - orderData.amountPaid;
            if (pardonDeficit) {
               finalBalance = 0;
+          }
+          
+          if (orderData.changeGiven > 0) {
+              finalBalance = - (orderData.changeGiven - (orderData.amountPaid - total));
           }
 
           orderData.balanceDue = finalBalance;
@@ -234,6 +240,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   const renderBalanceBreakdown = () => {
     if (!editingOrder) return null;
 
+    const amountOwedNow = total - editingOrder.amountPaid;
+
     return (
       <Card className="mb-4">
         <CardContent className="p-4">
@@ -243,7 +251,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Previous Total:</span>
+              <span className="text-muted-foreground">Original Order Total:</span>
               <span>{formatCurrency(editingOrder.total)}</span>
             </div>
             <div className="flex justify-between">
@@ -254,22 +262,15 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               <span className="text-muted-foreground">Already Paid:</span>
               <span>{formatCurrency(editingOrder.amountPaid)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Change Already Given:</span>
-              <span>{formatCurrency(editingOrder.changeGiven || 0)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Previous Balance:</span>
-              <span className={editingOrder.balanceDue > 0 ? "text-red-500" : editingOrder.balanceDue < 0 ? "text-green-500" : ""}>
-                {editingOrder.balanceDue > 0 ? 'Owed: ' : editingOrder.balanceDue < 0 ? 'Change Due: ' : 'Settled: '}
-                {formatCurrency(Math.abs(editingOrder.balanceDue))}
-              </span>
+            <div className="flex justify-between font-bold text-base mt-2 pt-2 border-t">
+              <span>Amount Owed Now:</span>
+              <span>{formatCurrency(amountOwedNow)}</span>
             </div>
             {isAmountPaidEntered && (
               <>
                 <hr className="my-2" />
                 <div className="flex justify-between font-semibold">
-                  <span>New Balance After Payment:</span>
+                  <span>New Balance:</span>
                   <span className={balances.newBalance > 0 ? "text-red-500" : balances.newBalance < 0 ? "text-green-500" : "text-blue-500"}>
                     {balances.newBalance > 0 ? 'Customer Owes: ' : balances.newBalance < 0 ? 'Change Due: ' : 'Fully Paid'}
                     {balances.newBalance !== 0 ? formatCurrency(Math.abs(balances.newBalance)) : ''}

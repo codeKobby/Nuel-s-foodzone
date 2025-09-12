@@ -28,6 +28,8 @@ export async function hashPassword(password: string): Promise<string> {
 export async function verifyPassword(input: VerifyPasswordInput): Promise<boolean> {
     const { role, password } = input;
 
+    if (!password) return false;
+
     // Master password check for manager
     if (role === 'manager' && password === MASTER_PASSWORD) {
         return true;
@@ -45,6 +47,7 @@ export async function verifyPassword(input: VerifyPasswordInput): Promise<boolea
         } else {
             const defaultPassword = DEFAULT_PASSWORDS[role as keyof typeof DEFAULT_PASSWORDS];
             if (password === defaultPassword) {
+                // Lazily create the credential document if it doesn't exist
                 const newHash = await hashPassword(defaultPassword);
                 await setDoc(credentialRef, { passwordHash: newHash });
                 return true;
