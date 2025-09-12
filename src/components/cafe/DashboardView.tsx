@@ -297,6 +297,7 @@ const DashboardView: React.FC = () => {
                 orderAgeAnalysis: overdueOrders.map(o => ({
                     orderId: o.id,
                     orderNumber: o.simplifiedId,
+                    cashierName: o.cashierName,
                     daysOverdue: differenceInDays(new Date(), o.timestamp.toDate()),
                     amount: o.balanceDue,
                     riskLevel: differenceInDays(new Date(), o.timestamp.toDate()) > 5 ? 'high' : 'medium',
@@ -685,17 +686,24 @@ const DashboardView: React.FC = () => {
                   <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
                   <Tooltip
                     content={<ChartTooltipContent
-                      formatter={(value, name) => (
-                        <div className="flex items-center gap-2">
-                          <div className={cn(
-                            "w-2 h-2 rounded-full",
-                            name === 'newSales' ? 'bg-[--color-newSales]' : 
-                            name === 'collections' ? 'bg-[--color-collections]' : 'bg-[--color-netRevenue]'
-                          )}></div>
-                          <span className="capitalize">
-                            {name === 'newSales' ? 'New Sales' : 
-                             name === 'collections' ? 'Collections' : 'Net Revenue'}: {formatCurrency(Number(value))}
-                          </span>
+                      formatter={(value, name, item) => (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "w-2 h-2 rounded-full",
+                              name === 'newSales' ? 'bg-[--color-newSales]' : 
+                              name === 'collections' ? 'bg-[--color-collections]' : 'bg-[--color-netRevenue]'
+                            )}></div>
+                            <span className="capitalize">
+                              {name === 'newSales' ? 'New Sales' : 
+                               name === 'collections' ? 'Collections' : 'Net Revenue'}: {formatCurrency(Number(value))}
+                            </span>
+                          </div>
+                          {item.payload.cashierNames && (
+                            <span className="pl-4 text-xs text-muted-foreground">
+                              By: {item.payload.cashierNames}
+                            </span>
+                          )}
                         </div>
                       )}
                     />}
