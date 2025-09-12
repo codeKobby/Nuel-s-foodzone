@@ -24,7 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart"
-import { LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Line, ComposedChart } from 'recharts';
 import { DateRange } from "react-day-picker"
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, endOfToday, differenceInDays, isToday } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -187,41 +187,48 @@ const DashboardView: React.FC = () => {
             const periodExpenses = expensesSnapshot.docs.map(d => d.data()) as MiscExpense[];
             const periodReports = reportsSnapshot.docs.map(d => d.data()) as EnhancedReconciliationReport[];
             
-            const ordersInPeriod = allOrders.filter(o => o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate);
+            const ordersCreatedInPeriod = allOrders.filter(o => o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate);
 
-            // Calculate metrics
-            const totalSales = ordersInPeriod
+            // Calculate metrics for orders created in the period
+            const totalSales = ordersCreatedInPeriod
                 .filter(o => o.status === 'Completed')
                 .reduce((sum, o) => sum + o.total, 0);
             
-            const totalOrders = ordersInPeriod.length;
-            const totalItemsSold = ordersInPeriod
+            const totalOrders = ordersCreatedInPeriod.length;
+            const totalItemsSold = ordersCreatedInPeriod
                 .filter(o => o.status === 'Completed')
                 .reduce((sum, o) => sum + o.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0);
+            const totalPardonedAmount = ordersCreatedInPeriod.reduce((sum, o) => sum + (o.pardonedAmount || 0), 0);
 
-            const collections = allOrders
-                .filter(o => {
-                    const paymentDate = o.lastPaymentTimestamp?.toDate();
-                    return paymentDate && paymentDate >= startDate && paymentDate <= endDate && o.timestamp.toDate() < startDate;
-                })
-                .reduce((sum, o) => sum + (o.lastPaymentAmount || 0), 0);
+            // Calculate payments received in the period (for both new and old orders)
+            let newSalesRevenue = 0;
+            let collections = 0;
+            let cashSales = 0;
+            let momoSales = 0;
 
-            const { cashSales, momoSales } = ordersInPeriod
-                .reduce((acc, o) => {
-                    if (o.lastPaymentTimestamp && o.lastPaymentTimestamp.toDate() >= startDate && o.lastPaymentTimestamp.toDate() <= endDate) {
-                        if (o.paymentMethod === 'cash') acc.cashSales += o.lastPaymentAmount || 0;
-                        if (o.paymentMethod === 'momo') acc.momoSales += o.lastPaymentAmount || 0;
+            allOrders.forEach(o => {
+                const paymentDate = o.lastPaymentTimestamp?.toDate();
+                if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                    const paymentAmount = o.lastPaymentAmount || 0;
+                    const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
+
+                    if (isOrderFromPeriod) {
+                        newSalesRevenue += paymentAmount;
+                    } else {
+                        collections += paymentAmount;
                     }
-                    return acc;
-                }, { cashSales: 0, momoSales: 0 });
+
+                    if (o.paymentMethod === 'cash') cashSales += paymentAmount;
+                    if (o.paymentMethod === 'momo') momoSales += paymentAmount;
+                }
+            });
 
             const totalMiscExpenses = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
-            const totalPardonedAmount = ordersInPeriod.reduce((sum, o) => sum + (o.pardonedAmount || 0), 0);
-            const netRevenueFromNewSales = (cashSales + momoSales) - totalMiscExpenses - totalPardonedAmount;
-            const totalNetRevenue = netRevenueFromNewSales + collections;
-
+            const totalNetRevenue = (newSalesRevenue + collections) - totalMiscExpenses - totalPardonedAmount;
+            
+            // Unpaid orders value should be calculated from ALL orders, regardless of date range
             const unpaidOrdersValue = allOrders
-                .filter(o => o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid')
+                .filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0)
                 .reduce((sum, o) => sum + o.balanceDue, 0);
 
             const overdueOrders = allOrders.filter(o => o.balanceDue > 0 && differenceInDays(new Date(), o.timestamp.toDate()) > 2);
@@ -237,29 +244,26 @@ const DashboardView: React.FC = () => {
             }
 
             allOrders.forEach(o => {
-                const orderDate = o.timestamp.toDate();
-                if (orderDate >= startDate && orderDate <= endDate) {
-                    const day = format(orderDate, 'MMM d');
-                    if (salesDataMap[day]) {
-                         if (o.status === 'Completed') salesDataMap[day].newSales += o.total;
-                    }
-                }
                 const paymentDate = o.lastPaymentTimestamp?.toDate();
                 if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
                      const day = format(paymentDate, 'MMM d');
                      if (salesDataMap[day]) {
-                        if(o.timestamp.toDate() < startDate) {
-                            salesDataMap[day].collections += o.lastPaymentAmount || 0;
+                        const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
+                        const paymentAmount = o.lastPaymentAmount || 0;
+                        if(isOrderFromPeriod) {
+                            salesDataMap[day].newSales += paymentAmount;
+                        } else {
+                            salesDataMap[day].collections += paymentAmount;
                         }
                      }
                 }
             });
-
+            
              const salesData = Object.entries(salesDataMap).map(([date, values]) => ({
-                date, ...values, netRevenue: values.newSales + values.collections,
+                date, ...values, netRevenue: values.newSales + values.collections
             }));
             
-             const itemPerformance = ordersInPeriod
+             const itemPerformance = ordersCreatedInPeriod
                 .filter(o => o.status === 'Completed')
                 .flatMap(o => o.items)
                 .reduce((acc, item) => {
@@ -273,7 +277,7 @@ const DashboardView: React.FC = () => {
 
             setStats({
                 totalSales,
-                netRevenueFromNewSales,
+                netRevenueFromNewSales: newSalesRevenue, // Corrected
                 totalNetRevenue,
                 previousDayCollections: collections,
                 cashSales,
@@ -282,7 +286,7 @@ const DashboardView: React.FC = () => {
                 changeFundHealth: 'healthy', // MOCK DATA
                 totalOrders,
                 totalItemsSold,
-                unpaidOrdersValue,
+                unpaidOrdersValue, // Corrected
                 overdueOrdersCount: overdueOrders.length,
                 totalMiscExpenses,
                 totalPardonedAmount,
@@ -406,6 +410,42 @@ const DashboardView: React.FC = () => {
       setItemSortDirection('desc');
     }
   };
+  
+    const handleSendMessage = async () => {
+    if (!chatInput.trim()) return;
+
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: [{ text: chatInput }],
+    };
+
+    setChatHistory(prev => [...prev, userMessage]);
+    setChatInput('');
+    setIsAiReplying(true);
+
+    try {
+      const response = await businessChat({
+        history: chatHistory,
+        prompt: userMessage.content[0].text,
+      });
+
+      const modelMessage: ChatMessage = {
+        role: 'model',
+        content: [{ text: response }],
+      };
+      setChatHistory(prev => [...prev, modelMessage]);
+    } catch (err) {
+      console.error("AI Chat failed:", err);
+      const errorMessage: ChatMessage = {
+        role: 'model',
+        content: [{ text: "I'm sorry, I encountered an error. Please try again." }],
+      };
+      setChatHistory(prev => [...prev, errorMessage]);
+    } finally {
+      setIsAiReplying(false);
+    }
+  };
+
 
   const SortButton = ({ sortKey, label }: { sortKey: ItemSortKey; label: string }) => (
     <Button variant="ghost" size="sm" onClick={() => handleSortChange(sortKey)}>
@@ -428,7 +468,7 @@ const DashboardView: React.FC = () => {
               <div className="space-y-1 mt-3 text-sm">
                 <p className="italic">"How did we perform this week?"</p>
                 <p className="italic">"Which items need more promotion?"</p>
-                <p className="italic">"What's our change fund health?"</p>
+                <p className="italic">"Add a new drink called 'Sobolo' for 10 cedis"</p>
               </div>
             </div>
           )}
@@ -466,13 +506,13 @@ const DashboardView: React.FC = () => {
           placeholder="Ask about your business..."
           value={chatInput}
           onChange={(e) => setChatInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && !isAiReplying && chatInput.trim() && setChatInput('')}
+          onKeyDown={(e) => e.key === 'Enter' && !isAiReplying && handleSendMessage()}
           disabled={isAiReplying}
           className="h-12"
         />
         <Button 
-          onClick={() => setChatInput('')} 
-          disabled={isAiReplying || !chatInput} 
+          onClick={handleSendMessage} 
+          disabled={isAiReplying || !chatInput.trim()} 
           className="h-12"
         >
           <Send />
@@ -634,11 +674,11 @@ const DashboardView: React.FC = () => {
               description={`+${formatCurrency(stats.previousDayCollections)} collections`}
             />
             <StatCard 
-              icon={<Hourglass className={stats.overdueOrdersCount === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
+              icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
               title="Unpaid Orders" 
               value={formatCurrency(stats.unpaidOrdersValue)}
               description={`${stats.overdueOrdersCount} overdue orders`}
-              onClick={stats.overdueOrdersCount > 0 ? () => setIsOrderAgeModalOpen(true) : undefined}
+              onClick={stats.unpaidOrdersValue > 0 ? () => setIsOrderAgeModalOpen(true) : undefined}
               variant={stats.overdueOrdersCount > 3 ? 'danger' : stats.overdueOrdersCount > 0 ? 'warning' : 'default'}
               badge={stats.overdueOrdersCount > 0 ? (
                 <Badge variant="destructive" className="text-xs">
@@ -675,12 +715,12 @@ const DashboardView: React.FC = () => {
             <CardHeader>
               <CardTitle>Revenue Trend Analysis</CardTitle>
               <CardDescription>
-                Daily breakdown showing new sales, collections, and net revenue
+                Daily breakdown showing new sales vs. collections from old debt.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                <BarChart data={stats.salesData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <ComposedChart data={stats.salesData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
@@ -699,19 +739,14 @@ const DashboardView: React.FC = () => {
                                name === 'collections' ? 'Collections' : 'Net Revenue'}: {formatCurrency(Number(value))}
                             </span>
                           </div>
-                          {item.payload.cashierNames && (
-                            <span className="pl-4 text-xs text-muted-foreground">
-                              By: {item.payload.cashierNames}
-                            </span>
-                          )}
                         </div>
                       )}
                     />}
                   />
-                  <Bar dataKey="newSales" fill="var(--color-newSales)" />
-                  <Bar dataKey="collections" fill="var(--color-collections)" />
-                  <Line type="monotone" dataKey="netRevenue" stroke="var(--color-netRevenue)" strokeWidth={3} />
-                </BarChart>
+                  <Bar dataKey="newSales" fill="var(--color-newSales)" stackId="a" />
+                  <Bar dataKey="collections" fill="var(--color-collections)" stackId="a" />
+                  <Line type="monotone" dataKey="netRevenue" stroke="var(--color-netRevenue)" strokeWidth={3} dot={false} />
+                </ComposedChart>
               </ChartContainer>
             </CardContent>
           </Card>
@@ -750,14 +785,14 @@ const DashboardView: React.FC = () => {
                     <p className="text-sm text-muted-foreground">Cash Sales</p>
                     <p className="text-lg font-bold">{formatCurrency(stats.cashSales)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {((stats.cashSales / (stats.cashSales + stats.momoSales)) * 100).toFixed(1)}% of total
+                      {((stats.cashSales / (stats.cashSales + stats.momoSales || 1)) * 100).toFixed(1)}% of total
                     </p>
                   </div>
                   <div className="p-3 bg-secondary rounded">
                     <p className="text-sm text-muted-foreground">Digital Sales</p>
                     <p className="text-lg font-bold">{formatCurrency(stats.momoSales)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {((stats.momoSales / (stats.cashSales + stats.momoSales)) * 100).toFixed(1)}% of total
+                      {((stats.momoSales / (stats.cashSales + stats.momoSales || 1)) * 100).toFixed(1)}% of total
                     </p>
                   </div>
                 </div>
@@ -971,7 +1006,7 @@ const DashboardView: React.FC = () => {
                 <div className="p-3 bg-secondary rounded text-center">
                   <p className="text-sm text-muted-foreground">Cash vs Digital</p>
                   <p className="text-xl font-bold">
-                    {((stats.cashSales / (stats.cashSales + stats.momoSales)) * 100).toFixed(0)}% Cash
+                    {((stats.cashSales / (stats.cashSales + stats.momoSales || 1)) * 100).toFixed(0)}% Cash
                   </p>
                 </div>
                 <div className="p-3 bg-secondary rounded text-center">
