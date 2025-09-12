@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { generateUniqueUsername, generateOneTimePassword, hashPassword } from '@/lib/auth-tools';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogContent } from '@/components/ui/dialog';
 
 const AccountForm = ({
   isProcessing,
@@ -96,10 +97,12 @@ const AccountsView: React.FC = () => {
             
             setNewPasswordInfo({ username, otp: oneTimePassword });
             setIsSheetOpen(false);
+            toast({ type: 'success', title: "Account Created", description: `Successfully created account for ${fullName}.` });
         } catch (e) {
             console.error("Error creating account:", e);
-            setError("Failed to create the account. Please try again.");
-            toast({ type: 'error', title: "Creation Failed", description: "Could not create the new cashier account."});
+            const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
+            setError(`Failed to create the account. Please try again. Error: ${errorMessage}`);
+            toast({ type: 'error', title: "Creation Failed", description: `Could not create the new cashier account. ${errorMessage}`});
         } finally {
             setIsProcessing(false);
         }
@@ -125,8 +128,10 @@ const AccountsView: React.FC = () => {
                 isTemporaryPassword: true
             });
             setNewPasswordInfo({ username: account.username, otp: oneTimePassword });
+             toast({ type: 'success', title: "Password Reset", description: `Temporary password created for ${account.fullName}.` });
         } catch(e) {
             setError(`Failed to reset password for ${account.fullName}.`);
+            toast({ type: 'error', title: "Reset Failed", description: `Could not reset password.` });
         } finally {
             setIsProcessing(false);
         }

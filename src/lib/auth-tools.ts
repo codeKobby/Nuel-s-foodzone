@@ -4,7 +4,7 @@
  * @fileOverview This file contains server-side functions for authentication.
  * Using "use server" allows these to be called from client components for secure operations.
  */
-import { doc, getDoc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { createHash } from 'crypto';
 import type { VerifyPasswordInput, UpdatePasswordInput } from '@/ai/schemas';
@@ -107,7 +107,7 @@ export async function updatePassword(input: UpdatePasswordInput): Promise<{ succ
     try {
         const credentialRef = doc(db, "credentials", role);
         const newHash = await hashPassword(newPassword);
-        await setDoc(credentialRef, { passwordHash: newHash });
+        await updateDoc(credentialRef, { passwordHash: newHash });
         return { success: true, message: "Password updated successfully." };
     } catch (error) {
         console.error("Error updating password:", error);
