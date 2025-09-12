@@ -3,14 +3,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions ---
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
+    // Helper functions to check user roles from a custom claim
     function isManager() {
-      // In a real app, you'd check a custom claim set during login.
-      // For this app, we trust the 'role' passed from the client context.
       return request.auth.token.role == 'manager';
     }
 
@@ -18,60 +12,54 @@ service cloud.firestore {
       return request.auth.token.role == 'cashier';
     }
 
-    // --- Default Security ---
-    // By default, nobody can read or write to any document.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Default deny all access unless explicitly allowed
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- Menu Items ---
-    // Any authenticated user (cashier or manager) can read the menu.
-    // Only managers can change the menu.
+    // Manager can read/write everything
+    match /{document=**} {
+      allow read, write: if isManager();
+    }
+    
+    // Cashier specific rules
+    
+    // Cashiers can read menu items
     match /menuItems/{item} {
-      allow read: if isSignedIn();
-      allow write: if isManager();
+      allow read: if isCashier();
     }
-    
-    // --- Orders ---
-    // Any authenticated user can create an order.
-    // Managers can read all orders for the dashboard.
-    // Cashiers can read and update orders (for pending, completion, payment).
+
+    // Cashiers can create and update orders, but not delete
     match /orders/{orderId} {
-      allow read, update: if isSignedIn();
-      allow create: if isSignedIn();
-      allow delete: if isCashier();
+      allow read, create, update: if isCashier();
     }
-
-    // --- Miscellaneous Expenses ---
-    // Cashiers can create expenses. Managers can read/update them (to settle).
+    
+    // Cashiers can create and read their own expenses
     match /miscExpenses/{expenseId} {
-      allow read, update: if isSignedIn();
-      allow create: if isCashier();
-      allow delete: if isCashier();
+      allow read, create: if isCashier();
     }
 
-    // --- Reconciliation Reports ---
-    // Cashiers can create daily reports. Managers can read all reports.
+    // Cashiers can create and read their own reports
     match /reconciliationReports/{reportId} {
-      allow read: if isManager();
-      allow create: if isCashier();
+      allow read, create: if isCashier();
     }
-    
-    // --- Counters (for Order IDs) ---
-    // Any authenticated user needs to be able to read and write to this document
-    // inside a transaction to generate a new order ID.
-    match /counters/orderIdCounter {
-        allow read, write: if isSignedIn();
+
+    // Counter can be read by anyone signed in, but only written by backend/manager
+    match /counters/{counterId} {
+        allow read: if isSignedIn();
+        allow write: if isManager();
     }
-    
-    // --- Credentials & Accounts ---
-    // Only managers should be able to manage credentials and cashier accounts.
-    match /credentials/{role} {
-        allow read, write: if isManager();
-    }
-    
+
+    // Cashiers cannot access cashier accounts or credentials directly
     match /cashierAccounts/{accountId} {
-        allow read, write: if isManager();
+        allow read: if isManager();
+    }
+    match /credentials/{role} {
+        allow read: if isManager();
     }
   }
 }
