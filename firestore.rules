@@ -1,44 +1,39 @@
-rules_version = '2';
 
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Default deny all
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Allow authenticated users to read menu items
-    match /menuItems/{item} {
+    match /menuItems/{document=**} {
       allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
-    
-    // Allow authenticated users to read and write orders, expenses, and reports
-    match /orders/{order} {
-      allow read, write: if isAuthenticated();
-    }
-    match /miscExpenses/{expense} {
-      allow read, write: if isAuthenticated();
-    }
-    match /reconciliationReports/{report} {
+
+    match /orders/{document=**} {
       allow read, write: if isAuthenticated();
     }
 
-    // Explicitly allow authenticated users (manager session) to create cashier accounts
-    match /cashierAccounts/{accountId} {
-      allow read, create, update: if isAuthenticated();
+    match /miscExpenses/{document=**} {
+        allow read, write: if isAuthenticated();
     }
     
-    // Protect credentials and counters
-    match /credentials/{role} {
-      allow read, write: if isAuthenticated();
+    match /reconciliationReports/{document=**} {
+        allow read, write: if isAuthenticated();
     }
-    match /counters/{counter} {
-      allow read, write: if isAuthenticated();
+
+    match /cashierAccounts/{document=**} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+    
+    match /credentials/{document=**} {
+        allow read, write: if isAuthenticated();
+    }
+    
+    match /counters/{document=**} {
+        allow read, write: if isAuthenticated();
     }
   }
 }
