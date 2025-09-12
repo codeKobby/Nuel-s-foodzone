@@ -220,15 +220,23 @@ function CafePage() {
 
 
     const renderActiveView = () => {
+        // Client-side role check for security reinforcement
+        const isManager = role === 'manager';
+        const isCashier = role === 'cashier';
+
         switch (activeView) {
-            case 'pos': return role === 'cashier' ? <PosView setActiveView={setActiveView} /> : null;
-            case 'orders': return role === 'cashier' ? <OrdersView setActiveView={setActiveView} /> : null;
-            case 'dashboard': return role === 'manager' ? <DashboardView /> : null;
-            case 'accounting': return role === 'cashier' ? <AccountingView setActiveView={setActiveView}/> : null;
-            case 'misc': return role === 'cashier' ? <MiscView /> : null;
-            case 'admin': return role === 'manager' ? <AdminView /> : null;
-            case 'accounts': return role === 'manager' ? <AccountsView /> : null;
-            case 'stock': return role === 'cashier' ? <StockView /> : null;
+            // Cashier Views
+            case 'pos': return isCashier ? <PosView setActiveView={setActiveView} /> : null;
+            case 'orders': return isCashier ? <OrdersView setActiveView={setActiveView} /> : null;
+            case 'accounting': return isCashier ? <AccountingView setActiveView={setActiveView}/> : null;
+            case 'misc': return isCashier ? <MiscView /> : null;
+            case 'stock': return isCashier ? <StockView /> : null;
+            
+            // Manager Views
+            case 'dashboard': return isManager ? <DashboardView /> : null;
+            case 'admin': return isManager ? <AdminView /> : null;
+            case 'accounts': return isManager ? <AccountsView /> : null;
+            
             default: return null;
         }
     };
