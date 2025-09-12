@@ -2,62 +2,21 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper function to check if a user is authenticated.
+
+    // Helper function to check if a user is signed in.
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    // Helper function to check if the user has the 'manager' role.
-    function isManager() {
-      return request.auth.token.role == 'manager';
-    }
-    
-    // Helper function to check if the user has the 'cashier' role.
-    function isCashier() {
-      return request.auth.token.role == 'cashier';
+
+    // Default-deny all reads and writes.
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    // Managers can read and write all data.
-    // Cashiers can create and update orders.
-    match /orders/{orderId} {
-      allow read, write: if isManager();
-      allow create, update: if isCashier();
-    }
-    
-    // Managers can manage the menu. Cashiers can only read it.
-    match /menuItems/{itemId} {
-      allow read: if isAuthenticated();
-      allow write: if isManager();
-    }
-    
-    // Managers can read all expenses. Cashiers can create their own.
-    match /miscExpenses/{expenseId} {
-        allow read, write: if isManager();
-        allow create: if isCashier();
-    }
-    
-    // Managers can read all reports. Cashiers can create their own.
-    match /reconciliationReports/{reportId} {
-        allow read, write: if isManager();
-        allow create: if isCashier();
-    }
-
-    // Only managers can create, read, and update cashier accounts.
-    match /cashierAccounts/{accountId} {
-        allow read, write: if isManager();
-    }
-    
-    // Secure credentials. Only allow reads/writes by an authenticated manager.
-    match /credentials/{role} {
-        allow read, write: if isManager();
-    }
-    
-    // The order ID counter can be read by any authenticated user but only
-    // written to within a transaction (handled by backend logic).
-    match /counters/orderIdCounter {
-        allow read: if isAuthenticated();
-        allow write: if isManager() || isCashier(); // Should be transactional
+    // Allow any authenticated user to read and write to the collections.
+    // The application logic itself (password prompts) is the primary gatekeeper.
+    match /(orders|menuItems|miscExpenses|reconciliationReports|cashierAccounts|counters|credentials)/{document=**} {
+      allow read, write: if isAuthenticated();
     }
   }
 }

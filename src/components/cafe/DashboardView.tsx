@@ -23,9 +23,10 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartConfig
+  ChartConfig,
+  ChartArea as Area,
 } from "@/components/ui/chart"
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, CartesianGrid, Line as ChartLine, Area as ChartArea } from 'recharts';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, CartesianGrid, Line as ChartLine } from 'recharts';
 
 import { DateRange } from "react-day-picker"
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, endOfToday, differenceInDays } from "date-fns"
@@ -187,7 +188,7 @@ const DashboardView: React.FC = () => {
             const unpaidOrders = allOrders.filter(o => o.balanceDue > 0);
             setAllUnpaidOrders(unpaidOrders);
             const unpaidOrdersValue = unpaidOrders.reduce((sum, o) => sum + o.balanceDue, 0);
-            const overdueOrders = unpaidOrders.filter(o => differenceInDays(new Date(), o.timestamp.toDate()) > 2);
+            const overdueOrdersCount = unpaidOrders.filter(o => differenceInDays(new Date(), o.timestamp.toDate()) > 2).length;
 
             // Other stats are calculated for the selected PERIOD
             const ordersCreatedInPeriod = allOrders.filter(o => o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate);
@@ -281,7 +282,7 @@ const DashboardView: React.FC = () => {
                 totalOrders,
                 totalItemsSold,
                 unpaidOrdersValue,
-                overdueOrdersCount: overdueOrders.length,
+                overdueOrdersCount: overdueOrdersCount,
                 totalMiscExpenses,
                 totalVariance: totalVariance,
                 enhancedReports: periodReports,
@@ -589,8 +590,8 @@ const DashboardView: React.FC = () => {
                       />
                     )}
                   />
-                  <ChartArea dataKey="collections" type="natural" fill="var(--color-collections)" fillOpacity={0.4} stroke="var(--color-collections)" stackId="a" />
-                  <ChartArea dataKey="newSales" type="natural" fill="var(--color-newSales)" fillOpacity={0.4} stroke="var(--color-newSales)" stackId="a" />
+                  <Area dataKey="collections" type="natural" fill="var(--color-collections)" fillOpacity={0.4} stroke="var(--color-collections)" stackId="a" />
+                  <Area dataKey="newSales" type="natural" fill="var(--color-newSales)" fillOpacity={0.4} stroke="var(--color-newSales)" stackId="a" />
                    <ChartLine dataKey="expenses" type="natural" stroke="var(--color-expenses)" strokeWidth={2} dot={false} />
                 </ComposedChart>
               </ChartContainer>
