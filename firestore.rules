@@ -2,75 +2,58 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- Helper Functions ---
-    // Checks if the requesting user has the 'manager' role.
+  
+    // Helper functions
     function isManager() {
-      // For this app, the manager role is not stored per-user in Firestore.
-      // We rely on the client-side session. This rule is a placeholder for a more robust system.
-      // We will check a property on the auth token if available, or assume role from client.
-      // For now, we will trust the client logic and just check for authentication.
-      // A more secure implementation would involve custom claims.
-      return request.auth != null; 
-    }
-
-    // Checks if the requesting user has the 'cashier' role.
-    function isCashier() {
-      return request.auth != null;
+      return request.auth.token.role == 'manager';
     }
     
-    // Checks if a user is authenticated.
+    function isCashier() {
+      return request.auth.token.role == 'cashier';
+    }
+    
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // --- Global Read Rule for Managers ---
-    // Managers can read documents in any collection. This is essential for the dashboard.
-    match /{path=**} {
-      allow read: if isAuthenticated() && isManager();
+    // Allow managers to do anything
+    match /{document=**} {
+      allow read, write: if isManager();
     }
     
-    // --- Collection-Specific Rules ---
-
-    // Cashier Accounts: Only managers can do anything with cashier accounts.
-    match /cashierAccounts/{accountId} {
-      allow read, create, update, delete: if isAuthenticated() && isManager();
-    }
-
-    // Credentials: Only managers can read or write credentials.
-    match /credentials/{role} {
-       allow read, write: if isAuthenticated() && isManager();
+    // Cashier Rules
+    match /menuItems/{item} {
+      allow read: if isCashier();
     }
     
-    // Counters: Any authenticated user can read and write to counters (needed for order creation).
-    match /counters/{counterId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    // Menu Items: Managers have full control, cashiers can only read.
-    match /menuItems/{itemId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && isManager();
-    }
-
-    // Orders: Cashiers can create and update. Managers have full control.
     match /orders/{orderId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated(); // Both roles can create/update
-      allow delete: if isAuthenticated() && isManager();
-    }
-
-    // Misc Expenses: Cashiers can create. Managers have full control.
-    match /miscExpenses/{expenseId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && isManager();
+      allow create: if isCashier();
+      allow read, update: if isCashier();
     }
     
-    // Reconciliation Reports: Cashiers can create reports. Managers can read and manage them.
+    match /miscExpenses/{expenseId} {
+      allow create: if isCashier();
+      allow read, update, delete: if isCashier() && resource.data.settled == false;
+    }
+    
     match /reconciliationReports/{reportId} {
-        allow read, update, delete: if isAuthenticated() && isManager();
-        allow create: if isAuthenticated();
+        allow read, create: if isCashier();
+    }
+    
+    // Read-only for core data
+    match /credentials/{role} {
+        allow read: if isAuthenticated();
+    }
+
+    match /counters/{counterId} {
+        allow read: if isAuthenticated();
+    }
+    
+    // Cashier accounts can be read by cashiers (for login) but only created/managed by managers
+    match /cashierAccounts/{accountId} {
+        allow read: if isCashier();
     }
   }
 }
+
+    

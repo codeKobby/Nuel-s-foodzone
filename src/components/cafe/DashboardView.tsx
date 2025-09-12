@@ -23,11 +23,9 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartConfig,
-  ChartArea as Area,
-  ChartLine
+  ChartConfig
 } from "@/components/ui/chart"
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, CartesianGrid } from 'recharts';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, CartesianGrid, Line as ChartLine, Area as ChartArea } from 'recharts';
 
 import { DateRange } from "react-day-picker"
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, endOfToday, differenceInDays } from "date-fns"
@@ -492,7 +490,7 @@ const DashboardView: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-red-500">{formatCurrency(order.balanceDue)}</p>
-                      <Badge variant="destructive">{order.paymentStatus}</Badge>
+                      <Badge variant={order.paymentStatus === 'Unpaid' ? 'destructive' : 'secondary'}>{order.paymentStatus}</Badge>
                     </div>
                   </div>
                 </div>
@@ -591,8 +589,8 @@ const DashboardView: React.FC = () => {
                       />
                     )}
                   />
-                  <Area dataKey="collections" type="natural" fill="var(--color-collections)" fillOpacity={0.4} stroke="var(--color-collections)" stackId="a" />
-                  <Area dataKey="newSales" type="natural" fill="var(--color-newSales)" fillOpacity={0.4} stroke="var(--color-newSales)" stackId="a" />
+                  <ChartArea dataKey="collections" type="natural" fill="var(--color-collections)" fillOpacity={0.4} stroke="var(--color-collections)" stackId="a" />
+                  <ChartArea dataKey="newSales" type="natural" fill="var(--color-newSales)" fillOpacity={0.4} stroke="var(--color-newSales)" stackId="a" />
                    <ChartLine dataKey="expenses" type="natural" stroke="var(--color-expenses)" strokeWidth={2} dot={false} />
                 </ComposedChart>
               </ChartContainer>
