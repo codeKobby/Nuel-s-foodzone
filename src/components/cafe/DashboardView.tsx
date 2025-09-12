@@ -23,6 +23,9 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  ChartConfig,
+  ChartArea,
+  ChartLine as ChartLineRecharts,
 } from "@/components/ui/chart"
 import { Area, ComposedChart, CartesianGrid, XAxis, YAxis, Line as ChartLine } from 'recharts';
 
@@ -168,29 +171,36 @@ const DashboardView: React.FC = () => {
             const startDate = date?.from!;
             const endDate = date?.to || date?.from!;
             
-            const allOrdersQuery = query(collection(db, "orders"), orderBy('timestamp', 'desc'));
+            const ordersInPeriodQuery = query(
+                collection(db, "orders"), 
+                where('timestamp', '>=', startDate), 
+                where('timestamp', '<=', endDate)
+            );
+            const allUnpaidOrdersQuery = query(collection(db, "orders"), where("balanceDue", ">", 0));
             const expensesQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
             const reportsQuery = query(collection(db, "reconciliationReports"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
 
-            const [allOrdersSnapshot, expensesSnapshot, reportsSnapshot] = await Promise.all([
-                getDocs(allOrdersQuery),
+            const [
+                ordersInPeriodSnapshot,
+                allUnpaidOrdersSnapshot,
+                expensesSnapshot, 
+                reportsSnapshot
+            ] = await Promise.all([
+                getDocs(ordersInPeriodQuery),
+                getDocs(allUnpaidOrdersQuery),
                 getDocs(expensesQuery),
                 getDocs(reportsQuery),
             ]);
 
-            const allOrders = allOrdersSnapshot.docs.map(d => ({...d.data(), id: d.id})) as Order[];
-            const periodExpenses = expensesSnapshot.docs.map(d => d.data()) as MiscExpense[];
-            const periodReports = reportsSnapshot.docs.map(d => d.data()) as EnhancedReconciliationReport[];
-            
-            // Unpaid orders are calculated across ALL time
-            const unpaidOrders = allOrders.filter(o => o.balanceDue > 0);
+            const ordersCreatedInPeriod = ordersInPeriodSnapshot.docs.map(d => ({...d.data(), id: d.id})) as Order[];
+            const unpaidOrders = allUnpaidOrdersSnapshot.docs.map(d => ({...d.data(), id: d.id})) as Order[];
             setAllUnpaidOrders(unpaidOrders);
             const unpaidOrdersValue = unpaidOrders.reduce((sum, o) => sum + o.balanceDue, 0);
             const overdueOrdersCount = unpaidOrders.filter(o => differenceInDays(new Date(), o.timestamp.toDate()) > 2).length;
 
-            // Other stats are calculated for the selected PERIOD
-            const ordersCreatedInPeriod = allOrders.filter(o => o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate);
-
+            const periodExpenses = expensesSnapshot.docs.map(d => d.data()) as MiscExpense[];
+            const periodReports = reportsSnapshot.docs.map(d => d.data()) as EnhancedReconciliationReport[];
+            
             const totalSales = ordersCreatedInPeriod
                 .filter(o => o.status === 'Completed')
                 .reduce((sum, o) => sum + o.total, 0);
@@ -203,18 +213,20 @@ const DashboardView: React.FC = () => {
             let newSalesRevenue = 0;
             let collections = 0;
 
-            allOrders.forEach(o => {
-                const paymentDate = o.lastPaymentTimestamp?.toDate();
-                if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
-                    const paymentAmount = o.lastPaymentAmount || 0;
-                    const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
-
-                    if (isOrderFromPeriod) {
-                        newSalesRevenue += paymentAmount;
-                    } else {
-                        collections += paymentAmount;
-                    }
-                }
+            // This logic needs to query all orders to correctly differentiate collections vs new sales
+            const allOrdersSnapshot = await getDocs(collection(db, "orders"));
+            allOrdersSnapshot.docs.forEach(doc => {
+              const o = doc.data() as Order;
+              const paymentDate = o.lastPaymentTimestamp?.toDate();
+              if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                  const paymentAmount = o.lastPaymentAmount || 0;
+                  const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
+                  if (isOrderFromPeriod) {
+                      newSalesRevenue += paymentAmount;
+                  } else {
+                      collections += paymentAmount;
+                  }
+              }
             });
 
             const totalMiscExpenses = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -222,14 +234,15 @@ const DashboardView: React.FC = () => {
             
             const totalVariance = periodReports.reduce((sum, r) => sum + r.totalDiscrepancy, 0);
 
-            const salesDataMap: Record<string, { newSales: number; collections: number; expenses: number; netRevenue: number; cashiers: Set<string> }> = {};
+            const salesDataMap: Record<string, { newSales: number; collections: number; expenses: number; netRevenue: number; cashierNames: Set<string> }> = {};
             const daysInRange = differenceInDays(endDate, startDate) + 1;
             for (let i = 0; i < daysInRange; i++) {
                 const day = format(addDays(startDate, i), 'MMM d');
-                salesDataMap[day] = { newSales: 0, collections: 0, netRevenue: 0, expenses: 0, cashiers: new Set() };
+                salesDataMap[day] = { newSales: 0, collections: 0, netRevenue: 0, expenses: 0, cashierNames: new Set() };
             }
 
-            allOrders.forEach(o => {
+            allOrdersSnapshot.docs.forEach(doc => {
+                const o = doc.data() as Order;
                 const paymentDate = o.lastPaymentTimestamp?.toDate();
                 if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
                      const day = format(paymentDate, 'MMM d');
@@ -241,7 +254,7 @@ const DashboardView: React.FC = () => {
                         } else {
                             salesDataMap[day].collections += paymentAmount;
                         }
-                        if (o.cashierName) salesDataMap[day].cashiers.add(o.cashierName);
+                        if (o.cashierName) salesDataMap[day].cashierNames.add(o.cashierName);
                      }
                 }
             });
@@ -250,7 +263,7 @@ const DashboardView: React.FC = () => {
                 const day = format(e.timestamp.toDate(), 'MMM d');
                 if (salesDataMap[day]) {
                     salesDataMap[day].expenses += e.amount;
-                    if(e.cashierName) salesDataMap[day].cashiers.add(e.cashierName);
+                    if(e.cashierName) salesDataMap[day].cashierNames.add(e.cashierName);
                 }
             });
             
@@ -258,7 +271,7 @@ const DashboardView: React.FC = () => {
                 date,
                 ...values,
                 netRevenue: values.newSales + values.collections - values.expenses,
-                cashierNames: Array.from(values.cashiers).join(', ')
+                cashierNames: Array.from(values.cashierNames).join(', ')
             }));
             
              const itemPerformance = ordersCreatedInPeriod
@@ -542,7 +555,7 @@ const DashboardView: React.FC = () => {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-2">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="items">Item Performance</TabsTrigger>
         </TabsList>
@@ -588,9 +601,9 @@ const DashboardView: React.FC = () => {
                       />
                     )}
                   />
-                  <Area dataKey="collections" type="natural" fill="var(--color-collections)" fillOpacity={0.4} stroke="var(--color-collections)" stackId="a" />
-                  <Area dataKey="newSales" type="natural" fill="var(--color-newSales)" fillOpacity={0.4} stroke="var(--color-newSales)" stackId="a" />
-                   <ChartLine dataKey="expenses" type="natural" stroke="var(--color-expenses)" strokeWidth={2} dot={false} />
+                  <ChartArea dataKey="collections" type="natural" fill="var(--color-collections)" fillOpacity={0.4} stroke="var(--color-collections)" stackId="a" />
+                  <ChartArea dataKey="newSales" type="natural" fill="var(--color-newSales)" fillOpacity={0.4} stroke="var(--color-newSales)" stackId="a" />
+                   <ChartLineRecharts dataKey="expenses" type="monotone" stroke="var(--color-expenses)" strokeWidth={2} dot={false} />
                 </ComposedChart>
               </ChartContainer>
             </CardContent>
