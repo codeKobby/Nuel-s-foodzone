@@ -19,8 +19,8 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig, ChartArea as Area } from "@/components/ui/chart"
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, CartesianGrid, Line } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig, ChartArea as Area, ChartLine, ComposedChart, CartesianGrid } from "@/components/ui/chart"
+import { XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 import { DateRange } from "react-day-picker"
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, endOfToday, differenceInDays } from "date-fns"
@@ -164,20 +164,27 @@ const DashboardView: React.FC = () => {
             const startDate = date.from!;
             const endDate = date.to || date.from;
             
-            const ordersQuery = query(collection(db, "orders"), orderBy('timestamp', 'desc'));
+            const allOrdersQuery = query(collection(db, "orders"), orderBy('timestamp', 'desc'));
             const expensesQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
             const reportsQuery = query(collection(db, "reconciliationReports"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
 
-            const [ordersSnapshot, expensesSnapshot, reportsSnapshot] = await Promise.all([
-                getDocs(ordersQuery),
+            const [allOrdersSnapshot, expensesSnapshot, reportsSnapshot] = await Promise.all([
+                getDocs(allOrdersQuery),
                 getDocs(expensesQuery),
                 getDocs(reportsQuery),
             ]);
 
-            const allOrders = ordersSnapshot.docs.map(d => ({...d.data(), id: d.id})) as Order[];
+            const allOrders = allOrdersSnapshot.docs.map(d => ({...d.data(), id: d.id})) as Order[];
             const periodExpenses = expensesSnapshot.docs.map(d => d.data()) as MiscExpense[];
             const periodReports = reportsSnapshot.docs.map(d => d.data()) as EnhancedReconciliationReport[];
             
+            // Unpaid orders are calculated across ALL time
+            const unpaidOrders = allOrders.filter(o => o.balanceDue > 0);
+            setAllUnpaidOrders(unpaidOrders);
+            const unpaidOrdersValue = unpaidOrders.reduce((sum, o) => sum + o.balanceDue, 0);
+            const overdueOrders = unpaidOrders.filter(o => differenceInDays(new Date(), o.timestamp.toDate()) > 2);
+
+            // Other stats are calculated for the selected PERIOD
             const ordersCreatedInPeriod = allOrders.filter(o => o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate);
 
             const totalSales = ordersCreatedInPeriod
@@ -208,12 +215,6 @@ const DashboardView: React.FC = () => {
 
             const totalMiscExpenses = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
             const totalNetRevenue = (newSalesRevenue + collections) - totalMiscExpenses;
-            
-            const unpaidOrders = allOrders.filter(o => o.balanceDue > 0);
-            setAllUnpaidOrders(unpaidOrders);
-            const unpaidOrdersValue = unpaidOrders.reduce((sum, o) => sum + o.balanceDue, 0);
-
-            const overdueOrders = unpaidOrders.filter(o => differenceInDays(new Date(), o.timestamp.toDate()) > 2);
             
             const totalVariance = periodReports.reduce((sum, r) => sum + r.totalDiscrepancy, 0);
 
@@ -581,7 +582,7 @@ const DashboardView: React.FC = () => {
                   />
                   <Area dataKey="collections" type="natural" fill="var(--color-collections)" fillOpacity={0.4} stroke="var(--color-collections)" stackId="a" />
                   <Area dataKey="newSales" type="natural" fill="var(--color-newSales)" fillOpacity={0.4} stroke="var(--color-newSales)" stackId="a" />
-                   <Line dataKey="expenses" type="natural" stroke="var(--color-expenses)" strokeWidth={2} dot={false} />
+                   <ChartLine dataKey="expenses" type="natural" stroke="var(--color-expenses)" strokeWidth={2} dot={false} />
                 </ComposedChart>
               </ChartContainer>
             </CardContent>
