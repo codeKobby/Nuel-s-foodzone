@@ -253,7 +253,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         <div className="fixed bottom-4 left-4 z-40">
             <div
             className={cn(
-                'flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium shadow-lg transition-all duration-500 animate-fade-in-up',
+                'flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium shadow-lg transition-all duration-500 animate-in fade-in-0 slide-in-from-bottom-2',
                 isOnline
                 ? 'bg-green-500 text-white'
                 : 'bg-red-500 text-white animate-pulse'
