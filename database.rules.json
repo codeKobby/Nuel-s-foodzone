@@ -1,7 +1,43 @@
 
 {
   "rules": {
-    ".read": false,
-    ".write": false
+    "users": {
+      "$uid": {
+        ".read": "$uid === request.auth.uid",
+        ".write": "$uid === request.auth.uid"
+      }
+    },
+    "menuItems": {
+      ".read": "request.auth != null",
+      ".write": "request.auth != null"
+    },
+    "orders": {
+      ".read": "request.auth != null",
+      ".write": "request.auth != null"
+    },
+    "miscExpenses": {
+      ".read": "request.auth != null",
+      ".write": "request.auth != null"
+    },
+    "reconciliationReports": {
+      ".read": "request.auth != null",
+      ".write": "request.auth != null"
+    },
+    "counters": {
+      "orderIdCounter": {
+        ".read": "request.auth != null",
+        ".write": "request.auth != null"
+      }
+    },
+    "credentials": {
+      "manager": {
+        ".read": "request.auth != null",
+        ".write": "request.auth != null"
+      }
+    },
+    "cashierAccounts": {
+      ".read": "request.auth != null",
+      ".write": "request.auth != null"
+    }
   }
 }
