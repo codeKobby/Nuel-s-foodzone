@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import type { 
     Order, 
     MiscExpense, 
-    EnhancedReconciliationReport, 
+    ReconciliationReport as EnhancedReconciliationReport, 
     ChatSession, 
     EnhancedPeriodStats,
     PreviousDaySettlement,
@@ -111,105 +111,6 @@ const StatCard: React.FC<{
   );
 };
 
-// Mock data generator for demonstration
-const generateMockData = (): DashboardStats => {
-  const today = new Date();
-  const mockDailyStats: EnhancedPeriodStats[] = [];
-  const mockSalesData = [];
-  
-  // Generate 7 days of mock data
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const dayStr = format(date, 'MMM d');
-    
-    const newSales = Math.random() * 400 + 200;
-    const collections = Math.random() * 100;
-    const expenses = Math.random() * 50;
-    const netRevenue = newSales + collections - expenses;
-    
-    mockDailyStats.push({
-      date: dateStr,
-      todayNewSales: newSales,
-      todayNewItemsSold: Math.floor(Math.random() * 30) + 10,
-      todayNewCashSales: newSales * 0.7,
-      todayNewMomoSales: newSales * 0.3,
-      previousDaysCashCollected: collections * 0.8,
-      previousDaysMomoCollected: collections * 0.2,
-      previousDaysOrdersSettled: [],
-      totalCashReceived: newSales * 0.7 + collections * 0.8,
-      totalMomoReceived: newSales * 0.3 + collections * 0.2,
-      totalExpectedCash: newSales * 0.7 + collections * 0.8,
-      totalExpectedMomo: newSales * 0.3 + collections * 0.2,
-      miscCashExpenses: expenses * 0.6,
-      miscMomoExpenses: expenses * 0.4,
-      changeFund: {
-        openingBalance: 30,
-        changeGenerated: Math.random() * 20,
-        changeSettled: Math.random() * 15,
-        totalAvailable: 35,
-        setAsideAmount: Math.random() > 0.5 ? Math.random() * 20 : 0,
-        wasSetAside: Math.random() > 0.5
-      },
-      changeImpactOnNet: Math.random() * 10 - 5,
-      netRevenueFromNewSales: newSales - expenses,
-      totalNetRevenue: netRevenue,
-      allTimeUnpaidOrdersValue: Math.random() * 200,
-      todayUnpaidOrdersValue: Math.random() * 50,
-      overdueOrdersCount: Math.floor(Math.random() * 5),
-      totalPardonedAmount: Math.random() * 20,
-      orders: [],
-      itemStats: {}
-    });
-    
-    mockSalesData.push({
-      date: dayStr,
-      newSales: newSales,
-      collections: collections,
-      netRevenue: netRevenue
-    });
-  }
-  
-  return {
-    totalSales: 2800,
-    netRevenueFromNewSales: 2400,
-    totalNetRevenue: 2650,
-    previousDayCollections: 250,
-    cashSales: 1960,
-    momoSales: 840,
-    changeFundImpact: -45,
-    changeFundHealth: 'healthy',
-    totalOrders: 85,
-    totalItemsSold: 145,
-    unpaidOrdersValue: 180,
-    overdueOrdersCount: 4,
-    totalMiscExpenses: 120,
-    totalPardonedAmount: 35,
-    totalVariance: 15,
-    totalSurplus: 25,
-    totalDeficit: 10,
-    enhancedReports: [],
-    dailyStats: mockDailyStats,
-    salesData: mockSalesData,
-    itemPerformance: [
-      { name: 'Jollof Rice', count: 25, totalValue: 375 },
-      { name: 'Fried Rice', count: 20, totalValue: 340 },
-      { name: 'Banku & Tilapia', count: 18, totalValue: 450 },
-      { name: 'Waakye', count: 15, totalValue: 225 },
-      { name: 'Fufu & Soup', count: 12, totalValue: 240 }
-    ],
-    businessMetrics: [],
-    orderAgeAnalysis: [
-      { orderId: '1', orderNumber: 'ORD-123', daysOverdue: 3, amount: 45, riskLevel: 'medium', recommendedAction: 'Follow up call' },
-      { orderId: '2', orderNumber: 'ORD-118', daysOverdue: 1, amount: 28, riskLevel: 'low', recommendedAction: 'Gentle reminder' },
-      { orderId: '3', orderNumber: 'ORD-115', daysOverdue: 5, amount: 67, riskLevel: 'high', recommendedAction: 'Immediate collection' },
-      { orderId: '4', orderNumber: 'ORD-108', daysOverdue: 7, amount: 40, riskLevel: 'high', recommendedAction: 'Consider write-off' }
-    ],
-    incompleteAccountingDays: ['2025-08-16', '2025-08-14'],
-    pardonedOrders: []
-  };
-};
 
 const chartConfig = {
   newSales: {
@@ -262,16 +163,158 @@ const DashboardView: React.FC = () => {
   
   const { toast } = useToast();
 
-  // Mock data loading
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setStats(generateMockData());
-      setLoading(false);
+   useEffect(() => {
+    if (!date?.from) return;
+
+    setLoading(true);
+
+    const fetchDashboardData = async () => {
+        try {
+            const startDate = date.from!;
+            const endDate = date.to || date.from;
+            
+            const ordersQuery = query(collection(db, "orders"), orderBy('timestamp', 'desc'));
+            const expensesQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
+            const reportsQuery = query(collection(db, "reconciliationReports"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
+
+            const [ordersSnapshot, expensesSnapshot, reportsSnapshot] = await Promise.all([
+                getDocs(ordersQuery),
+                getDocs(expensesQuery),
+                getDocs(reportsQuery),
+            ]);
+
+            const allOrders = ordersSnapshot.docs.map(d => ({...d.data(), id: d.id})) as Order[];
+            const periodExpenses = expensesSnapshot.docs.map(d => d.data()) as MiscExpense[];
+            const periodReports = reportsSnapshot.docs.map(d => d.data()) as EnhancedReconciliationReport[];
+            
+            const ordersInPeriod = allOrders.filter(o => o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate);
+
+            // Calculate metrics
+            const totalSales = ordersInPeriod
+                .filter(o => o.status === 'Completed')
+                .reduce((sum, o) => sum + o.total, 0);
+            
+            const totalOrders = ordersInPeriod.length;
+            const totalItemsSold = ordersInPeriod
+                .filter(o => o.status === 'Completed')
+                .reduce((sum, o) => sum + o.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0);
+
+            const collections = allOrders
+                .filter(o => {
+                    const paymentDate = o.lastPaymentTimestamp?.toDate();
+                    return paymentDate && paymentDate >= startDate && paymentDate <= endDate && o.timestamp.toDate() < startDate;
+                })
+                .reduce((sum, o) => sum + (o.lastPaymentAmount || 0), 0);
+
+            const { cashSales, momoSales } = ordersInPeriod
+                .reduce((acc, o) => {
+                    if (o.lastPaymentTimestamp && o.lastPaymentTimestamp.toDate() >= startDate && o.lastPaymentTimestamp.toDate() <= endDate) {
+                        if (o.paymentMethod === 'cash') acc.cashSales += o.lastPaymentAmount || 0;
+                        if (o.paymentMethod === 'momo') acc.momoSales += o.lastPaymentAmount || 0;
+                    }
+                    return acc;
+                }, { cashSales: 0, momoSales: 0 });
+
+            const totalMiscExpenses = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
+            const totalPardonedAmount = ordersInPeriod.reduce((sum, o) => sum + (o.pardonedAmount || 0), 0);
+            const netRevenueFromNewSales = (cashSales + momoSales) - totalMiscExpenses - totalPardonedAmount;
+            const totalNetRevenue = netRevenueFromNewSales + collections;
+
+            const unpaidOrdersValue = allOrders
+                .filter(o => o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid')
+                .reduce((sum, o) => sum + o.balanceDue, 0);
+
+            const overdueOrders = allOrders.filter(o => o.balanceDue > 0 && differenceInDays(new Date(), o.timestamp.toDate()) > 2);
+            
+            const totalVariance = periodReports.reduce((sum, r) => sum + r.totalDiscrepancy, 0);
+
+            // Chart Data
+            const salesDataMap: Record<string, { newSales: number; collections: number; netRevenue: number }> = {};
+            const daysInRange = differenceInDays(endDate, startDate) + 1;
+            for (let i = 0; i < daysInRange; i++) {
+                const day = format(addDays(startDate, i), 'MMM d');
+                salesDataMap[day] = { newSales: 0, collections: 0, netRevenue: 0 };
+            }
+
+            allOrders.forEach(o => {
+                const orderDate = o.timestamp.toDate();
+                if (orderDate >= startDate && orderDate <= endDate) {
+                    const day = format(orderDate, 'MMM d');
+                    if (salesDataMap[day]) {
+                         if (o.status === 'Completed') salesDataMap[day].newSales += o.total;
+                    }
+                }
+                const paymentDate = o.lastPaymentTimestamp?.toDate();
+                if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                     const day = format(paymentDate, 'MMM d');
+                     if (salesDataMap[day]) {
+                        if(o.timestamp.toDate() < startDate) {
+                            salesDataMap[day].collections += o.lastPaymentAmount || 0;
+                        }
+                     }
+                }
+            });
+
+             const salesData = Object.entries(salesDataMap).map(([date, values]) => ({
+                date, ...values, netRevenue: values.newSales + values.collections,
+            }));
+            
+             const itemPerformance = ordersInPeriod
+                .filter(o => o.status === 'Completed')
+                .flatMap(o => o.items)
+                .reduce((acc, item) => {
+                    if (!acc[item.name]) {
+                        acc[item.name] = { name: item.name, count: 0, totalValue: 0 };
+                    }
+                    acc[item.name].count += item.quantity;
+                    acc[item.name].totalValue += item.quantity * item.price;
+                    return acc;
+                }, {} as Record<string, { name: string; count: number; totalValue: number }>);
+
+            setStats({
+                totalSales,
+                netRevenueFromNewSales,
+                totalNetRevenue,
+                previousDayCollections: collections,
+                cashSales,
+                momoSales,
+                changeFundImpact: -45, // MOCK DATA
+                changeFundHealth: 'healthy', // MOCK DATA
+                totalOrders,
+                totalItemsSold,
+                unpaidOrdersValue,
+                overdueOrdersCount: overdueOrders.length,
+                totalMiscExpenses,
+                totalPardonedAmount,
+                totalVariance: totalVariance,
+                totalSurplus: periodReports.filter(r => r.totalDiscrepancy > 0).reduce((sum, r) => sum + r.totalDiscrepancy, 0),
+                totalDeficit: periodReports.filter(r => r.totalDiscrepancy < 0).reduce((sum, r) => sum + r.totalDiscrepancy, 0),
+                enhancedReports: periodReports,
+                dailyStats: [], // Needs more complex daily breakdown
+                salesData,
+                itemPerformance: Object.values(itemPerformance),
+                businessMetrics: [], // MOCK DATA
+                orderAgeAnalysis: overdueOrders.map(o => ({
+                    orderId: o.id,
+                    orderNumber: o.simplifiedId,
+                    daysOverdue: differenceInDays(new Date(), o.timestamp.toDate()),
+                    amount: o.balanceDue,
+                    riskLevel: differenceInDays(new Date(), o.timestamp.toDate()) > 5 ? 'high' : 'medium',
+                    recommendedAction: 'Follow up call'
+                })),
+                incompleteAccountingDays: [], // MOCK DATA
+                pardonedOrders: [] // MOCK DATA
+            });
+
+        } catch (err) {
+            console.error(err);
+            setError("Failed to fetch dashboard data. Please check your connection and try again.");
+        } finally {
+            setLoading(false);
+        }
     };
-    loadData();
+
+    fetchDashboardData();
   }, [date]);
 
   const setDateRange = (rangeType: PresetDateRange) => {
@@ -822,7 +865,7 @@ const DashboardView: React.FC = () => {
                           <div className="flex justify-between items-start">
                             <div>
                               <p className="font-medium">{order.orderNumber}</p>
-                              <p className="text-sm text-muted-foreground">{order.customerName || 'Unknown Customer'}</p>
+                              <p className="text-sm text-muted-foreground">{order.cashierName || 'Unknown Cashier'}</p>
                               <p className="text-xs text-muted-foreground">{order.daysOverdue} days overdue</p>
                             </div>
                             <div className="text-right">
@@ -1058,7 +1101,7 @@ const DashboardView: React.FC = () => {
                     <div>
                       <h4 className="font-semibold text-lg">{order.orderNumber}</h4>
                       <p className="text-sm text-muted-foreground">
-                        Customer: {order.customerName || 'Unknown'}
+                        Cashier: {order.cashierName || 'Unknown'}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {order.daysOverdue} days overdue
@@ -1182,31 +1225,7 @@ const DashboardView: React.FC = () => {
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] mt-4">
             <div className="space-y-4 pr-4">
-              {/* Mock enhanced reconciliation reports */}
-              {[
-                {
-                  id: '1',
-                  period: '2025-08-17',
-                  totalVariance: 15.50,
-                  expectedCash: 375.00,
-                  countedCash: 385.50,
-                  expectedMomo: 175.50,
-                  countedMomo: 170.00,
-                  reconciler: 'Sarah K.',
-                  notes: 'Found extra GH₵10 in drawer, MoMo slightly under due to pending transaction'
-                },
-                {
-                  id: '2',
-                  period: '2025-08-16',
-                  totalVariance: -8.00,
-                  expectedCash: 420.00,
-                  countedCash: 412.00,
-                  expectedMomo: 180.00,
-                  countedMomo: 180.00,
-                  reconciler: 'James M.',
-                  notes: 'Missing GH₵8 in cash, likely change calculation error'
-                }
-              ].map((report) => (
+              {stats.enhancedReports.map((report) => (
                 <Card key={report.id} className="p-4">
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -1214,14 +1233,14 @@ const DashboardView: React.FC = () => {
                         {format(new Date(report.period), 'EEEE, MMMM dd, yyyy')}
                       </h4>
                       <p className="text-sm text-muted-foreground">
-                        Reconciled by {report.reconciler}
+                        Reconciled by {report.cashierName}
                       </p>
                     </div>
                     <Badge 
-                      variant={report.totalVariance > 0 ? 'default' : report.totalVariance < 0 ? 'destructive' : 'secondary'}
+                      variant={report.totalDiscrepancy > 0 ? 'default' : report.totalDiscrepancy < 0 ? 'destructive' : 'secondary'}
                       className="text-lg px-3 py-1"
                     >
-                      {report.totalVariance > 0 ? '+' : ''}{formatCurrency(report.totalVariance)}
+                      {report.totalDiscrepancy > 0 ? '+' : ''}{formatCurrency(report.totalDiscrepancy)}
                     </Badge>
                   </div>
                   
@@ -1417,3 +1436,5 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
+    
