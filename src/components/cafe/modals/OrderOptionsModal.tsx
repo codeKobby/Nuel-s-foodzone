@@ -14,6 +14,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, Calculator, Info } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Card, CardContent } from '@/components/ui/card';
+import { AuthContext } from '@/context/AuthContext';
+import { useContext } from 'react';
+
 
 interface OrderOptionsModalProps {
     total: number;
@@ -38,6 +41,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   const [changeGivenInput, setChangeGivenInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { session } = useContext(AuthContext);
 
   useEffect(() => {
     if (editingOrder) {
@@ -62,13 +66,18 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     const finalChangeGiven = changeGivenSoFar + changeGivenNum;
     
     let newBalance = total - finalAmountPaid;
-    if (changeGivenNum > 0) {
-      // The balance is simply what they owe from the total vs what they paid.
-      newBalance = total - finalAmountPaid
+    
+    const deficit = newBalance > 0 ? newBalance : 0;
+    let change = newBalance < 0 ? Math.abs(newBalance) : 0;
+     if (paymentMethod === 'cash' && newPaymentAmount > total) {
+      change = newPaymentAmount - total;
+      if (editingOrder) {
+         change = newPaymentAmount - (total - editingOrder.amountPaid);
+      }
+    } else {
+        change = 0;
     }
 
-    const deficit = newBalance > 0 ? newBalance : 0;
-    const change = newBalance < 0 ? Math.abs(newBalance) : 0;
     
     return {
       finalAmountPaid,
@@ -127,6 +136,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         status: editingOrder?.status || 'Pending',
         fulfilledItems: editingOrder?.fulfilledItems || [],
         creditSource: editingOrder?.creditSource || [],
+        cashierId: session?.uid,
+        cashierName: session?.fullName || session?.username || 'Unknown',
       };
       
       if (isPaid) {
@@ -149,14 +160,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           let finalBalance = total - finalAmountPaid;
           if(pardonDeficit){
               finalBalance = 0;
-          } else if (finalBalance < 0) {
-            orderData.changeGiven = finalChangeGiven;
-          } else {
-            orderData.changeGiven = editingOrder.changeGiven || 0;
           }
           
           orderData.amountPaid = finalAmountPaid;
           orderData.balanceDue = finalBalance;
+          orderData.changeGiven = finalChangeGiven;
           
           if (finalBalance <= 0) {
               orderData.paymentStatus = 'Paid';
@@ -369,7 +377,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 }
               </DialogDescription>
               <div className="text-center text-3xl font-bold text-primary pt-2">
-                {formatCurrency(total)}
+                {formatCurrency(editingOrder ? total - editingOrder.amountPaid : total)}
               </div>
             </DialogHeader>
             
@@ -496,5 +504,3 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 };
 
 export default OrderOptionsModal;
-
-    

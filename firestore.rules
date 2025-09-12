@@ -1,13 +1,6 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Default rule: Allow read and write access to any authenticated user.
-    // The application's client-side code is responsible for handling
-    // role-based UI and access control (e.g., via password modals).
-    // This rule is secure as long as Anonymous Authentication is enabled
-    // in Firebase, as the app signs users in silently.
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
