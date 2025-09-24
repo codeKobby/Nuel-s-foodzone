@@ -11,6 +11,7 @@ import FinancialSummaryView from './FinancialSummaryView';
 import HistoryView from './HistoryView';
 import { isToday } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface PeriodStats {
     totalSales: number;
@@ -20,6 +21,7 @@ interface PeriodStats {
     miscMomoExpenses: number;
     totalPardonedAmount: number;
     changeOwedForPeriod: number;
+    collectionsFromPreviousDays: number;
     itemPerformance: { name: string; count: number; totalValue: number }[];
     orders: Order[];
 }
@@ -51,64 +53,64 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
             const startDateTimestamp = Timestamp.fromDate(today);
             const endDateTimestamp = Timestamp.fromDate(todayEnd);
 
-            const todayOrdersQuery = query(
-                collection(db, "orders"),
-                where("timestamp", ">=", startDateTimestamp),
-                where("timestamp", "<=", endDateTimestamp)
-            );
+            const allOrdersQuery = query(collection(db, "orders"));
             const todayMiscQuery = query(
                 collection(db, "miscExpenses"),
                 where("timestamp", ">=", startDateTimestamp),
                 where("timestamp", "<=", endDateTimestamp)
             );
             
-            const allUnpaidOrdersQuery = query(collection(db, "orders"), where("balanceDue", ">", 0));
-
-            const [todayOrdersSnapshot, todayMiscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
-                getDocs(todayOrdersQuery),
+            const [allOrdersSnapshot, todayMiscSnapshot] = await Promise.all([
+                getDocs(allOrdersQuery),
                 getDocs(todayMiscQuery),
-                getDocs(allUnpaidOrdersQuery),
             ]);
             
-            setAllUnpaidOrdersTotal(allUnpaidOrdersSnapshot.docs.reduce((sum, doc) => sum + doc.data().balanceDue, 0));
+            setAllUnpaidOrdersTotal(allOrdersSnapshot.docs.reduce((sum, doc) => sum + (doc.data().balanceDue > 0 ? doc.data().balanceDue : 0), 0));
 
             let totalSales = 0;
             let cashSales = 0;
             let momoSales = 0;
+            let collectionsFromPreviousDays = 0;
             let totalPardonedAmount = 0;
             let changeOwedForPeriod = 0;
             const todayOrders: Order[] = [];
             const itemPerformance: Record<string, { name: string; count: number; totalValue: number }> = {};
 
-            todayOrdersSnapshot.docs.forEach(doc => {
+            allOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
-                todayOrders.push(order);
+                const orderDate = order.timestamp.toDate();
 
-                if (order.status === 'Completed') {
-                    totalSales += order.total;
-                    order.items.forEach(item => {
-                        if (!itemPerformance[item.name]) {
-                            itemPerformance[item.name] = { name: item.name, count: 0, totalValue: 0 };
-                        }
-                        itemPerformance[item.name].count += item.quantity;
-                        itemPerformance[item.name].totalValue += item.price * item.quantity;
-                    });
-                }
-                
-                if (order.pardonedAmount && order.pardonedAmount > 0) {
-                    totalPardonedAmount += order.pardonedAmount;
-                }
-                
-                if (order.balanceDue < 0) {
-                    changeOwedForPeriod += Math.abs(order.balanceDue);
+                if (orderDate >= today && orderDate <= todayEnd) {
+                    todayOrders.push(order);
+
+                    if (order.status === 'Completed') {
+                        totalSales += order.total;
+                        order.items.forEach(item => {
+                            if (!itemPerformance[item.name]) {
+                                itemPerformance[item.name] = { name: item.name, count: 0, totalValue: 0 };
+                            }
+                            itemPerformance[item.name].count += item.quantity;
+                            itemPerformance[item.name].totalValue += item.price * item.quantity;
+                        });
+                    }
+                    
+                    if (order.pardonedAmount && order.pardonedAmount > 0) {
+                        totalPardonedAmount += order.pardonedAmount;
+                    }
+                    
+                    if (order.balanceDue < 0) {
+                        changeOwedForPeriod += Math.abs(order.balanceDue);
+                    }
                 }
 
-                if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                    const paymentDate = order.lastPaymentTimestamp ? order.lastPaymentTimestamp.toDate() : order.timestamp.toDate();
-                    if (paymentDate >= today && paymentDate <= todayEnd) {
-                         const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
-                        if (order.paymentMethod === 'cash') cashSales += paidAmount;
-                        if (order.paymentMethod === 'momo') momoSales += paidAmount;
+                const paymentDate = order.lastPaymentTimestamp?.toDate();
+                if (paymentDate && paymentDate >= today && paymentDate <= todayEnd) {
+                    const paymentAmount = order.lastPaymentAmount ?? 0;
+                    if (order.paymentMethod === 'cash') cashSales += paymentAmount;
+                    if (order.paymentMethod === 'momo') momoSales += paymentAmount;
+
+                    if (orderDate < today) {
+                        collectionsFromPreviousDays += paymentAmount;
                     }
                 }
             });
@@ -125,6 +127,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                 totalSales,
                 cashSales,
                 momoSales,
+                collectionsFromPreviousDays,
                 miscCashExpenses,
                 miscMomoExpenses,
                 totalPardonedAmount,
@@ -153,18 +156,9 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
             console.error("Error loading reports:", err);
             setError("Failed to load past reports.");
         });
-
-        const unpaidOrdersQuery = query(collection(db, "orders"), where("balanceDue", ">", 0));
-        const unsubscribeUnpaid = onSnapshot(unpaidOrdersQuery, (snapshot) => {
-            const total = snapshot.docs.reduce((sum, doc) => sum + doc.data().balanceDue, 0);
-            setAllUnpaidOrdersTotal(total);
-        }, (err) => {
-            console.error("Error fetching all unpaid orders total:", err);
-        });
-
+        
         return () => {
             unsubscribeReports();
-            unsubscribeUnpaid();
         };
     }, []);
 
@@ -186,24 +180,28 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
     return (
         <div className="h-full flex flex-col">
-            <Tabs defaultValue="summary" className="flex-1 flex flex-col">
-                <div className="px-4 md:px-6 pt-4">
+            <Tabs defaultValue="summary" className="flex-1 flex flex-col overflow-hidden">
+                <div className="px-4 md:px-6 pt-4 border-b">
                     <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="summary">Today's Summary</TabsTrigger>
                         <TabsTrigger value="history">History</TabsTrigger>
                     </TabsList>
                 </div>
-                <TabsContent value="summary" className="flex-1 overflow-hidden">
-                    <FinancialSummaryView 
-                        stats={stats!}
-                        allUnpaidOrdersTotal={allUnpaidOrdersTotal}
-                        isTodayClosedOut={isTodayClosedOut}
-                        onStartEndDay={() => setShowReconciliation(true)}
-                    />
-                </TabsContent>
-                <TabsContent value="history" className="flex-1 overflow-y-auto">
-                    <HistoryView />
-                </TabsContent>
+                <div className="flex-1 relative">
+                    <ScrollArea className="absolute inset-0">
+                        <TabsContent value="summary">
+                            <FinancialSummaryView 
+                                stats={stats!}
+                                allUnpaidOrdersTotal={allUnpaidOrdersTotal}
+                                isTodayClosedOut={isTodayClosedOut}
+                                onStartEndDay={() => setShowReconciliation(true)}
+                            />
+                        </TabsContent>
+                        <TabsContent value="history">
+                            <HistoryView />
+                        </TabsContent>
+                    </ScrollArea>
+                </div>
             </Tabs>
         </div>
     );
