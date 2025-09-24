@@ -59,13 +59,15 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                 where("timestamp", ">=", startDateTimestamp),
                 where("timestamp", "<=", endDateTimestamp)
             );
+            const allUnpaidOrdersQuery = query(collection(db, "orders"), where("balanceDue", ">", 0));
             
-            const [allOrdersSnapshot, todayMiscSnapshot] = await Promise.all([
+            const [allOrdersSnapshot, todayMiscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
                 getDocs(allOrdersQuery),
                 getDocs(todayMiscQuery),
+                getDocs(allUnpaidOrdersQuery),
             ]);
             
-            setAllUnpaidOrdersTotal(allOrdersSnapshot.docs.reduce((sum, doc) => sum + (doc.data().balanceDue > 0 ? doc.data().balanceDue : 0), 0));
+            setAllUnpaidOrdersTotal(allUnpaidOrdersSnapshot.docs.reduce((sum, doc) => sum + doc.data().balanceDue, 0));
 
             let totalSales = 0;
             let cashSales = 0;
@@ -189,17 +191,15 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                 </div>
                 <div className="flex-1 overflow-hidden">
                     <TabsContent value="summary" className="h-full">
-                        <ScrollArea className="h-full">
-                            <FinancialSummaryView 
-                                stats={stats!}
-                                allUnpaidOrdersTotal={allUnpaidOrdersTotal}
-                                isTodayClosedOut={isTodayClosedOut}
-                                onStartEndDay={() => setShowReconciliation(true)}
-                            />
-                        </ScrollArea>
+                        <FinancialSummaryView 
+                            stats={stats!}
+                            allUnpaidOrdersTotal={allUnpaidOrdersTotal}
+                            isTodayClosedOut={isTodayClosedOut}
+                            onStartEndDay={() => setShowReconciliation(true)}
+                        />
                     </TabsContent>
                     <TabsContent value="history" className="h-full">
-                        <HistoryView />
+                      <HistoryView />
                     </TabsContent>
                 </div>
             </Tabs>
