@@ -787,3 +787,5 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 export default AccountingView;
 
     
+
+    
