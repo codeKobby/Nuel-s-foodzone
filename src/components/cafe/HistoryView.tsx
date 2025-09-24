@@ -43,14 +43,14 @@ const HistoryView: React.FC = () => {
     }
 
     return (
-        <div className="p-4 md:p-6 h-full">
-            <Card className="h-full flex flex-col">
-                <CardHeader>
-                    <CardTitle>Reconciliation History</CardTitle>
-                    <CardDescription>A log of all past end-of-day financial reports.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-hidden">
-                    <ScrollArea className="h-full pr-4">
+        <ScrollArea className="h-full">
+            <div className="p-4 md:p-6 h-full">
+                <Card className="h-full flex flex-col">
+                    <CardHeader>
+                        <CardTitle>Reconciliation History</CardTitle>
+                        <CardDescription>A log of all past end-of-day financial reports.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-hidden">
                         {Object.keys(groupedReports).length > 0 ? (
                             <div className="space-y-6">
                                 {Object.entries(groupedReports).map(([date, reportsOnDate]) => (
@@ -89,10 +89,10 @@ const HistoryView: React.FC = () => {
                                 <p>No historical reports found.</p>
                             </div>
                         )}
-                    </ScrollArea>
-                </CardContent>
-            </Card>
-        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        </ScrollArea>
     );
 };
 

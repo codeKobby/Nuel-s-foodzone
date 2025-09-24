@@ -181,26 +181,26 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
     return (
         <div className="h-full flex flex-col">
             <Tabs defaultValue="summary" className="flex-1 flex flex-col overflow-hidden">
-                <div className="px-4 md:px-6 pt-4 border-b">
+                <div className="px-4 md:px-6 pt-4 border-b flex-shrink-0">
                     <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="summary">Today's Summary</TabsTrigger>
                         <TabsTrigger value="history">History</TabsTrigger>
                     </TabsList>
                 </div>
-                <div className="flex-1 relative">
-                    <ScrollArea className="absolute inset-0">
-                        <TabsContent value="summary">
+                <div className="flex-1 overflow-hidden">
+                    <TabsContent value="summary" className="h-full">
+                        <ScrollArea className="h-full">
                             <FinancialSummaryView 
                                 stats={stats!}
                                 allUnpaidOrdersTotal={allUnpaidOrdersTotal}
                                 isTodayClosedOut={isTodayClosedOut}
                                 onStartEndDay={() => setShowReconciliation(true)}
                             />
-                        </TabsContent>
-                        <TabsContent value="history">
-                            <HistoryView />
-                        </TabsContent>
-                    </ScrollArea>
+                        </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="history" className="h-full">
+                        <HistoryView />
+                    </TabsContent>
                 </div>
             </Tabs>
         </div>
