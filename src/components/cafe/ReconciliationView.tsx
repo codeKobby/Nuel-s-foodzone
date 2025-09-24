@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
-import type { Order, ReconciliationReport } from '@/lib/types';
+import type { Order } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -68,24 +68,18 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
     const totalCountedMomo = useMemo(() => {
         return momoTransactions.reduce((total, amount) => total + amount, 0);
     }, [momoTransactions]);
-
-    const totalMiscExpenses = useMemo(() => (stats?.miscCashExpenses || 0) + (stats?.miscMomoExpenses || 0), [stats]);
-
-    const expectedMoney = useMemo(() => {
-        if (!stats) return 0;
-        return (stats.cashSales - stats.miscCashExpenses) + (stats.momoSales - stats.miscMomoExpenses);
-    }, [stats]);
-      
+    
+    const expectedCash = useMemo(() => (stats?.cashSales || 0) - (stats?.miscCashExpenses || 0), [stats]);
+    
     const availableMoney = useMemo(() => {
-        if (!stats) return 0;
-        let available = totalCountedCash + totalCountedMomo - stats.totalPardonedAmount;
+        let available = totalCountedCash;
         if (deductCustomerChange) {
             available -= stats.changeOwedForPeriod;
         }
         return available;
-    }, [totalCountedCash, totalCountedMomo, stats, deductCustomerChange]);
+    }, [totalCountedCash, stats, deductCustomerChange]);
 
-    const balanceDifference = availableMoney - expectedMoney;
+    const balanceDifference = availableMoney - expectedCash;
     const isBalanced = Math.abs(balanceDifference) < 0.01;
 
     const resetForm = useCallback(() => {
@@ -107,13 +101,13 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                 timestamp: serverTimestamp(),
                 period: format(today, 'yyyy-MM-dd'),
                 totalSales: stats.totalSales,
-                expectedCash: stats.cashSales - stats.miscCashExpenses,
+                expectedCash: expectedCash,
                 expectedMomo: stats.momoSales - stats.miscMomoExpenses,
-                totalExpectedRevenue: expectedMoney,
+                totalExpectedRevenue: expectedCash + (stats.momoSales - stats.miscMomoExpenses),
                 countedCash: totalCountedCash,
                 countedMomo: totalCountedMomo,
                 totalCountedRevenue: totalCountedCash + totalCountedMomo,
-                totalDiscrepancy: balanceDifference,
+                totalDiscrepancy: (totalCountedCash + totalCountedMomo) - (expectedCash + (stats.momoSales - stats.miscMomoExpenses)),
                 notes: notes,
                 changeOwedForPeriod: stats.changeOwedForPeriod,
                 changeOwedSetAside: deductCustomerChange,
@@ -250,20 +244,24 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
           </Dialog>
         );
     };
+    
+    const confirmationDescription = `You are about to finalize the financial report for today. ${
+        stats.changeOwedForPeriod > 0
+            ? `You have indicated that customer change of ${formatCurrency(stats.changeOwedForPeriod)} will be ${deductCustomerChange ? 'DEDUCTED from the available cash' : 'LEFT IN the cash drawer'}.`
+            : ''
+    } This action cannot be undone.`;
 
     return (
-        <div className="h-full flex flex-col">
-            <div className="p-4 md:p-6 border-b">
-                <div className="flex items-center gap-4">
+        <ScrollArea className="h-full">
+            <div className="p-4 md:p-6 h-full flex flex-col">
+                <div className="flex items-center gap-4 mb-6">
                     <Button variant="outline" size="icon" onClick={onBack}><ArrowLeft/></Button>
                     <div>
                         <h1 className="text-2xl md:text-3xl font-bold text-foreground">End-of-Day Reconciliation</h1>
                         <p className="text-muted-foreground">Complete daily cash reconciliation for {format(today, "EEEE, MMMM dd, yyyy")}</p>
                     </div>
                 </div>
-            </div>
-             <ScrollArea className="flex-1">
-                <div className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
                     <div className="lg:col-span-2 space-y-6">
                         <Card><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Banknote className="h-5 w-5 text-green-600" />Physical Cash Count</CardTitle><CardDescription>Count each denomination in your cash drawer</CardDescription></CardHeader><CardContent>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">{cashDenominations.map(den => (<div key={den} className="space-y-2"><Label className="text-sm font-medium text-foreground">GH₵{den}</Label><div className="flex items-center gap-2 p-3 bg-secondary rounded-lg border"><span className="text-sm text-muted-foreground min-w-[20px]">×</span><Input type="text" inputMode="numeric" value={denominationQuantities[String(den)]} onChange={(e) => handleDenominationChange(e.target.value, String(den))} placeholder="0" className="text-center font-medium border-0 bg-transparent p-0 h-auto focus-visible:ring-1" /><div className="text-xs text-center text-muted-foreground">{denominationQuantities[String(den)] ? formatCurrency(den * (parseInt(String(denominationQuantities[String(den)])) || 0)) : ''}</div></div></div>))}</div>
@@ -275,39 +273,62 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                             <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4"><div className="flex justify-between items-center"><span className="font-semibold text-purple-800 dark:text-purple-200">Total MoMo Counted:</span><span className="text-xl font-bold text-purple-600 dark:text-purple-400">{formatCurrency(totalCountedMomo)}</span></div></div>
                         </CardContent></Card>
                         {stats.changeOwedForPeriod > 0 && (<Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/50"><CardHeader className="pb-4"><CardTitle className="flex items-center gap-2 text-lg text-orange-800 dark:text-orange-200"><ArrowRightLeft className="h-5 w-5" />Customer Change Management</CardTitle><CardDescription>You owe {formatCurrency(stats.changeOwedForPeriod)} in customer change</CardDescription></CardHeader><CardContent>
-                            <div className="flex items-center justify-between p-4 bg-background rounded-lg"><div className="flex items-center space-x-3"><Switch id="deduct-change" checked={deductCustomerChange} onCheckedChange={setDeductCustomerChange} /><Label htmlFor="deduct-change" className="font-medium">Deduct customer change from available money?</Label></div></div>
-                            <p className="text-sm text-muted-foreground mt-3">{deductCustomerChange ? "Change will be set aside and deducted from your available money" : "Change will be counted as part of available money"}</p>
+                            <div className="flex items-center justify-between p-4 bg-background rounded-lg"><div className="flex items-center space-x-3"><Switch id="deduct-change" checked={deductCustomerChange} onCheckedChange={setDeductCustomerChange} /><Label htmlFor="deduct-change" className="font-medium">Deduct customer change from available cash?</Label></div></div>
+                            <p className="text-sm text-muted-foreground mt-3">{deductCustomerChange ? "Change will be set aside and deducted from your available cash" : "Change will be counted as part of available cash"}</p>
                         </CardContent></Card>)}
                     </div>
                     <div className="space-y-6">
-                        <Card><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Calculator className="h-5 w-5 text-foreground" />Reconciliation Summary</CardTitle></CardHeader><CardContent><div className="space-y-4">
-                            <div className="p-4 rounded-lg bg-secondary"><p className="text-sm text-muted-foreground">Expected Money</p><p className="text-2xl font-bold">{formatCurrency(expectedMoney)}</p><p className="text-xs text-muted-foreground">(Total Sales - Expenses)</p></div>
-                            <div className="p-4 rounded-lg bg-secondary"><p className="text-sm text-muted-foreground">Counted Money</p><p className="text-2xl font-bold">{formatCurrency(totalCountedCash + totalCountedMomo)}</p><p className="text-xs text-muted-foreground">(Cash + MoMo)</p></div>
-                            <div className="p-4 rounded-lg bg-secondary"><p className="text-sm text-muted-foreground">Available Money</p><p className="text-2xl font-bold">{formatCurrency(availableMoney)}</p><p className="text-xs text-muted-foreground">(Counted - Pardons - Change)</p></div>
-                        </div></CardContent></Card>
+                        <Card>
+                            <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Calculator className="h-5 w-5 text-foreground" />Reconciliation Summary</CardTitle></CardHeader>
+                            <CardContent><div className="space-y-4">
+                                <div className="p-4 rounded-lg bg-secondary space-y-2">
+                                    <div className="flex justify-between items-center"><p className="text-sm text-muted-foreground">Expected Cash</p><p className="font-semibold">{formatCurrency(expectedCash)}</p></div>
+                                    <div className="flex justify-between items-center"><p className="text-sm text-muted-foreground">Available Cash</p><p className="font-semibold">{formatCurrency(availableMoney)}</p></div>
+                                    <Separator/>
+                                    <div className={`flex justify-between items-center font-bold ${balanceStatus.color}`}>
+                                        <p>Cash Discrepancy</p>
+                                        <p>{formatCurrency(balanceDifference)}</p>
+                                    </div>
+                                </div>
+                                <div className="p-4 rounded-lg bg-secondary space-y-2">
+                                    <div className="flex justify-between items-center"><p className="text-sm text-muted-foreground">Expected MoMo</p><p className="font-semibold">{formatCurrency(stats.momoSales - stats.miscMomoExpenses)}</p></div>
+                                    <div className="flex justify-between items-center"><p className="text-sm text-muted-foreground">Counted MoMo</p><p className="font-semibold">{formatCurrency(totalCountedMomo)}</p></div>
+                                    <Separator/>
+                                     <div className={`flex justify-between items-center font-bold ${totalCountedMomo - (stats.momoSales - stats.miscMomoExpenses) === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        <p>MoMo Discrepancy</p>
+                                        <p>{formatCurrency(totalCountedMomo - (stats.momoSales - stats.miscMomoExpenses))}</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
                         <Card className={`border-2 ${balanceStatus.bg}`}><CardContent className="p-6"><div className="flex items-center justify-center space-x-3">
                             <balanceStatus.icon className={`h-6 w-6 ${balanceStatus.color}`} />
-                            <div className="text-center"><p className="text-sm font-medium text-foreground">Balance Status</p><p className={`text-xl font-bold ${balanceStatus.color}`}>{balanceStatus.text}</p></div>
+                            <div className="text-center"><p className="text-sm font-medium text-foreground">Cash Balance</p><p className={`text-xl font-bold ${balanceStatus.color}`}>{balanceStatus.text}</p></div>
                         </div></CardContent></Card>
+                        
                         <Card><CardHeader><CardTitle className="text-lg">Notes</CardTitle></CardHeader><CardContent>
                             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add any notes for discrepancy..." />
                         </CardContent></Card>
+                        
                         <div className="space-y-3 pt-4">
                             <Button variant="outline" className="w-full" onClick={() => setShowAuditModal(true)}><FileText className="mr-2 h-4 w-4" />Cross-Check Orders</Button>
                             <Button className="w-full h-12 text-lg font-semibold" onClick={() => setShowConfirm(true)} disabled={isSubmitting}>{isSubmitting ? <LoadingSpinner/> : isBalanced ? "Finalize Day" : "Finalize with Discrepancy"}</Button>
                         </div>
                     </div>
                 </div>
-            </ScrollArea>
+            </div>
             {showAuditModal && <AdvancedReconciliationModal />}
             <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}><AlertDialogContent>
-                <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action will finalize the financial report for today. It cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>{confirmationDescription}</AlertDialogDescription>
+                </AlertDialogHeader>
                 <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleSaveReport}>Continue</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent></AlertDialog>
-        </div>
+        </ScrollArea>
     );
 };
 
 export default ReconciliationView;
-
     

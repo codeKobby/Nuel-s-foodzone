@@ -4,11 +4,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, query, where, getDocs, Timestamp, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
+import type { Order, ReconciliationReport } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import ReconciliationView from './ReconciliationView';
 import FinancialSummaryView from './FinancialSummaryView';
+import HistoryView from './HistoryView';
 import { isToday } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface PeriodStats {
     totalSales: number;
@@ -176,12 +178,27 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
     }
 
     return (
-        <FinancialSummaryView 
-            stats={stats!}
-            allUnpaidOrdersTotal={allUnpaidOrdersTotal}
-            isTodayClosedOut={isTodayClosedOut}
-            onStartEndDay={() => setShowReconciliation(true)}
-        />
+        <div className="h-full flex flex-col">
+            <Tabs defaultValue="summary" className="flex-1 flex flex-col">
+                <div className="px-4 md:px-6 pt-4">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="summary">Today's Summary</TabsTrigger>
+                        <TabsTrigger value="history">History</TabsTrigger>
+                    </TabsList>
+                </div>
+                <TabsContent value="summary" className="flex-1 overflow-y-auto">
+                    <FinancialSummaryView 
+                        stats={stats!}
+                        allUnpaidOrdersTotal={allUnpaidOrdersTotal}
+                        isTodayClosedOut={isTodayClosedOut}
+                        onStartEndDay={() => setShowReconciliation(true)}
+                    />
+                </TabsContent>
+                <TabsContent value="history" className="flex-1 overflow-y-auto">
+                    <HistoryView />
+                </TabsContent>
+            </Tabs>
+        </div>
     );
 };
 
