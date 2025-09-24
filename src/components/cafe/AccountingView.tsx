@@ -78,20 +78,20 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     
     const [deductCustomerChange, setDeductCustomerChange] = useState(true);
     const cashDenominations = [200, 100, 50, 20, 10, 5, 2, 1];
-    const [denominationQuantities, setDenominationQuantities] = useState(
-      cashDenominations.reduce((acc, val) => ({ ...acc, [val]: '' }), {})
+    const [denominationQuantities, setDenominationQuantities] = useState<Record<string, string>>(
+      cashDenominations.reduce((acc, val) => ({ ...acc, [String(val)]: '' }), {})
     );
   
     const [momoTransactions, setMomoTransactions] = useState<number[]>([]);
     const [momoInput, setMomoInput] = useState('');
 
     const isTodayClosedOut = useMemo(() => {
-        return reports.some(report => isToday(report.timestamp.toDate()));
+        return reports.some(report => report.timestamp && isToday(report.timestamp.toDate()));
     }, [reports]);
 
     const totalCountedCash = useMemo(() => {
         return cashDenominations.reduce((total, den) => {
-            const quantity = parseInt(String(denominationQuantities[den] || '0')) || 0;
+            const quantity = parseInt(String(denominationQuantities[String(den)] || '0')) || 0;
             return total + (den * quantity);
         }, 0);
     }, [denominationQuantities]);
@@ -300,9 +300,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
       if (isBalanced) {
         return { color: 'text-green-600', bg: 'bg-green-50 border-green-200', icon: CheckCircle, text: 'Balanced' };
       } else if (balanceDifference > 0) {
-        return { color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200', icon: AlertTriangle, text: `Surplus: ${formatCurrency(balanceDifference)}` };
+        return { color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200', icon: AlertTriangleIcon, text: `Surplus: ${formatCurrency(balanceDifference)}` };
       } else {
-        return { color: 'text-red-600', bg: 'bg-red-50 border-red-200', icon: AlertTriangle, text: `Deficit: ${formatCurrency(Math.abs(balanceDifference))}` };
+        return { color: 'text-red-600', bg: 'bg-red-50 border-red-200', icon: AlertTriangleIcon, text: `Deficit: ${formatCurrency(Math.abs(balanceDifference))}` };
       }
     };
 
@@ -326,7 +326,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
         const filteredOrders = useMemo(() => stats?.orders.filter(order =>
           order.simplifiedId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          order.tag?.toLowerCase().includes(searchQuery.toLowerCase())
+          (order.tag && order.tag.toLowerCase().includes(searchQuery.toLowerCase()))
         ) || [], [stats?.orders, searchQuery]);
     
         const checkedTotal = useMemo(() => filteredOrders
@@ -393,9 +393,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2">
                                   <span className="font-semibold text-lg">{order.simplifiedId}</span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {order.tag}
-                                  </Badge>
+                                  {order.tag && <Badge variant="outline" className="text-xs">{order.tag}</Badge>}
                                   <Badge variant={order.paymentStatus === 'Paid' ? 'default' : 'secondary'} className="text-xs">
                                     {order.paymentStatus}
                                   </Badge>
@@ -749,8 +747,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             <div key={report.id} className="p-4 mb-3 border rounded-lg bg-gray-50">
                                 <div className="flex justify-between items-center mb-2">
                                     <div>
-                                        <p className="font-bold">{format(report.timestamp.toDate(), 'EEEE, LLL dd, yyyy')}</p>
-                                        <p className="text-xs text-gray-500">{formatTimestamp(report.timestamp)}</p>
+                                        <p className="font-bold">{report.timestamp ? format(report.timestamp.toDate(), 'EEEE, LLL dd, yyyy') : 'Invalid Date'}</p>
+                                        <p className="text-xs text-gray-500">{report.timestamp ? formatTimestamp(report.timestamp) : ''}</p>
                                     </div>
                                     <Badge variant={report.totalDiscrepancy === 0 ? 'default' : 'destructive'}>
                                         {formatCurrency(report.totalDiscrepancy)}
@@ -785,3 +783,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
       </div>
     );
 };
+
+export default AccountingView;
+
+    

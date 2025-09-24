@@ -25,7 +25,6 @@ import {
   ChartTooltipContent,
   ChartConfig,
   ChartArea,
-  ChartLine as ChartLineRecharts,
 } from "@/components/ui/chart"
 import { Area, ComposedChart, CartesianGrid, XAxis, YAxis, Line as ChartLine } from 'recharts';
 
@@ -582,30 +581,36 @@ const DashboardView: React.FC = () => {
               <CardDescription>Daily breakdown of new sales vs. collections on old debts</CardDescription>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                <ComposedChart data={stats.salesData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
-                  <ChartTooltip
-                    content={({ payload, label }) => (
-                      <ChartTooltipContent
-                        label={label}
-                        payload={payload || []}
-                        formatter={(value, name, props) => (
-                          <div className="flex flex-col">
-                            <span className="font-bold">{formatCurrency(value as number)}</span>
-                            {props.payload.cashierNames && <span className="text-xs text-muted-foreground">{props.payload.cashierNames}</span>}
-                          </div>
-                        )}
-                      />
-                    )}
-                  />
-                  <ChartArea dataKey="collections" type="natural" fill="var(--color-collections)" fillOpacity={0.4} stroke="var(--color-collections)" stackId="a" />
-                  <ChartArea dataKey="newSales" type="natural" fill="var(--color-newSales)" fillOpacity={0.4} stroke="var(--color-newSales)" stackId="a" />
-                   <ChartLineRecharts dataKey="expenses" type="monotone" stroke="var(--color-expenses)" strokeWidth={2} dot={false} />
-                </ComposedChart>
-              </ChartContainer>
+              {stats.salesData && stats.salesData.length > 0 ? (
+                <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                  <ComposedChart data={stats.salesData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
+                    <ChartTooltip
+                      content={({ payload, label }) => (
+                        <ChartTooltipContent
+                          label={label}
+                          payload={payload || []}
+                          formatter={(value, name, props) => (
+                            <div className="flex flex-col">
+                              <span className="font-bold">{formatCurrency(value as number)}</span>
+                              {props.payload.cashierNames && <span className="text-xs text-muted-foreground">{props.payload.cashierNames}</span>}
+                            </div>
+                          )}
+                        />
+                      )}
+                    />
+                    <Area dataKey="collections" type="natural" fill="var(--color-collections)" fillOpacity={0.4} stroke="var(--color-collections)" stackId="a" />
+                    <Area dataKey="newSales" type="natural" fill="var(--color-newSales)" fillOpacity={0.4} stroke="var(--color-newSales)" stackId="a" />
+                    <ChartLine dataKey="expenses" type="monotone" stroke="var(--color-expenses)" strokeWidth={2} dot={false} />
+                  </ComposedChart>
+                </ChartContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  No sales data available for this period.
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
