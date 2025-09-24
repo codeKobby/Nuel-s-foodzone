@@ -61,11 +61,16 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                 where("timestamp", ">=", startDateTimestamp),
                 where("timestamp", "<=", endDateTimestamp)
             );
+            
+            const allUnpaidOrdersQuery = query(collection(db, "orders"), where("balanceDue", ">", 0));
 
-            const [todayOrdersSnapshot, todayMiscSnapshot] = await Promise.all([
+            const [todayOrdersSnapshot, todayMiscSnapshot, allUnpaidOrdersSnapshot] = await Promise.all([
                 getDocs(todayOrdersQuery),
                 getDocs(todayMiscQuery),
+                getDocs(allUnpaidOrdersQuery),
             ]);
+            
+            setAllUnpaidOrdersTotal(allUnpaidOrdersSnapshot.docs.reduce((sum, doc) => sum + doc.data().balanceDue, 0));
 
             let totalSales = 0;
             let cashSales = 0;
@@ -153,6 +158,8 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
         const unsubscribeUnpaid = onSnapshot(unpaidOrdersQuery, (snapshot) => {
             const total = snapshot.docs.reduce((sum, doc) => sum + doc.data().balanceDue, 0);
             setAllUnpaidOrdersTotal(total);
+        }, (err) => {
+            console.error("Error fetching all unpaid orders total:", err);
         });
 
         return () => {
@@ -186,7 +193,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         <TabsTrigger value="history">History</TabsTrigger>
                     </TabsList>
                 </div>
-                <TabsContent value="summary" className="flex-1 overflow-y-auto">
+                <TabsContent value="summary" className="flex-1 overflow-hidden">
                     <FinancialSummaryView 
                         stats={stats!}
                         allUnpaidOrdersTotal={allUnpaidOrdersTotal}
