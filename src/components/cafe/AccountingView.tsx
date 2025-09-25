@@ -189,15 +189,19 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     <TabsTrigger value="summary">Financial Summary</TabsTrigger>
                     <TabsTrigger value="history">History</TabsTrigger>
                 </TabsList>
-                <TabsContent value="summary" className="flex-1 overflow-y-auto">
-                     {stats ? (
-                        <FinancialSummaryView stats={stats} allUnpaidOrdersTotal={allUnpaidOrdersTotal} />
-                    ) : (
-                        <p className="p-6 text-muted-foreground">No data for today.</p>
-                    )}
+                <TabsContent value="summary" className="flex-1 overflow-hidden">
+                     <ScrollArea className="h-full">
+                        {stats ? (
+                            <FinancialSummaryView stats={stats} allUnpaidOrdersTotal={allUnpaidOrdersTotal} />
+                        ) : (
+                            <p className="p-6 text-muted-foreground">No data for today.</p>
+                        )}
+                    </ScrollArea>
                 </TabsContent>
-                <TabsContent value="history" className="flex-1 overflow-y-auto">
-                    <HistoryView />
+                <TabsContent value="history" className="flex-1 overflow-hidden">
+                    <ScrollArea className="h-full">
+                        <HistoryView />
+                    </ScrollArea>
                 </TabsContent>
             </Tabs>
         </div>
