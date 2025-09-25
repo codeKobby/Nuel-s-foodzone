@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import FinancialSummaryView from '@/components/cafe/FinancialSummaryView';
 import ReconciliationView from '@/components/cafe/ReconciliationView';
 import HistoryView from '@/components/cafe/HistoryView';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface PeriodStats {
     totalSales: number;
@@ -57,7 +58,14 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             // Fetch all-time unpaid orders total separately for accuracy
             const allUnpaidQuery = query(collection(db, "orders"), where("paymentStatus", "in", ["Unpaid", "Partially Paid"]));
             const allUnpaidSnapshot = await getDocs(allUnpaidQuery);
-            const totalUnpaidValue = allUnpaidSnapshot.docs.reduce((sum, doc) => sum + (doc.data().balanceDue || 0), 0);
+            const totalUnpaidValue = allUnpaidSnapshot.docs.reduce((sum, doc) => {
+                 const orderData = doc.data() as Order;
+                 // Only add positive balances, ignore credit balances
+                 if (orderData.balanceDue > 0) {
+                    return sum + orderData.balanceDue;
+                 }
+                 return sum;
+            }, 0);
             setAllUnpaidOrdersTotal(totalUnpaidValue);
             
             // Fetch today's data
@@ -144,7 +152,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     }, [orders, miscExpenses, loading, todayStart, todayEnd]);
     
     const unpaidOrdersToday = useMemo(() => {
-        return orders.filter(o => o.paymentStatus !== 'Paid');
+        return orders.filter(o => o.paymentStatus !== 'Paid' && o.balanceDue > 0);
     }, [orders]);
     
     const handleStartEndDay = () => {
@@ -170,8 +178,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
     return (
         <div className="h-full flex flex-col bg-background">
-            <Tabs defaultValue="summary" className="flex-1 flex flex-col">
-                <div className="p-4 md:p-6 border-b">
+            <Tabs defaultValue="summary" className="flex-1 flex flex-col overflow-hidden">
+                <div className="p-4 md:p-6 border-b flex-shrink-0">
                      <div className="flex justify-between items-center mb-4">
                         <h1 className="text-2xl md:text-3xl font-bold">Accounting</h1>
                         <Button onClick={handleStartEndDay} disabled={isTodayClosedOut}>
@@ -184,8 +192,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         <TabsTrigger value="history">History</TabsTrigger>
                     </TabsList>
                 </div>
-                <TabsContent value="summary" className="flex-1 overflow-auto">
-                    {stats ? (
+                <TabsContent value="summary" className="flex-1 overflow-y-auto">
+                     {stats ? (
                         <FinancialSummaryView
                             stats={stats}
                             allUnpaidOrdersTotal={allUnpaidOrdersTotal}
@@ -196,7 +204,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         <p className="p-6 text-muted-foreground">No data for today.</p>
                     )}
                 </TabsContent>
-                <TabsContent value="history" className="flex-1 overflow-auto">
+                <TabsContent value="history" className="flex-1 overflow-y-auto">
                     <HistoryView />
                 </TabsContent>
             </Tabs>
