@@ -87,7 +87,7 @@ const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalProps> = 
                                             <div>
                                                 <span className="font-semibold">{order.simplifiedId}</span>
                                                 {order.tag && <span className="text-muted-foreground ml-2">({order.tag})</span>}
-                                                <p className="text-xs text-muted-foreground">{formatTimestamp(order.timestamp)}</p>
+                                                <p className="text-xs text-muted-foreground">{formatTimestamp(order.timestamp, true)}</p>
                                             </div>
                                             <div className="text-right">
                                                <p className="font-bold">{formatCurrency(order.total)}</p>
@@ -129,5 +129,3 @@ const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalProps> = 
 };
 
 export default AdvancedReconciliationModal;
-
-    
