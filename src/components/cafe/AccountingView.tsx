@@ -195,10 +195,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 where("timestamp", "<=", endDateTimestamp)
             );
             
-            // CORRECTED: Query for all unpaid orders (all time)
+            // Query for all unpaid orders (all time)
             const allUnpaidOrdersQuery = query(
                 collection(db, "orders"), 
-                where("balanceDue", ">", 0)
+                where("paymentStatus", "in", ["Unpaid", "Partially Paid"])
             );
 
             // Query for orders settled today (from previous days)
@@ -229,10 +229,18 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             let settledUnpaidOrdersValue = 0;
             let previousDaysChangeGiven = 0;
 
-            // CORRECTED: Process all unpaid orders (all time)
+            // Process all unpaid orders (all time)
             allUnpaidOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
-                allTimeUnpaidOrdersValue += order.balanceDue;
+                if (order.balanceDue > 0) {
+                    allTimeUnpaidOrdersValue += order.balanceDue;
+                }
+                
+                // Check if this unpaid order is from today
+                const orderDate = order.timestamp.toDate();
+                if (orderDate >= today && orderDate <= todayEnd && order.balanceDue > 0) {
+                    todayUnpaidOrdersValue += order.balanceDue;
+                }
             });
 
             // Process orders settled today (from previous days)
@@ -255,11 +263,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             todayOrdersSnapshot.docs.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 todayOrders.push(order);
-
-                // Add to today's unpaid value if applicable
-                if (order.balanceDue > 0) {
-                    todayUnpaidOrdersValue += order.balanceDue;
-                }
 
                 // Calculate pardoned amounts
                 if (order.pardonedAmount && order.pardonedAmount > 0) {
@@ -387,7 +390,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         setIsSubmitting(true);
         
         try {
-            const reportData: Omit<ReconciliationReport, 'id' | 'cashierId' | 'cashierName'> = {
+            const reportData: Omit<ReconciliationReport, 'id'| 'cashierId' | 'cashierName'> = {
                 timestamp: serverTimestamp(),
                 period: format(today, 'yyyy-MM-dd'),
                 totalSales: stats.totalSales,
