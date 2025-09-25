@@ -89,17 +89,19 @@ const RewardsView: React.FC = () => {
         const numBags = parseInt(bagsToAdd, 10);
         if (isNaN(numBags) || numBags <= 0) return;
         
+        setUpdatingCustomerId(customerId);
         try {
             await updateDoc(doc(db, 'rewards', customerId), {
                 bagCount: currentBags + numBags,
                 updatedAt: serverTimestamp(),
             });
             toast({ type: 'success', title: 'Bags Updated', description: `Added ${numBags} bag(s).` });
-            setUpdatingCustomerId(null);
             setBagsToAdd('');
         } catch (e) {
             console.error(e);
              toast({ type: 'error', title: 'Error', description: 'Failed to update bag count.' });
+        } finally {
+            setUpdatingCustomerId(null); // This will close the popover and re-enable button
         }
     };
 
@@ -125,6 +127,7 @@ const RewardsView: React.FC = () => {
                 {filteredRewards.map(reward => {
                     const discount = Math.floor(reward.bagCount / 5) * 10;
                     const canClaim = discount > 0;
+                    const isUpdatingThisCustomer = updatingCustomerId === reward.id;
                     
                     return (
                         <div key={reward.id} className="p-4 bg-card rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -145,7 +148,7 @@ const RewardsView: React.FC = () => {
                                 </div>
                             </div>
 
-                             <Popover onOpenChange={(open) => { if(!open) { setUpdatingCustomerId(null); setBagsToAdd(''); }}}>
+                             <Popover open={isUpdatingThisCustomer} onOpenChange={(open) => { if(!open) { setUpdatingCustomerId(null); setBagsToAdd(''); }}}>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" size="sm" onClick={() => setUpdatingCustomerId(reward.id)}>
                                         <PlusCircle className="h-4 w-4 mr-2"/> Add Bags
@@ -166,8 +169,11 @@ const RewardsView: React.FC = () => {
                                                 value={bagsToAdd} 
                                                 onChange={(e) => setBagsToAdd(e.target.value)} 
                                                 autoFocus
+                                                disabled={isUpdatingThisCustomer}
                                             />
-                                            <Button onClick={() => handleUpdateBags(reward.id, reward.bagCount)}>Save</Button>
+                                            <Button onClick={() => handleUpdateBags(reward.id, reward.bagCount)} disabled={isUpdatingThisCustomer || !bagsToAdd}>
+                                                {isUpdatingThisCustomer ? <LoadingSpinner/> : 'Save'}
+                                            </Button>
                                         </div>
                                     </div>
                                 </PopoverContent>
