@@ -11,8 +11,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, User, UserPlus, PlusCircle, X, Gift, Package, BadgeCheck } from 'lucide-react';
+import { Search, User, UserPlus, PlusCircle, Gift, Package, BadgeCheck } from 'lucide-react';
 import { EmptyState } from '@/components/shared/ErrorPages';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -43,7 +42,7 @@ const RewardsView: React.FC = () => {
     const [rewards, setRewards] = useState<CustomerReward[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [isAdding, setIsAdding] = useState(false);
+    const [isAddingCustomer, setIsAddingCustomer] = useState(false);
     const [newCustomerTag, setNewCustomerTag] = useState('');
     const [updatingCustomerId, setUpdatingCustomerId] = useState<string | null>(null);
     const [bagsToAdd, setBagsToAdd] = useState('');
@@ -67,7 +66,7 @@ const RewardsView: React.FC = () => {
 
     const handleAddCustomer = async () => {
         if (!newCustomerTag.trim()) return;
-        setIsAdding(true);
+        setIsAddingCustomer(true);
         try {
             await addDoc(collection(db, 'rewards'), {
                 customerTag: newCustomerTag,
@@ -81,13 +80,16 @@ const RewardsView: React.FC = () => {
             console.error(e);
             toast({ type: 'error', title: 'Error', description: 'Could not add new customer.' });
         } finally {
-            setIsAdding(false);
+            setIsAddingCustomer(false);
         }
     };
     
     const handleUpdateBags = async (customerId: string, currentBags: number) => {
         const numBags = parseInt(bagsToAdd, 10);
-        if (isNaN(numBags) || numBags <= 0) return;
+        if (isNaN(numBags) || numBags <= 0) {
+            toast({type: 'error', title: 'Invalid number', description: 'Please enter a valid number of bags.'});
+            return;
+        };
         
         setUpdatingCustomerId(customerId);
         try {
@@ -97,11 +99,13 @@ const RewardsView: React.FC = () => {
             });
             toast({ type: 'success', title: 'Bags Updated', description: `Added ${numBags} bag(s).` });
             setBagsToAdd('');
+            setUpdatingCustomerId(null); // This will close the popover
         } catch (e) {
             console.error(e);
              toast({ type: 'error', title: 'Error', description: 'Failed to update bag count.' });
         } finally {
-            setUpdatingCustomerId(null); // This will close the popover and re-enable button
+            // State is set to null on success, but also set it here in case of error
+             setUpdatingCustomerId(null); 
         }
     };
 
@@ -127,7 +131,6 @@ const RewardsView: React.FC = () => {
                 {filteredRewards.map(reward => {
                     const discount = Math.floor(reward.bagCount / 5) * 10;
                     const canClaim = discount > 0;
-                    const isUpdatingThisCustomer = updatingCustomerId === reward.id;
                     
                     return (
                         <div key={reward.id} className="p-4 bg-card rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -148,9 +151,9 @@ const RewardsView: React.FC = () => {
                                 </div>
                             </div>
 
-                             <Popover open={isUpdatingThisCustomer} onOpenChange={(open) => { if(!open) { setUpdatingCustomerId(null); setBagsToAdd(''); }}}>
+                             <Popover onOpenChange={(open) => { if(!open) setUpdatingCustomerId(null)}}>
                                 <PopoverTrigger asChild>
-                                    <Button variant="outline" size="sm" onClick={() => setUpdatingCustomerId(reward.id)}>
+                                    <Button variant="outline" size="sm">
                                         <PlusCircle className="h-4 w-4 mr-2"/> Add Bags
                                     </Button>
                                 </PopoverTrigger>
@@ -169,10 +172,10 @@ const RewardsView: React.FC = () => {
                                                 value={bagsToAdd} 
                                                 onChange={(e) => setBagsToAdd(e.target.value)} 
                                                 autoFocus
-                                                disabled={isUpdatingThisCustomer}
+                                                disabled={updatingCustomerId === reward.id}
                                             />
-                                            <Button onClick={() => handleUpdateBags(reward.id, reward.bagCount)} disabled={isUpdatingThisCustomer || !bagsToAdd}>
-                                                {isUpdatingThisCustomer ? <LoadingSpinner/> : 'Save'}
+                                            <Button onClick={() => handleUpdateBags(reward.id, reward.bagCount)} disabled={updatingCustomerId === reward.id || !bagsToAdd}>
+                                                {updatingCustomerId === reward.id ? <LoadingSpinner/> : 'Save'}
                                             </Button>
                                         </div>
                                     </div>
@@ -202,7 +205,7 @@ const RewardsView: React.FC = () => {
                                 <div className="p-4">
                                 <AddCustomerForm 
                                     onAdd={handleAddCustomer}
-                                    isAdding={isAdding}
+                                    isAdding={isAddingCustomer}
                                     newCustomerTag={newCustomerTag}
                                     setNewCustomerTag={setNewCustomerTag}
                                 />
@@ -239,7 +242,7 @@ const RewardsView: React.FC = () => {
                     <CardContent>
                         <AddCustomerForm 
                             onAdd={handleAddCustomer}
-                            isAdding={isAdding}
+                            isAdding={isAddingCustomer}
                             newCustomerTag={newCustomerTag}
                             setNewCustomerTag={setNewCustomerTag}
                         />
