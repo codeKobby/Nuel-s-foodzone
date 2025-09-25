@@ -55,16 +55,12 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         setError(null);
 
         try {
-            // Fetch all-time unpaid orders total separately for accuracy
-            const allUnpaidQuery = query(collection(db, "orders"), where("paymentStatus", "in", ["Unpaid", "Partially Paid"]));
+            // Correctly query for all unpaid orders (balanceDue > 0)
+            const allUnpaidQuery = query(collection(db, "orders"), where("balanceDue", ">", 0));
             const allUnpaidSnapshot = await getDocs(allUnpaidQuery);
             const totalUnpaidValue = allUnpaidSnapshot.docs.reduce((sum, doc) => {
                  const orderData = doc.data() as Order;
-                 // Only add positive balances, ignore credit balances
-                 if (orderData.balanceDue > 0) {
-                    return sum + orderData.balanceDue;
-                 }
-                 return sum;
+                 return sum + orderData.balanceDue;
             }, 0);
             setAllUnpaidOrdersTotal(totalUnpaidValue);
             
@@ -86,6 +82,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             setLoading(false);
         }
     }, [todayStart, todayEnd]);
+
 
     useEffect(() => {
         fetchAllData();
@@ -178,28 +175,23 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
     return (
         <div className="h-full flex flex-col bg-background">
-            <Tabs defaultValue="summary" className="flex-1 flex flex-col overflow-hidden">
-                <div className="p-4 md:p-6 border-b flex-shrink-0">
-                     <div className="flex justify-between items-center mb-4">
-                        <h1 className="text-2xl md:text-3xl font-bold">Accounting</h1>
-                        <Button onClick={handleStartEndDay} disabled={isTodayClosedOut}>
-                            <FileSignature className="mr-2 h-4 w-4" />
-                            {isTodayClosedOut ? 'Day Already Closed' : 'Start End-of-Day'}
-                        </Button>
-                    </div>
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="summary">Financial Summary</TabsTrigger>
-                        <TabsTrigger value="history">History</TabsTrigger>
-                    </TabsList>
+            <div className="p-4 md:p-6 border-b flex-shrink-0">
+                <div className="flex justify-between items-center mb-4">
+                    <h1 className="text-2xl md:text-3xl font-bold">Accounting</h1>
+                    <Button onClick={handleStartEndDay} disabled={isTodayClosedOut}>
+                        <FileSignature className="mr-2 h-4 w-4" />
+                        {isTodayClosedOut ? 'Day Already Closed' : 'Start End-of-Day'}
+                    </Button>
                 </div>
+            </div>
+            <Tabs defaultValue="summary" className="flex-1 flex flex-col overflow-hidden">
+                <TabsList className="grid w-full grid-cols-2 mx-auto max-w-sm">
+                    <TabsTrigger value="summary">Financial Summary</TabsTrigger>
+                    <TabsTrigger value="history">History</TabsTrigger>
+                </TabsList>
                 <TabsContent value="summary" className="flex-1 overflow-y-auto">
                      {stats ? (
-                        <FinancialSummaryView
-                            stats={stats}
-                            allUnpaidOrdersTotal={allUnpaidOrdersTotal}
-                            isTodayClosedOut={isTodayClosedOut}
-                            onStartEndDay={handleStartEndDay}
-                        />
+                        <FinancialSummaryView stats={stats} allUnpaidOrdersTotal={allUnpaidOrdersTotal} />
                     ) : (
                         <p className="p-6 text-muted-foreground">No data for today.</p>
                     )}
