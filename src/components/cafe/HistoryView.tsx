@@ -43,56 +43,54 @@ const HistoryView: React.FC = () => {
     }
 
     return (
-        <ScrollArea className="h-full">
-            <div className="p-4 md:p-6 h-full">
-                <Card className="h-full flex flex-col">
-                    <CardHeader>
-                        <CardTitle>Reconciliation History</CardTitle>
-                        <CardDescription>A log of all past end-of-day financial reports.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-1 overflow-hidden">
-                        {Object.keys(groupedReports).length > 0 ? (
-                            <div className="space-y-6">
-                                {Object.entries(groupedReports).map(([date, reportsOnDate]) => (
-                                    <div key={date}>
-                                        <h3 className="text-lg font-semibold mb-3">{date}</h3>
-                                        <div className="space-y-4">
-                                            {reportsOnDate.map(report => (
-                                                <div key={report.id} className="p-4 border rounded-lg bg-secondary">
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <p className="font-semibold text-sm">{formatTimestamp(report.timestamp)}</p>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                <p>Expected: {formatCurrency(report.totalExpectedRevenue)}</p>
-                                                                <p>Counted: {formatCurrency(report.totalCountedRevenue)}</p>
-                                                            </div>
+        <div className="p-4 md:p-6 h-full">
+            <Card className="h-full flex flex-col">
+                <CardHeader>
+                    <CardTitle>Reconciliation History</CardTitle>
+                    <CardDescription>A log of all past end-of-day financial reports.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden">
+                    {Object.keys(groupedReports).length > 0 ? (
+                        <div className="space-y-6">
+                            {Object.entries(groupedReports).map(([date, reportsOnDate]) => (
+                                <div key={date}>
+                                    <h3 className="text-lg font-semibold mb-3">{date}</h3>
+                                    <div className="space-y-4">
+                                        {reportsOnDate.map(report => (
+                                            <div key={report.id} className="p-4 border rounded-lg bg-secondary">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <p className="font-semibold text-sm">{formatTimestamp(report.timestamp)}</p>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            <p>Expected: {formatCurrency(report.totalExpectedRevenue)}</p>
+                                                            <p>Counted: {formatCurrency(report.totalCountedRevenue)}</p>
                                                         </div>
-                                                        <Badge variant={report.totalDiscrepancy === 0 ? "default" : "destructive"}>
-                                                            {report.totalDiscrepancy > 0 && <TrendingUp className="mr-1 h-3 w-3" />}
-                                                            {report.totalDiscrepancy < 0 && <TrendingDown className="mr-1 h-3 w-3" />}
-                                                            {report.totalDiscrepancy === 0 && <CheckCircle className="mr-1 h-3 w-3" />}
-                                                            {formatCurrency(report.totalDiscrepancy)}
-                                                        </Badge>
                                                     </div>
-                                                    {report.notes && (
-                                                        <p className="text-xs mt-2 italic text-muted-foreground">Note: "{report.notes}"</p>
-                                                    )}
+                                                    <Badge variant={report.totalDiscrepancy === 0 ? "default" : "destructive"}>
+                                                        {report.totalDiscrepancy > 0 && <TrendingUp className="mr-1 h-3 w-3" />}
+                                                        {report.totalDiscrepancy < 0 && <TrendingDown className="mr-1 h-3 w-3" />}
+                                                        {report.totalDiscrepancy === 0 && <CheckCircle className="mr-1 h-3 w-3" />}
+                                                        {formatCurrency(report.totalDiscrepancy)}
+                                                    </Badge>
                                                 </div>
-                                            ))}
-                                        </div>
+                                                {report.notes && (
+                                                    <p className="text-xs mt-2 italic text-muted-foreground">Note: "{report.notes}"</p>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                <AlertTriangle className="h-10 w-10 mb-4" />
-                                <p>No historical reports found.</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
-        </ScrollArea>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                            <AlertTriangle className="h-10 w-10 mb-4" />
+                            <p>No historical reports found.</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
     );
 };
 
