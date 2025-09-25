@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, Suspense, useContext } from 'react';
@@ -7,7 +6,7 @@ import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Menu, LogOut, Package, Users } from 'lucide-react';
+import { Menu, LogOut, Package, Users, Gift } from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/app/logo.png';
 
@@ -20,6 +19,7 @@ import MiscView from '@/components/cafe/MiscView';
 import AccountingView from '@/components/cafe/AccountingView';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import StockView from '@/components/cafe/StockView';
+import RewardsView from '@/components/cafe/RewardsView';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, Home, ClipboardList, Settings, BarChart2, Sun, Moon, Briefcase, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,7 @@ const MobileNav = ({
             { id: 'pos', icon: Home, label: 'POS' },
             { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
             { id: 'stock', icon: Package, label: 'Stock' },
+            { id: 'rewards', icon: Gift, label: 'Rewards' },
             { id: 'accounting', icon: Scale, label: 'Accounting' },
             { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
         ],
@@ -229,6 +230,7 @@ function CafePage() {
             case 'accounting': return isCashier ? <AccountingView setActiveView={setActiveView}/> : null;
             case 'misc': return isCashier ? <MiscView /> : null;
             case 'stock': return isCashier ? <StockView /> : null;
+            case 'rewards': return isCashier ? <RewardsView /> : null;
             
             // Manager Views
             case 'dashboard': return isManager ? <DashboardView /> : null;

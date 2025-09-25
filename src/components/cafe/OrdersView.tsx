@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useContext } from 'react';
@@ -42,7 +40,7 @@ import {
 import { Separator } from '../ui/separator';
 import { cn } from '@/lib/utils';
 import { EmptyState, LoadingError, NoSearchResults } from '@/components/shared/ErrorPages';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast.tsx';
 import { ScrollArea } from '../ui/scroll-area';
 
 
@@ -255,111 +253,6 @@ const OrderCard: React.FC<OrderCardProps> = ({
   );
 };
 
-const RewardsView = () => {
-    const [rewards, setRewards] = useState<CustomerReward[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [isAdding, setIsAdding] = useState(false);
-    const [newCustomerTag, setNewCustomerTag] = useState('');
-    const [updatingCustomerId, setUpdatingCustomerId] = useState<string | null>(null);
-    const [bagsToAdd, setBagsToAdd] = useState('');
-    const { toast } = useToast();
-
-    useEffect(() => {
-        const q = query(collection(db, "rewards"), orderBy('updatedAt', 'desc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            setRewards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerReward)));
-            setLoading(false);
-        }, (error) => {
-            console.error(error);
-            setLoading(false);
-            toast({ type: 'error', title: 'Error', description: 'Could not load rewards data.' });
-        });
-        return unsubscribe;
-    }, [toast]);
-
-    const handleAddCustomer = async () => {
-        if (!newCustomerTag.trim()) return;
-        setIsAdding(true);
-        try {
-            await addDoc(collection(db, 'rewards'), {
-                customerTag: newCustomerTag,
-                bagCount: 0,
-                updatedAt: serverTimestamp(),
-            });
-            setNewCustomerTag('');
-        } catch (e) {
-            console.error(e);
-            toast({ type: 'error', title: 'Error', description: 'Could not add new customer.' });
-        } finally {
-            setIsAdding(false);
-        }
-    };
-    
-    const handleUpdateBags = async (customerId: string, currentBags: number) => {
-        const numBags = parseInt(bagsToAdd, 10);
-        if (isNaN(numBags) || numBags <= 0) return;
-        
-        try {
-            await updateDoc(doc(db, 'rewards', customerId), {
-                bagCount: currentBags + numBags,
-                updatedAt: serverTimestamp(),
-            });
-            setUpdatingCustomerId(null);
-            setBagsToAdd('');
-        } catch (e) {
-            console.error(e);
-             toast({ type: 'error', title: 'Error', description: 'Failed to update bag count.' });
-        }
-    };
-
-    const filteredRewards = useMemo(() => {
-        return rewards.filter(r => r.customerTag.toLowerCase().includes(searchQuery.toLowerCase()));
-    }, [rewards, searchQuery]);
-    
-    return (
-        <div className="p-4 space-y-4">
-            <div className="flex gap-2">
-                <Input placeholder="New customer name..." value={newCustomerTag} onChange={e => setNewCustomerTag(e.target.value)} disabled={isAdding}/>
-                <Button onClick={handleAddCustomer} disabled={isAdding || !newCustomerTag.trim()}>
-                    {isAdding ? <LoadingSpinner/> : <UserPlus className="h-4 w-4"/>}
-                </Button>
-            </div>
-             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search customers..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
-            </div>
-
-            <ScrollArea className="h-[calc(100vh-250px)]">
-                {loading ? <LoadingSpinner/> : filteredRewards.map(reward => {
-                    const discount = Math.floor(reward.bagCount / 5) * 10;
-                    return (
-                        <Card key={reward.id} className="mb-3">
-                            <CardContent className="p-4">
-                               <div className="flex justify-between items-center">
-                                    <div>
-                                        <p className="font-bold text-lg flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground"/> {reward.customerTag}</p>
-                                        <p className="text-sm text-muted-foreground">Bags: {reward.bagCount} | Discount: {formatCurrency(discount)}</p>
-                                    </div>
-                                    <Button variant="outline" size="icon" onClick={() => setUpdatingCustomerId(reward.id)}>
-                                        <PlusCircle/>
-                                    </Button>
-                               </div>
-                               {updatingCustomerId === reward.id && (
-                                   <div className="mt-3 pt-3 border-t flex gap-2">
-                                       <Input type="number" placeholder="Bags to add" value={bagsToAdd} onChange={(e) => setBagsToAdd(e.target.value)} autoFocus/>
-                                       <Button onClick={() => handleUpdateBags(reward.id, reward.bagCount)}>Add</Button>
-                                       <Button variant="ghost" size="icon" onClick={() => setUpdatingCustomerId(null)}><X/></Button>
-                                   </div>
-                               )}
-                            </CardContent>
-                        </Card>
-                    )
-                })}
-            </ScrollArea>
-        </div>
-    );
-}
 
 interface FilterState {
   paymentStatus: string[];
@@ -647,7 +540,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
           <div className="p-4">
             {/* Top row - Title and main actions */}
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl sm:text-2xl font-bold">Manage</h1>
+              <h1 className="text-xl sm:text-2xl font-bold">Manage Orders</h1>
               <div className="flex items-center gap-2">
                 {/* Change Due Indicator */}
                 <Tooltip>
@@ -797,7 +690,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
             </div>
           ) : (
             <Tabs defaultValue="pending" className="h-full flex flex-col">
-              <TabsList className="grid w-full max-w-2xl grid-cols-4 mx-4 mt-4">
+              <TabsList className="grid w-full max-w-2xl grid-cols-3 mx-4 mt-4">
                 <TabsTrigger value="pending" className="text-xs sm:text-sm">
                   Pending ({filteredCounts.pending})
                 </TabsTrigger>
@@ -806,10 +699,6 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                 </TabsTrigger>
                 <TabsTrigger value="completed" className="text-xs sm:text-sm">
                   Completed ({filteredCounts.completed})
-                </TabsTrigger>
-                <TabsTrigger value="rewards" className="text-xs sm:text-sm">
-                  <Gift className="h-3 w-3 mr-1.5"/>
-                  Rewards
                 </TabsTrigger>
               </TabsList>
               
@@ -822,9 +711,6 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                 </TabsContent>
                 <TabsContent value="completed" className="h-full overflow-y-auto px-4 mt-4">
                   {renderGroupedOrderList(filteredOrders.completed, "No completed orders found.")}
-                </TabsContent>
-                <TabsContent value="rewards" className="h-full overflow-y-auto mt-4">
-                    <RewardsView />
                 </TabsContent>
               </div>
             </Tabs>
