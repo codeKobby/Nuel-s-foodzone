@@ -43,12 +43,21 @@ export interface Order {
   status: 'Pending' | 'Completed';
   timestamp: Timestamp;
   creditSource?: string[];
+  rewardDiscount?: number;
+  rewardCustomerTag?: string;
   lastPaymentTimestamp?: Timestamp;
   lastPaymentAmount?: number;
   settledOn?: Timestamp;
   notes?: string;
   cashierId: string;
   cashierName: string;
+}
+
+export interface CustomerReward {
+  id: string;
+  customerTag: string;
+  bagCount: number;
+  updatedAt: Timestamp;
 }
 
 export interface MiscExpense {

@@ -1,22 +1,31 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc, writeBatch, serverTimestamp, collection, Timestamp, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, writeBatch, serverTimestamp, collection, Timestamp, runTransaction, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
-import type { OrderItem, Order } from '@/lib/types';
+import type { OrderItem, Order, CustomerReward } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Calculator, Info } from 'lucide-react';
+import { AlertTriangle, Calculator, Info, Gift, Search as SearchIcon, User as UserIcon } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { AuthContext } from '@/context/AuthContext';
 import { useContext } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
+interface RewardApplication {
+    customer: CustomerReward;
+    discount: number;
+    bagsUsed: number;
+}
 
 interface OrderOptionsModalProps {
     total: number;
@@ -42,6 +51,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { session } = useContext(AuthContext);
+  const [isApplyingReward, setIsApplyingReward] = useState(false);
+  const [rewardSearch, setRewardSearch] = useState('');
+  const [rewardCustomers, setRewardCustomers] = useState<CustomerReward[]>([]);
+  const [reward, setReward] = useState<RewardApplication | null>(null);
 
   useEffect(() => {
     if (editingOrder) {
@@ -49,6 +62,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
       setOrderTag(editingOrder.tag || '');
     }
   }, [editingOrder]);
+
+  const finalTotal = Math.max(0, total - (reward?.discount ?? 0));
 
   const calculateBalances = () => {
     const newPaymentAmount = parseFloat(amountPaidInput) || 0;
@@ -65,12 +80,12 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     const finalAmountPaid = totalPaidSoFar + newPaymentAmount;
     const finalChangeGiven = changeGivenSoFar + changeGivenNum;
     
-    let newBalance = total - finalAmountPaid;
+    let newBalance = finalTotal - finalAmountPaid;
     
     const deficit = newBalance > 0 ? newBalance : 0;
     let change = 0;
      if (paymentMethod === 'cash' && newPaymentAmount > 0) {
-      const amountOwedNow = editingOrder ? total - editingOrder.amountPaid : total;
+      const amountOwedNow = editingOrder ? finalTotal - editingOrder.amountPaid : finalTotal;
       if(newPaymentAmount > amountOwedNow) {
         change = newPaymentAmount - amountOwedNow;
       }
@@ -109,6 +124,31 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     setError(null);
     processOrder({ isPaid: false });
   };
+  
+    const handleRewardSearch = async () => {
+    if (!rewardSearch.trim()) {
+      setRewardCustomers([]);
+      return;
+    }
+    const q = query(collection(db, 'rewards'), where('customerTag', '>=', rewardSearch), where('customerTag', '<=', rewardSearch + '\uf8ff'));
+    const snapshot = await getDocs(q);
+    const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerReward));
+    setRewardCustomers(customers);
+  };
+
+  const handleSelectRewardCustomer = (customer: CustomerReward) => {
+    const availableDiscount = Math.floor(customer.bagCount / 5) * 10;
+    if (availableDiscount > 0) {
+      const discountToApply = Math.min(availableDiscount, total);
+      const bagsUsed = Math.ceil((discountToApply / 10)) * 5;
+      setReward({
+        customer,
+        discount: discountToApply,
+        bagsUsed,
+      });
+      setIsApplyingReward(false);
+    }
+  };
 
   const processOrder = async (options: { isPaid: boolean, pardonDeficit?: boolean }) => {
     setIsProcessing(true);
@@ -127,7 +167,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           price: i.price, 
           quantity: i.quantity 
         })),
-        total,
+        total: finalTotal,
         paymentMethod: isPaid ? paymentMethod : 'Unpaid',
         pardonedAmount: (editingOrder?.pardonedAmount || 0) + pardonedAmount,
         notes: editingOrder?.notes || '',
@@ -136,6 +176,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         creditSource: editingOrder?.creditSource || [],
         cashierId: session?.uid || 'unknown',
         cashierName: session?.fullName || session?.username || 'Unknown',
+        rewardDiscount: reward?.discount || 0,
+        rewardCustomerTag: reward?.customer.customerTag || '',
       };
       
       if (isPaid) {
@@ -155,13 +197,13 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           const changeGivenNum = parseFloat(changeGivenInput) || 0;
           const finalChangeGiven = (editingOrder.changeGiven || 0) + changeGivenNum;
           
-          let finalBalance = total - finalAmountPaid;
+          let finalBalance = finalTotal - finalAmountPaid;
           if(pardonDeficit){
               finalBalance = 0;
           }
           
-          if (finalAmountPaid > total && changeGivenNum > 0) {
-              finalBalance = -(changeGivenNum - (finalAmountPaid - total));
+          if (finalAmountPaid > finalTotal && changeGivenNum > 0) {
+              finalBalance = -(changeGivenNum - (finalAmountPaid - finalTotal));
           }
           
           orderData.amountPaid = finalAmountPaid;
@@ -185,15 +227,15 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           const changeGiven = parseFloat(changeGivenInput) || 0;
           
           orderData.amountPaid = isPaid ? newPaymentAmount : 0;
-          orderData.changeGiven = isPaid && newPaymentAmount > total ? changeGiven : 0;
+          orderData.changeGiven = isPaid && newPaymentAmount > finalTotal ? changeGiven : 0;
           
-          let finalBalance = total - orderData.amountPaid;
+          let finalBalance = finalTotal - orderData.amountPaid;
            if (pardonDeficit) {
               finalBalance = 0;
           }
           
           if (orderData.changeGiven > 0) {
-              finalBalance = - (orderData.changeGiven - (orderData.amountPaid - total));
+              finalBalance = - (orderData.changeGiven - (orderData.amountPaid - finalTotal));
           }
 
           orderData.balanceDue = finalBalance;
@@ -210,6 +252,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           const newOrderRef = doc(collection(db, "orders"));
           
           await runTransaction(db, async (transaction) => {
+              if (reward) {
+                const rewardRef = doc(db, 'rewards', reward.customer.id);
+                const newBagCount = reward.customer.bagCount - reward.bagsUsed;
+                transaction.update(rewardRef, { bagCount: newBagCount, updatedAt: serverTimestamp() });
+              }
               const counterDoc = await transaction.get(counterRef);
               const newCount = (counterDoc.exists() ? counterDoc.data().count : 0) + 1;
               const simplifiedId = generateSimpleOrderId(newCount);
@@ -240,7 +287,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   const renderBalanceBreakdown = () => {
     if (!editingOrder) return null;
 
-    const amountOwedNow = total - editingOrder.amountPaid;
+    const amountOwedNow = finalTotal - editingOrder.amountPaid;
 
     return (
       <Card className="mb-4">
@@ -256,7 +303,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">New Total:</span>
-              <span className="font-semibold">{formatCurrency(total)}</span>
+              <span className="font-semibold">{formatCurrency(finalTotal)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Already Paid:</span>
@@ -283,11 +330,49 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
       </Card>
     );
   };
+  
+  const RewardContent = () => (
+     <>
+        <DialogHeader>
+          <DialogTitle>Apply Customer Reward</DialogTitle>
+          <DialogDescription>Search for a customer to apply their bag return discount.</DialogDescription>
+        </DialogHeader>
+        <div className="py-4 space-y-4">
+            <div className="flex gap-2">
+                <Input placeholder="Search customer name..." value={rewardSearch} onChange={(e) => setRewardSearch(e.target.value)} />
+                <Button onClick={handleRewardSearch}><SearchIcon /></Button>
+            </div>
+            <ScrollArea className="h-60 border rounded-md">
+                {rewardCustomers.length > 0 ? (
+                    rewardCustomers.map(customer => {
+                        const discount = Math.floor(customer.bagCount / 5) * 10;
+                        return (
+                            <div key={customer.id} className="p-3 border-b flex justify-between items-center">
+                                <div>
+                                    <p className="font-semibold">{customer.customerTag}</p>
+                                    <p className="text-sm text-muted-foreground">Bags: {customer.bagCount} | Discount: {formatCurrency(discount)}</p>
+                                </div>
+                                <Button size="sm" onClick={() => handleSelectRewardCustomer(customer)} disabled={discount <= 0}>
+                                    Apply
+                                </Button>
+                            </div>
+                        )
+                    })
+                ) : (
+                    <p className="p-4 text-center text-muted-foreground">No customers found.</p>
+                )}
+            </ScrollArea>
+        </div>
+        <DialogFooter>
+            <Button variant="secondary" onClick={() => setIsApplyingReward(false)}>Back to Payment</Button>
+        </DialogFooter>
+     </>
+  );
 
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
-        {step === 1 && (
+        {isApplyingReward ? <RewardContent /> : step === 1 ? (
           <>
             <DialogHeader>
               <DialogTitle>
@@ -363,9 +448,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               </Button>
             </DialogFooter>
           </>
-        )}
-
-        {step === 2 && (
+        ) : (
           <>
             <DialogHeader>
               <DialogTitle>
@@ -377,9 +460,18 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                   : 'Complete the payment for this new order.'
                 }
               </DialogDescription>
-              <div className="text-center text-3xl font-bold text-primary pt-2">
-                {formatCurrency(editingOrder ? total - editingOrder.amountPaid : total)}
-              </div>
+                <div className="space-y-1 text-center pt-2">
+                    {reward && (
+                        <p className="text-sm text-muted-foreground line-through">{formatCurrency(total)}</p>
+                    )}
+                    <p className="text-3xl font-bold text-primary">{formatCurrency(finalTotal)}</p>
+                    {reward && (
+                        <Badge variant="secondary">
+                            <Gift className="h-3 w-3 mr-1.5" />
+                            {formatCurrency(reward.discount)} discount applied
+                        </Badge>
+                    )}
+                </div>
             </DialogHeader>
             
             <div className="space-y-4">
@@ -460,6 +552,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
             </div>
             
             <DialogFooter className="grid grid-cols-1 gap-3 pt-4">
+              <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
+                  <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
+              </Button>
               {showDeficitOptions ? (
                 <div className="grid grid-cols-2 gap-2">
                   <Button 
@@ -505,3 +600,4 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 };
 
 export default OrderOptionsModal;
+
