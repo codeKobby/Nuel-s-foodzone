@@ -629,9 +629,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 miscExpensesSnapshot
             ] = await Promise.all([
                 getDocs(ordersInPeriodQuery),
-                getDocs(allUnpaidOrdersSnapshot),
+                getDocs(allUnpaidOrdersQuery),
                 getDocs(settledTodayQuery),
-                getDocs(miscExpensesSnapshot)
+                getDocs(miscExpensesQuery)
             ]);
 
             let totalSales = 0, totalItemsSold = 0, cashSales = 0, momoSales = 0, allTimeUnpaidOrdersValue = 0, todayUnpaidOrdersValue = 0, totalPardonedAmount = 0, changeOwedForPeriod = 0, settledUnpaidOrdersValue = 0, previousDaysChangeGiven = 0;
@@ -825,4 +825,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     );
 };
 
-export default RefactoredAccountingInterface;
+export default AccountingView;
+
+    
