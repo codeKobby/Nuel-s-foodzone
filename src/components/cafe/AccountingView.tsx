@@ -52,7 +52,7 @@ interface PeriodStats {
     itemStats: Record<string, { count: number; totalValue: number }>;
 }
 
-const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, color?: string, description?: string }> = ({ icon, title, value, color, description }) => (
+const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, color?: string, description?: string | React.ReactNode }> = ({ icon, title, value, color, description }) => (
     <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -60,7 +60,7 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
         </CardHeader>
         <CardContent>
             <div className={`text-xl md:text-2xl font-bold ${color}`}>{value}</div>
-            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+            {description && <div className="text-xs text-muted-foreground">{description}</div>}
         </CardContent>
     </Card>
 );
@@ -694,6 +694,15 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 }
 
             });
+            
+            const previousUnpaidOrdersValue = allOrdersSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as Order))
+                .filter(order => {
+                    const orderDate = order.timestamp.toDate();
+                    return orderDate < todayStart && order.balanceDue > 0 && order.status === 'Completed';
+                })
+                .reduce((sum, order) => sum + order.balanceDue, 0);
+
 
             let miscCashExpenses = 0, miscMomoExpenses = 0;
             miscExpensesSnapshot.forEach(doc => {
@@ -717,7 +726,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 netRevenue, 
                 todayUnpaidOrdersValue,
                 allTimeUnpaidOrdersValue,
-                previousUnpaidOrdersValue: allTimeUnpaidOrdersValue - todayUnpaidOrdersValue,
+                previousUnpaidOrdersValue,
                 totalPardonedAmount, 
                 changeOwedForPeriod, 
                 settledUnpaidOrdersValue, 
@@ -806,7 +815,18 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                         <StatCard icon={<DollarSign className="text-muted-foreground" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold from completed orders`} />
                                         <StatCard icon={<Landmark className="text-muted-foreground" />} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="All cash payments received today" />
                                         <StatCard icon={<CreditCard className="text-muted-foreground" />} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} description="All momo/card payments received" />
-                                        <StatCard icon={<Hourglass className="text-muted-foreground" />} title="Unpaid Orders (All Time)" value={formatCurrency(stats.allTimeUnpaidOrdersValue)} description={`Today: ${formatCurrency(stats.todayUnpaidOrdersValue)} | Previous: ${formatCurrency(stats.previousUnpaidOrdersValue)}`} />
+                                        <StatCard 
+                                            icon={<Hourglass className="text-muted-foreground" />} 
+                                            title="Unpaid Orders (All Time)" 
+                                            value={formatCurrency(stats.allTimeUnpaidOrdersValue)} 
+                                            description={
+                                                <span>
+                                                    <strong className="text-base font-semibold text-foreground">Today: {formatCurrency(stats.todayUnpaidOrdersValue)}</strong>
+                                                    {' | '}
+                                                    Previous: {formatCurrency(stats.previousUnpaidOrdersValue)}
+                                                </span>
+                                            } 
+                                        />
                                         <StatCard icon={<MinusCircle className="text-muted-foreground" />} title="Total Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`} />
                                         <StatCard icon={<Ban className="text-muted-foreground" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} description="Unplanned discounts given today" />
                                         <StatCard icon={<ArrowRightLeft className="text-muted-foreground" />} title="Change Owed" value={formatCurrency(stats.changeOwedForPeriod)} description="Total change owed to customers today" />
