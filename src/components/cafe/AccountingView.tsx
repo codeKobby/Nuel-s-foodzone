@@ -27,6 +27,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Search } from 'lucide-react';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { AuthContext } from '@/context/AuthContext';
+import { formatCurrency } from '@/lib/utils';
 
 
 interface PeriodStats {
