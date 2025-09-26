@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
@@ -41,6 +42,8 @@ interface PeriodStats {
     expectedMomo: number;
     netRevenue: number;
     todayUnpaidOrdersValue: number;
+    allTimeUnpaidOrdersValue: number;
+    previousUnpaidOrdersValue: number;
     totalPardonedAmount: number;
     changeOwedForPeriod: number;
     settledUnpaidOrdersValue: number;
@@ -630,7 +633,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             ]);
 
             let totalSales = 0, totalItemsSold = 0, cashSales = 0, momoSales = 0;
-            let todayUnpaidOrdersValue = 0;
+            let todayUnpaidOrdersValue = 0, allTimeUnpaidOrdersValue = 0;
             let totalPardonedAmount = 0, changeOwedForPeriod = 0;
             let settledUnpaidOrdersValue = 0, previousDaysChangeGiven = 0;
             
@@ -640,6 +643,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             allOrdersSnapshot.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 const orderDate = order.timestamp.toDate();
+
+                if (order.balanceDue > 0 && order.status === 'Completed') {
+                    allTimeUnpaidOrdersValue += order.balanceDue;
+                }
 
                 // Process orders created today
                 if (orderDate >= todayStart && orderDate <= todayEnd) {
@@ -698,7 +705,26 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const expectedMomo = momoSales - miscMomoExpenses;
             const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses);
             
-            setStats({ totalSales, totalItemsSold, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, expectedMomo, netRevenue, todayUnpaidOrdersValue, totalPardonedAmount, changeOwedForPeriod, settledUnpaidOrdersValue, previousDaysChangeGiven, orders: todayOrders, itemStats });
+            setStats({ 
+                totalSales, 
+                totalItemsSold, 
+                cashSales, 
+                momoSales, 
+                miscCashExpenses, 
+                miscMomoExpenses, 
+                expectedCash, 
+                expectedMomo, 
+                netRevenue, 
+                todayUnpaidOrdersValue,
+                allTimeUnpaidOrdersValue,
+                previousUnpaidOrdersValue: allTimeUnpaidOrdersValue - todayUnpaidOrdersValue,
+                totalPardonedAmount, 
+                changeOwedForPeriod, 
+                settledUnpaidOrdersValue, 
+                previousDaysChangeGiven, 
+                orders: todayOrders, 
+                itemStats 
+            });
         } catch (e) {
             console.error("Error fetching period data:", e);
             if (e instanceof Error && e.message.includes('firestore/permission-denied')) {
@@ -780,7 +806,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                         <StatCard icon={<DollarSign className="text-muted-foreground" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold from completed orders`} />
                                         <StatCard icon={<Landmark className="text-muted-foreground" />} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="All cash payments received today" />
                                         <StatCard icon={<CreditCard className="text-muted-foreground" />} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} description="All momo/card payments received" />
-                                        <StatCard icon={<Hourglass className="text-muted-foreground" />} title="Unpaid Orders (Completed)" value={formatCurrency(stats.todayUnpaidOrdersValue)} description={`From today's completed orders`} />
+                                        <StatCard icon={<Hourglass className="text-muted-foreground" />} title="Unpaid Orders (All Time)" value={formatCurrency(stats.allTimeUnpaidOrdersValue)} description={`Today: ${formatCurrency(stats.todayUnpaidOrdersValue)} | Previous: ${formatCurrency(stats.previousUnpaidOrdersValue)}`} />
                                         <StatCard icon={<MinusCircle className="text-muted-foreground" />} title="Total Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`} />
                                         <StatCard icon={<Ban className="text-muted-foreground" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} description="Unplanned discounts given today" />
                                         <StatCard icon={<ArrowRightLeft className="text-muted-foreground" />} title="Change Owed" value={formatCurrency(stats.changeOwedForPeriod)} description="Total change owed to customers today" />
@@ -850,3 +876,5 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+    
