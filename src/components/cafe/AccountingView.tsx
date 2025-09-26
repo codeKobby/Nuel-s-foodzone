@@ -614,10 +614,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         setStats(null);
         
         try {
-            const startDate = todayStart;
-            const endDate = todayEnd;
-            const startDateTimestamp = Timestamp.fromDate(startDate);
-            const endDateTimestamp = Timestamp.fromDate(endDate);
+            const startDateTimestamp = Timestamp.fromDate(todayStart);
+            const endDateTimestamp = Timestamp.fromDate(todayEnd);
             
             const allOrdersQuery = query(collection(db, "orders"));
 
@@ -628,7 +626,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 miscExpensesSnapshot
             ] = await Promise.all([
                 getDocs(allOrdersQuery),
-                getDocs(miscExpensesSnapshot)
+                getDocs(miscExpensesQuery)
             ]);
 
             let totalSales = 0, totalItemsSold = 0, cashSales = 0, momoSales = 0;
@@ -643,8 +641,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const order = { id: doc.id, ...doc.data() } as Order;
                 const orderDate = order.timestamp.toDate();
 
-                // Check if the order was created today
-                if (orderDate >= startDate && orderDate <= endDate) {
+                // Process orders created today
+                if (orderDate >= todayStart && orderDate <= todayEnd) {
                     todayOrders.push(order);
                     
                     if (order.status === "Completed") {
@@ -656,17 +654,15 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
                         });
 
-                        if(order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid'){
-                             if(order.paymentMethod === 'cash'){
-                                cashSales += order.amountPaid;
-                            } else if(order.paymentMethod === 'momo'){
-                                momoSales += order.amountPaid;
-                            }
+                        if(order.paymentMethod === 'cash'){
+                            cashSales += order.amountPaid;
+                        } else if(order.paymentMethod === 'momo'){
+                            momoSales += order.amountPaid;
                         }
-
-                        if(order.balanceDue > 0) {
-                            todayUnpaidOrdersValue += order.balanceDue;
-                        }
+                    }
+                    
+                    if (order.balanceDue > 0 && order.status === 'Completed') {
+                        todayUnpaidOrdersValue += order.balanceDue;
                     }
 
                     if (order.pardonedAmount && order.pardonedAmount > 0) {
@@ -680,7 +676,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
                 // Check for collections on old debts that happened today
                 const paymentDate = order.lastPaymentTimestamp?.toDate();
-                if(paymentDate && paymentDate >= startDate && paymentDate <= endDate && orderDate < startDate) {
+                if(paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd && orderDate < todayStart) {
                      if(order.lastPaymentAmount && order.lastPaymentAmount > 0){
                         settledUnpaidOrdersValue += order.lastPaymentAmount;
                      }
@@ -688,21 +684,17 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
                 // Check for change given today for old orders
                 const settledDate = order.settledOn?.toDate();
-                if(settledDate && settledDate >= startDate && settledDate <= endDate && orderDate < startDate) {
+                if(settledDate && settledDate >= todayStart && settledDate <= todayEnd && orderDate < todayStart) {
                     if(order.changeGiven && order.changeGiven > 0){
                         previousDaysChangeGiven += order.changeGiven;
                     }
                 }
-            });
 
-            // Recalculate all-time unpaid orders value
-            allOrdersSnapshot.forEach(doc => {
-                const order = doc.data() as Order;
+                 // Calculate all-time unpaid orders value from completed orders
                 if(order.status === 'Completed' && order.balanceDue > 0) {
                     allTimeUnpaidOrdersValue += order.balanceDue;
                 }
             });
-
 
             let miscCashExpenses = 0, miscMomoExpenses = 0;
             miscExpensesSnapshot.forEach(doc => {
@@ -851,7 +843,5 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-    
 
     
