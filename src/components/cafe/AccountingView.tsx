@@ -619,7 +619,11 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const endDateTimestamp = Timestamp.fromDate(todayEnd);
             
             const ordersInPeriodQuery = query(collection(db, "orders"), where('timestamp', '>=', startDateTimestamp), where('timestamp', '<=', endDateTimestamp));
-            const allUnpaidOrdersQuery = query(collection(db, "orders"), where("paymentStatus", "in", ["Unpaid", "Partially Paid"]));
+            const allUnpaidOrdersQuery = query(
+                collection(db, "orders"), 
+                where("status", "==", "Completed"),
+                where("paymentStatus", "in", ["Unpaid", "Partially Paid"])
+            );
             const settledTodayQuery = query(collection(db, "orders"), where("settledOn", ">=", startDateTimestamp), where("settledOn", "<=", endDateTimestamp));
             const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', startDateTimestamp), where('timestamp', '<=', endDateTimestamp));
 
@@ -630,7 +634,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 miscExpensesSnapshot
             ] = await Promise.all([
                 getDocs(ordersInPeriodQuery),
-                getDocs(allUnpaidOrdersQuery),
+                getDocs(allUnpaidOrdersSnapshot),
                 getDocs(settledTodayQuery),
                 getDocs(miscExpensesQuery)
             ]);
@@ -661,7 +665,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 todayOrders.push(order);
                 if (order.pardonedAmount && order.pardonedAmount > 0) totalPardonedAmount += order.pardonedAmount;
                 if (order.balanceDue < 0) changeOwedForPeriod += Math.abs(order.balanceDue);
-                if (order.balanceDue > 0) todayUnpaidOrdersValue += order.balanceDue;
+                if (order.status === "Completed" && order.balanceDue > 0) todayUnpaidOrdersValue += order.balanceDue;
 
                 if (order.status === 'Completed') {
                     totalSales += order.total;
@@ -757,7 +761,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                         <StatCard icon={<DollarSign className="text-muted-foreground" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold from completed orders`} />
                                         <StatCard icon={<Landmark className="text-muted-foreground" />} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="All cash payments received today" />
                                         <StatCard icon={<CreditCard className="text-muted-foreground" />} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} description="All momo/card payments received" />
-                                        <StatCard icon={<Hourglass className="text-muted-foreground" />} title="Unpaid Orders (All Time)" value={formatCurrency(stats.allTimeUnpaidOrdersValue)} description="Total outstanding balance" />
+                                        <StatCard icon={<Hourglass className="text-muted-foreground" />} title="Unpaid Orders (All Time)" value={formatCurrency(stats.allTimeUnpaidOrdersValue)} description="Total outstanding balance on completed orders" />
                                         <StatCard icon={<MinusCircle className="text-muted-foreground" />} title="Total Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`} />
                                         <StatCard icon={<Ban className="text-muted-foreground" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} description="Unplanned discounts given today" />
                                         <StatCard icon={<ArrowRightLeft className="text-muted-foreground" />} title="Change Owed" value={formatCurrency(stats.changeOwedForPeriod)} description="Total change owed to customers today" />
