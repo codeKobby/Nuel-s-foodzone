@@ -635,7 +635,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 miscExpensesSnapshot
             ] = await Promise.all([
                 getDocs(allOrdersQuery),
-                getDocs(miscExpensesSnapshot)
+                getDocs(miscExpensesQuery)
             ]);
 
             let totalSales = 0, totalItemsSold = 0, cashSales = 0, momoSales = 0;
@@ -652,12 +652,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const order = { id: doc.id, ...doc.data() } as Order;
                 const orderDate = order.timestamp.toDate();
 
-                // Process orders still in 'Unpaid' or 'Partially Paid' status
-                if ((order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') && order.balanceDue > 0) {
-                     allTimeUnpaidOrdersValue += order.balanceDue;
-                    if (orderDate < todayStart) {
-                        previousUnpaidOrdersValue += order.balanceDue;
-                    }
+                // Process all orders for previous unpaid balances
+                if (orderDate < todayStart && (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid')) {
+                     previousUnpaidOrdersValue += order.balanceDue;
                 }
                 
                 // Process orders created today
@@ -706,6 +703,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 }
 
             });
+            
+            allTimeUnpaidOrdersValue = previousUnpaidOrdersValue + todayUnpaidOrdersValue;
 
             let miscCashExpenses = 0, miscMomoExpenses = 0;
             miscExpensesSnapshot.forEach(doc => {
@@ -779,7 +778,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         return stats.expectedCash + stats.settledUnpaidOrdersValue - stats.previousDaysChangeGiven;
     }, [stats]);
 
-    if (showReconciliation) {
+    if (showReconciliation && stats) {
         return <ReconciliationView stats={stats} adjustedExpectedCash={adjustedExpectedCash} onBack={() => setShowReconciliation(false)} />;
     }
 
