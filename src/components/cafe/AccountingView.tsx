@@ -692,7 +692,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             
             const expectedCash = cashSales - miscCashExpenses;
             const expectedMomo = momoSales - miscMomoExpenses;
-            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses) - totalPardonedAmount + settledUnpaidOrdersValue - previousDaysChangeGiven - todayUnpaidOrdersValue;
+            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses);
             
             setStats({ totalSales, totalItemsSold, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, expectedMomo, netRevenue, allTimeUnpaidOrdersValue, todayUnpaidOrdersValue, totalPardonedAmount, changeOwedForPeriod, settledUnpaidOrdersValue, previousDaysChangeGiven, orders: todayOrders, itemStats });
         } catch (e) {
@@ -771,7 +771,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                         <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30">
                                             <Label className="text-lg font-semibold text-green-800 dark:text-green-200">Net Revenue</Label>
                                             <p className="text-3xl font-bold text-green-700 dark:text-green-300">{formatCurrency(stats.netRevenue)}</p>
-                                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">(Today's Payments + Collections) - Expenses - Pardons - Unpaid</p>
+                                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">(Today's Payments) - Expenses</p>
                                         </div>
                                     </CardFooter>
                                 </Card>
@@ -831,3 +831,5 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+    
