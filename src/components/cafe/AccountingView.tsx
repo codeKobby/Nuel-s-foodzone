@@ -619,11 +619,13 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const endDateTimestamp = Timestamp.fromDate(todayEnd);
             
             const ordersInPeriodQuery = query(collection(db, "orders"), where('timestamp', '>=', startDateTimestamp), where('timestamp', '<=', endDateTimestamp));
+            
             const allUnpaidOrdersQuery = query(
                 collection(db, "orders"), 
                 where("status", "==", "Completed"),
                 where("paymentStatus", "in", ["Unpaid", "Partially Paid"])
             );
+
             const settledTodayQuery = query(collection(db, "orders"), where("settledOn", ">=", startDateTimestamp), where("settledOn", "<=", endDateTimestamp));
             const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', startDateTimestamp), where('timestamp', '<=', endDateTimestamp));
 
@@ -634,7 +636,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 miscExpensesSnapshot
             ] = await Promise.all([
                 getDocs(ordersInPeriodQuery),
-                getDocs(allUnpaidOrdersQuery),
+                getDocs(allUnpaidOrdersSnapshot),
                 getDocs(settledTodayQuery),
                 getDocs(miscExpensesQuery)
             ]);
@@ -831,5 +833,3 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-    
