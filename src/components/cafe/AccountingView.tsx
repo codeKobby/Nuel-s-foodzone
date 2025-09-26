@@ -7,11 +7,10 @@ import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle } from 'lucide-react';
+import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle, Landmark, CreditCard, DollarSign, Hourglass, MinusCircle, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isToday } from 'date-fns';
-import FinancialSummaryView from '@/components/cafe/FinancialSummaryView';
 import HistoryView from '@/components/cafe/HistoryView';
 import { ScrollArea } from '../ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
@@ -49,6 +48,19 @@ interface PeriodStats {
     orders: Order[];
     itemStats: Record<string, { count: number; totalValue: number }>;
 }
+
+const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, color?: string, description?: string }> = ({ icon, title, value, color, description }) => (
+    <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            {icon}
+        </CardHeader>
+        <CardContent>
+            <div className={`text-xl md:text-2xl font-bold ${color}`}>{value}</div>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        </CardContent>
+    </Card>
+);
 
 const ReconciliationView: React.FC<{ 
     stats: PeriodStats, 
@@ -164,7 +176,7 @@ const ReconciliationView: React.FC<{
         if ((e.key === 'Enter' || e.key === ' ') && momoInput.trim() !== '') {
             e.preventDefault();
             const amount = parseFloat(momoInput);
-if (!isNaN(amount) && amount > 0) {
+            if (!isNaN(amount) && amount > 0) {
                 setMomoTransactions([...momoTransactions, amount]);
                 setMomoInput('');
             }
@@ -605,46 +617,51 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const startDateTimestamp = Timestamp.fromDate(todayStart);
             const endDateTimestamp = Timestamp.fromDate(todayEnd);
             
-            const todayOrdersQuery = query(collection(db, "orders"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
-            const todayMiscQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
+            const ordersInPeriodQuery = query(collection(db, "orders"), where('timestamp', '>=', startDateTimestamp), where('timestamp', '<=', endDateTimestamp));
             const allUnpaidOrdersQuery = query(collection(db, "orders"), where("paymentStatus", "in", ["Unpaid", "Partially Paid"]));
             const settledTodayQuery = query(collection(db, "orders"), where("settledOn", ">=", startDateTimestamp), where("settledOn", "<=", endDateTimestamp));
+            const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', startDateTimestamp), where('timestamp', '<=', endDateTimestamp));
 
-            const [todayOrdersSnapshot, todayMiscSnapshot, allUnpaidOrdersSnapshot, settledTodaySnapshot] = await Promise.all([
-                getDocs(todayOrdersQuery),
-                getDocs(todayMiscQuery),
-                getDocs(allUnpaidOrdersQuery),
-                getDocs(settledTodayQuery)
+            const [
+                ordersInPeriodSnapshot,
+                allUnpaidOrdersSnapshot,
+                settledTodaySnapshot,
+                miscExpensesSnapshot
+            ] = await Promise.all([
+                getDocs(ordersInPeriodQuery),
+                getDocs(allUnpaidOrdersSnapshot),
+                getDocs(settledTodayQuery),
+                getDocs(miscExpensesSnapshot)
             ]);
 
             let totalSales = 0, totalItemsSold = 0, cashSales = 0, momoSales = 0, allTimeUnpaidOrdersValue = 0, todayUnpaidOrdersValue = 0, totalPardonedAmount = 0, changeOwedForPeriod = 0, settledUnpaidOrdersValue = 0, previousDaysChangeGiven = 0;
             const todayOrders: Order[] = [];
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
-
-            allUnpaidOrdersSnapshot.docs.forEach(doc => {
-                const order = { id: doc.id, ...doc.data() } as Order;
-                if (order.balanceDue > 0) {
+            
+            allUnpaidOrdersSnapshot.forEach(doc => {
+                const order = doc.data() as Order;
+                if(order.balanceDue > 0) {
                     allTimeUnpaidOrdersValue += order.balanceDue;
-                    const orderDate = order.timestamp.toDate();
-                    if (orderDate >= todayStart && orderDate <= todayEnd) {
-                        todayUnpaidOrdersValue += order.balanceDue;
+                }
+            });
+
+            settledTodaySnapshot.forEach(doc => {
+                const order = doc.data() as Order;
+                if (order.timestamp.toDate() < todayStart) {
+                    settledUnpaidOrdersValue += order.amountPaid;
+                    if (order.changeGiven && order.changeGiven > 0) {
+                        previousDaysChangeGiven += order.changeGiven;
                     }
                 }
             });
 
-            settledTodaySnapshot.docs.forEach(doc => {
-                const order = { id: doc.id, ...doc.data() } as Order;
-                if (order.timestamp.toDate() < todayStart) {
-                    settledUnpaidOrdersValue += order.amountPaid;
-                    if (order.changeGiven && order.changeGiven > 0) previousDaysChangeGiven += order.changeGiven;
-                }
-            });
-            
-            todayOrdersSnapshot.docs.forEach(doc => {
+            ordersInPeriodSnapshot.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 todayOrders.push(order);
                 if (order.pardonedAmount && order.pardonedAmount > 0) totalPardonedAmount += order.pardonedAmount;
                 if (order.balanceDue < 0) changeOwedForPeriod += Math.abs(order.balanceDue);
+                if (order.balanceDue > 0) todayUnpaidOrdersValue += order.balanceDue;
+
                 if (order.status === 'Completed') {
                     totalSales += order.total;
                     order.items.forEach(item => {
@@ -653,16 +670,17 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
                     });
                 }
+
                 const paymentDate = order.lastPaymentTimestamp ? order.lastPaymentTimestamp.toDate() : order.timestamp.toDate();
                 if (paymentDate >= todayStart && paymentDate <= todayEnd && (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid')) {
                     const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
                     if (order.paymentMethod === 'cash') cashSales += paidAmount;
-                    if (order.method === 'momo') momoSales += paidAmount;
+                    if (order.paymentMethod === 'momo') momoSales += paidAmount;
                 }
             });
 
             let miscCashExpenses = 0, miscMomoExpenses = 0;
-            todayMiscSnapshot.forEach(doc => {
+            miscExpensesSnapshot.forEach(doc => {
                 const expense = doc.data() as MiscExpense;
                 if (expense.source === 'cash') miscCashExpenses += expense.amount; else miscMomoExpenses += expense.amount;
             });
@@ -705,14 +723,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         return Object.entries(stats.itemStats).sort(([, a], [, b]) => b.count - a.count);
     }, [stats]);
     
-    if (loading) {
-        return <div className="p-6 h-full flex items-center justify-center"><LoadingSpinner /></div>;
-    }
-    
-    if (error) {
-        return <div className="p-6"><Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert></div>;
-    }
-
     if (showReconciliation && stats) {
         return <ReconciliationView stats={stats} onBack={() => setShowReconciliation(false)} />;
     }
@@ -734,7 +744,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     <TabsTrigger value="history">History</TabsTrigger>
                 </TabsList>
                 <TabsContent value="summary" className="flex-1 overflow-hidden mt-4">
-                    {stats ? (
+                    {loading ? <LoadingSpinner/> : stats ? (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-2 space-y-6">
                                 <Card>
@@ -815,4 +825,4 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     );
 };
 
-export default AccountingView;
+export default RefactoredAccountingInterface;
