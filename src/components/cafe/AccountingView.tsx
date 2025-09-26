@@ -481,7 +481,7 @@ const ReconciliationView: React.FC<{
                         
                         <Card>
                             <CardHeader>
-                                <CardTitle>Notes & Comments</CardTitle>
+                                <CardTitle>Notes &amp; Comments</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <Textarea 
@@ -584,7 +584,7 @@ const ReconciliationView: React.FC<{
                 <DialogFooter className="pt-6 border-t">
                     <Button variant="secondary" onClick={onBack} disabled={isSubmitting}>Cancel</Button>
                     <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting || !stats} className="w-full md:w-auto h-12 text-lg font-bold bg-green-600 hover:bg-green-700">
-                        {isSubmitting ? <LoadingSpinner /> : 'Save & Finalize Report'}
+                        {isSubmitting ? <LoadingSpinner /> : 'Save &amp; Finalize Report'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -647,6 +647,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     
                     if (order.status === "Completed") {
                         totalSales += order.total;
+                        cashSales += order.paymentMethod === 'cash' ? order.amountPaid : 0;
+                        momoSales += order.paymentMethod === 'momo' ? order.amountPaid : 0;
                         
                         order.items.forEach(item => {
                             totalItemsSold += item.quantity;
@@ -654,12 +656,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
                         });
                         
-                        if(order.paymentMethod === 'cash'){
-                            cashSales += order.amountPaid;
-                        } else if(order.paymentMethod === 'momo'){
-                            momoSales += order.amountPaid;
-                        }
-
                         if (order.balanceDue > 0) {
                             todayUnpaidOrdersValue += order.balanceDue;
                         }
@@ -690,7 +686,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     }
                 }
 
-                 // Calculate all-time unpaid orders value from completed orders
+                 // Calculate all-time unpaid orders value from completed orders with a balance
                 if(order.status === 'Completed' && order.balanceDue > 0) {
                     allTimeUnpaidOrdersValue += order.balanceDue;
                 }
@@ -788,7 +784,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                         <StatCard icon={<DollarSign className="text-muted-foreground" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold from completed orders`} />
                                         <StatCard icon={<Landmark className="text-muted-foreground" />} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="All cash payments received today" />
                                         <StatCard icon={<CreditCard className="text-muted-foreground" />} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} description="All momo/card payments received" />
-                                        <StatCard icon={<Hourglass className="text-muted-foreground" />} title="Unpaid Orders (All Time)" value={formatCurrency(stats.allTimeUnpaidOrdersValue)} description={`${formatCurrency(stats.todayUnpaidOrdersValue)} from today on completed orders`} />
+                                        <StatCard icon={<Hourglass className="text-muted-foreground" />} title="Unpaid Orders (Completed)" value={formatCurrency(stats.allTimeUnpaidOrdersValue)} description={`${formatCurrency(stats.todayUnpaidOrdersValue)} from today on completed orders`} />
                                         <StatCard icon={<MinusCircle className="text-muted-foreground" />} title="Total Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`} />
                                         <StatCard icon={<Ban className="text-muted-foreground" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} description="Unplanned discounts given today" />
                                         <StatCard icon={<ArrowRightLeft className="text-muted-foreground" />} title="Change Owed" value={formatCurrency(stats.changeOwedForPeriod)} description="Total change owed to customers today" />
