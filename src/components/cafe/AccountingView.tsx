@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
@@ -358,7 +357,7 @@ const ReconciliationView: React.FC<{
                 {!stats ? <LoadingSpinner /> : (
                 <ScrollArea className="max-h-[70vh]">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-6 pr-4">
-                    <div className="lg:col-span-2 space-y-6">
+                    <div className="lg:col-span-1 space-y-6">
                          <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -505,7 +504,7 @@ const ReconciliationView: React.FC<{
                         </Button>
                     </div>
 
-                    <div className="lg:col-span-1 space-y-6">
+                    <div className="lg:col-span-2 space-y-6">
                          <div className="text-center">
                             <h3 className="text-2xl font-bold mb-2">Reconciliation Analysis</h3>
                             <p className="text-muted-foreground">Comparing expected vs counted</p>
@@ -515,17 +514,31 @@ const ReconciliationView: React.FC<{
                             <CardHeader className="bg-blue-50 dark:bg-blue-900/20">
                                 <CardTitle className="flex items-center gap-2">
                                     <TrendingUp className="h-5 w-5 text-blue-600" />
-                                    Expected Money
+                                    Expected Money Breakdown
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="p-6 space-y-4">
-                                <div className="space-y-2 text-sm">
-                                    <h4 className="font-semibold text-base text-blue-600">Cash</h4>
-                                    <div className="flex justify-between font-bold text-blue-700"><span>Expected Cash:</span><span>{formatCurrency(adjustedExpectedCash)}</span></div>
-                                </div>
-                                <div className="space-y-2 text-sm">
-                                    <h4 className="font-semibold text-base text-purple-600">MoMo/Card</h4>
-                                    <div className="flex justify-between font-bold text-purple-700"><span>Expected MoMo:</span><span>{formatCurrency(stats.expectedMomo)}</span></div>
+                            <CardContent className="p-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-3">
+                                        <h4 className="font-semibold text-lg text-blue-600">Cash Expected</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between"><span>Today's Cash Sales:</span><span className="font-medium">{formatCurrency(stats.cashSales)}</span></div>
+                                            <div className="flex justify-between text-red-600"><span>(-) Cash Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscCashExpenses)}</span></div>
+                                            {stats.settledUnpaidOrdersValue > 0 && <div className="flex justify-between text-green-600"><span>(+) Settled Old Orders:</span><span className="font-medium">+{formatCurrency(stats.settledUnpaidOrdersValue)}</span></div>}
+                                            {stats.previousDaysChangeGiven > 0 && <div className="flex justify-between text-orange-600"><span>(-) Previous Days Change:</span><span className="font-medium">-{formatCurrency(stats.previousDaysChangeGiven)}</span></div>}
+                                            <Separator />
+                                            <div className="flex justify-between font-bold text-blue-700 text-base"><span>Expected Cash:</span><span>{formatCurrency(adjustedExpectedCash)}</span></div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <h4 className="font-semibold text-lg text-purple-600">MoMo/Card Expected</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between"><span>Today's MoMo Sales:</span><span className="font-medium">{formatCurrency(stats.momoSales)}</span></div>
+                                            <div className="flex justify-between text-red-600"><span>(-) MoMo Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscMomoExpenses)}</span></div>
+                                            <Separator />
+                                            <div className="flex justify-between font-bold text-purple-700 text-base"><span>Expected MoMo:</span><span>{formatCurrency(stats.expectedMomo)}</span></div>
+                                        </div>
+                                    </div>
                                 </div>
                             </CardContent>
                             <CardFooter className="bg-primary/10 p-4">
@@ -641,17 +654,15 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
                         });
                         
-                        if (order.amountPaid > 0) {
-                             if(order.paymentMethod === 'cash'){
-                                cashSales += order.amountPaid;
-                            } else if(order.paymentMethod === 'momo'){
-                                momoSales += order.amountPaid;
-                            }
+                        if(order.paymentMethod === 'cash'){
+                            cashSales += order.amountPaid;
+                        } else if(order.paymentMethod === 'momo'){
+                            momoSales += order.amountPaid;
                         }
-                    }
-                    
-                    if (order.balanceDue > 0 && order.status === 'Completed') {
-                        todayUnpaidOrdersValue += order.balanceDue;
+
+                        if (order.balanceDue > 0) {
+                            todayUnpaidOrdersValue += order.balanceDue;
+                        }
                     }
 
                     if (order.pardonedAmount && order.pardonedAmount > 0) {
@@ -847,5 +858,3 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-    
