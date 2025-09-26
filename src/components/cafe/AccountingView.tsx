@@ -10,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format } from 'date-fns';
+import { format, isToday } from 'date-fns';
 import FinancialSummaryView from '@/components/cafe/FinancialSummaryView';
 import HistoryView from '@/components/cafe/HistoryView';
 import { ScrollArea } from '../ui/scroll-area';
@@ -218,7 +218,7 @@ if (!isNaN(amount) && amount > 0) {
             <DialogContent className="max-w-4xl max-h-[85vh]">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <ClipboardCheck className="h-5 w-5" />
+                  <FileText className="h-5 w-5" />
                   Cross-Check Digital vs Written Orders
                 </DialogTitle>
                 <DialogDescription>
@@ -586,6 +586,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showReconciliation, setShowReconciliation] = useState(false);
+    const [showUnpaidOrdersWarning, setShowUnpaidOrdersWarning] = useState(false);
     
     const today = useMemo(() => new Date(), []);
     const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
@@ -699,6 +700,11 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         }
     }
     
+    const sortedItemStats = useMemo(() => {
+        if (!stats) return [];
+        return Object.entries(stats.itemStats).sort(([, a], [, b]) => b.count - a.count);
+    }, [stats]);
+    
     if (loading) {
         return <div className="p-6 h-full flex items-center justify-center"><LoadingSpinner /></div>;
     }
@@ -708,12 +714,12 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     }
 
     if (showReconciliation && stats) {
-        return <ReconciliationView stats={stats} orders={stats.orders} onBack={() => setShowReconciliation(false)} setActiveView={setActiveView} />;
+        return <ReconciliationView stats={stats} onBack={() => setShowReconciliation(false)} />;
     }
 
     return (
-        <div className="h-full flex flex-col bg-background">
-            <div className="p-4 md:p-6 border-b flex-shrink-0">
+        <ScrollArea className="h-full">
+            <div className="p-4 md:p-6 bg-background">
                 <div className="flex justify-between items-center mb-4">
                     <h1 className="text-2xl md:text-3xl font-bold">Accounting</h1>
                     <Button onClick={handleStartEndDay} disabled={isTodayClosedOut}>
@@ -722,21 +728,72 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     </Button>
                 </div>
             </div>
-            <Tabs defaultValue="summary" className="flex-1 flex flex-col overflow-hidden">
+            <Tabs defaultValue="summary" className="flex-1 flex flex-col overflow-hidden px-4 md:px-6">
                 <TabsList className="grid w-full grid-cols-2 mx-auto max-w-sm">
                     <TabsTrigger value="summary">Financial Summary</TabsTrigger>
                     <TabsTrigger value="history">History</TabsTrigger>
                 </TabsList>
-                <TabsContent value="summary" className="flex-1 overflow-hidden">
-                     <ScrollArea className="h-full">
-                        {stats ? (
-                            <FinancialSummaryView stats={stats} allUnpaidOrdersTotal={stats.allTimeUnpaidOrdersValue} />
-                        ) : (
-                            <p className="p-6 text-muted-foreground">No data for today.</p>
-                        )}
-                    </ScrollArea>
+                <TabsContent value="summary" className="flex-1 overflow-hidden mt-4">
+                    {stats ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2 space-y-6">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Financial Summary</CardTitle>
+                                        <CardDescription>Daily financial data for {format(new Date(), "EEEE, MMMM dd, yyyy")}</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <StatCard icon={<DollarSign className="text-muted-foreground" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold from completed orders`} />
+                                        <StatCard icon={<Landmark className="text-muted-foreground" />} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="All cash payments received today" />
+                                        <StatCard icon={<CreditCard className="text-muted-foreground" />} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} description="All momo/card payments received" />
+                                        <StatCard icon={<Hourglass className="text-muted-foreground" />} title="Unpaid Orders (All Time)" value={formatCurrency(stats.allTimeUnpaidOrdersValue)} description="Total outstanding balance" />
+                                        <StatCard icon={<MinusCircle className="text-muted-foreground" />} title="Total Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`} />
+                                        <StatCard icon={<Ban className="text-muted-foreground" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} description="Unplanned discounts given today" />
+                                        <StatCard icon={<ArrowRightLeft className="text-muted-foreground" />} title="Change Owed" value={formatCurrency(stats.changeOwedForPeriod)} description="Total change owed to customers today" />
+                                        <StatCard icon={<Coins className="text-muted-foreground" />} title="Previous Change Given" value={formatCurrency(stats.previousDaysChangeGiven)} description="Change for old orders given today" />
+                                    </CardContent>
+                                    <CardFooter>
+                                        <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30">
+                                            <Label className="text-lg font-semibold text-green-800 dark:text-green-200">Net Revenue</Label>
+                                            <p className="text-3xl font-bold text-green-700 dark:text-green-300">{formatCurrency(stats.netRevenue)}</p>
+                                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">(Today's Payments + Collections) - Expenses - Pardons - Unpaid</p>
+                                        </div>
+                                    </CardFooter>
+                                </Card>
+                            </div>
+                            <div className="flex flex-col">
+                                <Card className="flex-1 flex flex-col">
+                                    <CardHeader>
+                                        <CardTitle>Item Sales (Completed Orders)</CardTitle>
+                                        <CardDescription>Total count and value of each item sold today.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="flex-1 overflow-y-auto">
+                                        <div className="space-y-2">
+                                            {sortedItemStats.length > 0 ? (
+                                            sortedItemStats.map(([name, itemStat]) => (
+                                                <div key={name} className="flex justify-between items-center p-3 rounded-lg bg-secondary">
+                                                    <div>
+                                                        <p className="font-semibold">{name}</p>
+                                                        <p className="text-sm text-muted-foreground">{itemStat.count} sold</p>
+                                                    </div>
+                                                    <Badge variant="destructive">{formatCurrency(itemStat.totalValue)}</Badge>
+                                                </div>
+                                            ))
+                                            ) : (
+                                            <div className="h-full flex items-center justify-center text-muted-foreground">
+                                                <p>No items sold today.</p>
+                                            </div>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="p-6 text-muted-foreground">No data for today.</p>
+                    )}
                 </TabsContent>
-                <TabsContent value="history" className="flex-1 overflow-hidden">
+                <TabsContent value="history" className="flex-1 overflow-hidden mt-4">
                     <ScrollArea className="h-full">
                         <HistoryView />
                     </ScrollArea>
@@ -754,7 +811,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     </AlertDialogContent>
                 </AlertDialog>
             )}
-        </div>
+        </ScrollArea>
     );
 };
 
