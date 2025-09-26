@@ -64,9 +64,10 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
 );
 
 const ReconciliationView: React.FC<{ 
-    stats: PeriodStats, 
+    stats: PeriodStats,
+    adjustedExpectedCash: number,
     onBack: () => void 
-}> = ({ stats, onBack }) => {
+}> = ({ stats, adjustedExpectedCash, onBack }) => {
     const [notes, setNotes] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
@@ -94,13 +95,8 @@ const ReconciliationView: React.FC<{
         return momoTransactions.reduce((total, amount) => total + amount, 0);
     }, [momoTransactions]);
     
-    const adjustedExpectedCash = useMemo(() => {
-        if (!stats) return 0;
-        return stats.expectedCash + stats.settledUnpaidOrdersValue - stats.previousDaysChangeGiven;
-    }, [stats]);
-    
     const availableCash = useMemo(() => {
-        if (!deductCustomerChange || !stats) return 0;
+        if (!deductCustomerChange || !stats) return totalCountedCash;
         return totalCountedCash - stats.changeOwedForPeriod;
     }, [totalCountedCash, stats, deductCustomerChange]);
 
@@ -525,18 +521,10 @@ const ReconciliationView: React.FC<{
                             <CardContent className="p-6 space-y-4">
                                 <div className="space-y-2 text-sm">
                                     <h4 className="font-semibold text-base text-blue-600">Cash</h4>
-                                    <div className="flex justify-between"><span>Today's Sales:</span><span className="font-medium">{formatCurrency(stats.cashSales)}</span></div>
-                                    <div className="flex justify-between text-red-600"><span>(-) Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscCashExpenses)}</span></div>
-                                    {stats.settledUnpaidOrdersValue > 0 && <div className="flex justify-between text-green-600"><span>(+) Settled Old Orders:</span><span className="font-medium">+{formatCurrency(stats.settledUnpaidOrdersValue)}</span></div>}
-                                    {stats.previousDaysChangeGiven > 0 && <div className="flex justify-between text-orange-600"><span>(-) Old Change Paid:</span><span className="font-medium">-{formatCurrency(stats.previousDaysChangeGiven)}</span></div>}
-                                    <Separator />
                                     <div className="flex justify-between font-bold text-blue-700"><span>Expected Cash:</span><span>{formatCurrency(adjustedExpectedCash)}</span></div>
                                 </div>
                                 <div className="space-y-2 text-sm">
                                     <h4 className="font-semibold text-base text-purple-600">MoMo/Card</h4>
-                                    <div className="flex justify-between"><span>Today's Sales:</span><span className="font-medium">{formatCurrency(stats.momoSales)}</span></div>
-                                    <div className="flex justify-between text-red-600"><span>(-) Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscMomoExpenses)}</span></div>
-                                    <Separator />
                                     <div className="flex justify-between font-bold text-purple-700"><span>Expected MoMo:</span><span>{formatCurrency(stats.expectedMomo)}</span></div>
                                 </div>
                             </CardContent>
@@ -618,7 +606,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             const endDateTimestamp = Timestamp.fromDate(todayEnd);
             
             const allOrdersQuery = query(collection(db, "orders"));
-
             const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', startDateTimestamp), where('timestamp', '<=', endDateTimestamp));
 
             const [
@@ -653,11 +640,13 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
                             itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
                         });
-
-                        if(order.paymentMethod === 'cash'){
-                            cashSales += order.amountPaid;
-                        } else if(order.paymentMethod === 'momo'){
-                            momoSales += order.amountPaid;
+                        
+                        if (order.amountPaid > 0) {
+                             if(order.paymentMethod === 'cash'){
+                                cashSales += order.amountPaid;
+                            } else if(order.paymentMethod === 'momo'){
+                                momoSales += order.amountPaid;
+                            }
                         }
                     }
                     
@@ -709,7 +698,11 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             setStats({ totalSales, totalItemsSold, cashSales, momoSales, miscCashExpenses, miscMomoExpenses, expectedCash, expectedMomo, netRevenue, allTimeUnpaidOrdersValue, todayUnpaidOrdersValue, totalPardonedAmount, changeOwedForPeriod, settledUnpaidOrdersValue, previousDaysChangeGiven, orders: todayOrders, itemStats });
         } catch (e) {
             console.error("Error fetching period data:", e);
-            setError("Failed to load financial data for today.");
+            if (e instanceof Error && e.message.includes('firestore/permission-denied')) {
+                 setError("Permission denied. You may need to create a Firestore index. Check the browser console for a link to create it.");
+            } else {
+                setError("Failed to load financial data for today.");
+            }
         } finally {
             setLoading(false);
         }
@@ -740,8 +733,13 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         return Object.entries(stats.itemStats).sort(([, a], [, b]) => b.count - a.count);
     }, [stats]);
     
+    const adjustedExpectedCash = useMemo(() => {
+        if (!stats) return 0;
+        return stats.expectedCash + stats.settledUnpaidOrdersValue - stats.previousDaysChangeGiven;
+    }, [stats]);
+
     if (showReconciliation && stats) {
-        return <ReconciliationView stats={stats} onBack={() => setShowReconciliation(false)} />;
+        return <ReconciliationView stats={stats} adjustedExpectedCash={adjustedExpectedCash} onBack={() => setShowReconciliation(false)} />;
     }
 
     return (
@@ -761,7 +759,13 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     <TabsTrigger value="history">History</TabsTrigger>
                 </TabsList>
                 <TabsContent value="summary" className="flex-1 overflow-hidden mt-4">
-                    {loading ? <LoadingSpinner/> : stats ? (
+                    {loading ? <LoadingSpinner/> : error ? (
+                        <Alert variant="destructive">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Failed to Load Data</AlertTitle>
+                            <AlertDescription>{error}</AlertDescription>
+                         </Alert>
+                    ) : stats ? (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-2 space-y-6">
                                 <Card>
@@ -773,7 +777,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                         <StatCard icon={<DollarSign className="text-muted-foreground" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold from completed orders`} />
                                         <StatCard icon={<Landmark className="text-muted-foreground" />} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="All cash payments received today" />
                                         <StatCard icon={<CreditCard className="text-muted-foreground" />} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} description="All momo/card payments received" />
-                                        <StatCard icon={<Hourglass className="text-muted-foreground" />} title="Unpaid Orders (All Time)" value={formatCurrency(stats.allTimeUnpaidOrdersValue)} description="Total outstanding balance on completed orders" />
+                                        <StatCard icon={<Hourglass className="text-muted-foreground" />} title="Unpaid Orders (All Time)" value={formatCurrency(stats.allTimeUnpaidOrdersValue)} description={`${formatCurrency(stats.todayUnpaidOrdersValue)} from today on completed orders`} />
                                         <StatCard icon={<MinusCircle className="text-muted-foreground" />} title="Total Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`} />
                                         <StatCard icon={<Ban className="text-muted-foreground" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} description="Unplanned discounts given today" />
                                         <StatCard icon={<ArrowRightLeft className="text-muted-foreground" />} title="Change Owed" value={formatCurrency(stats.changeOwedForPeriod)} description="Total change owed to customers today" />
