@@ -66,7 +66,7 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
 );
 
 const ReconciliationView: React.FC<{ 
-    stats: PeriodStats,
+    stats: PeriodStats | null,
     adjustedExpectedCash: number,
     onBack: () => void 
 }> = ({ stats, adjustedExpectedCash, onBack }) => {
@@ -124,6 +124,15 @@ const ReconciliationView: React.FC<{
     }, []);
 
     const handleSaveReport = async () => {
+        if (!stats) {
+            toast({ 
+                title: "Error saving report",
+                description: "Cannot save report, financial stats are missing.",
+                variant: "destructive"
+            });
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const reportData = {
@@ -208,10 +217,10 @@ const ReconciliationView: React.FC<{
           });
         };
 
-        const filteredOrders = useMemo(() => stats.orders.filter(order =>
+        const filteredOrders = useMemo(() => stats?.orders.filter(order =>
           order.simplifiedId.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (order.tag && order.tag.toLowerCase().includes(searchQuery.toLowerCase()))
-        ) || [], [searchQuery]);
+        ) || [], [searchQuery, stats?.orders]);
     
         const checkedTotal = useMemo(() => filteredOrders
           .filter(o => checkedOrderIds.has(o.id))
@@ -618,36 +627,39 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         setStats(null);
         
         try {
-            const startDateTimestamp = Timestamp.fromDate(todayStart);
-            const endDateTimestamp = Timestamp.fromDate(todayEnd);
-            
+            const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', todayStart), where('timestamp', '<=', todayEnd));
             const allOrdersQuery = query(collection(db, "orders"));
-            const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', startDateTimestamp), where('timestamp', '<=', endDateTimestamp));
 
             const [
                 allOrdersSnapshot,
                 miscExpensesSnapshot
             ] = await Promise.all([
                 getDocs(allOrdersQuery),
-                getDocs(miscExpensesQuery)
+                getDocs(miscExpensesSnapshot)
             ]);
 
             let totalSales = 0, totalItemsSold = 0, cashSales = 0, momoSales = 0;
-            let todayUnpaidOrdersValue = 0, allTimeUnpaidOrdersValue = 0;
+            let todayUnpaidOrdersValue = 0;
             let totalPardonedAmount = 0, changeOwedForPeriod = 0;
             let settledUnpaidOrdersValue = 0, previousDaysChangeGiven = 0;
             
             const todayOrders: Order[] = [];
+            let allTimeUnpaidOrdersValue = 0;
+            let previousUnpaidOrdersValue = 0;
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             
             allOrdersSnapshot.forEach(doc => {
                 const order = { id: doc.id, ...doc.data() } as Order;
                 const orderDate = order.timestamp.toDate();
 
-                if (order.balanceDue > 0 && order.status === 'Completed') {
-                    allTimeUnpaidOrdersValue += order.balanceDue;
+                // Process orders still in 'Unpaid' or 'Partially Paid' status
+                if ((order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid') && order.balanceDue > 0) {
+                     allTimeUnpaidOrdersValue += order.balanceDue;
+                    if (orderDate < todayStart) {
+                        previousUnpaidOrdersValue += order.balanceDue;
+                    }
                 }
-
+                
                 // Process orders created today
                 if (orderDate >= todayStart && orderDate <= todayEnd) {
                     todayOrders.push(order);
@@ -694,15 +706,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 }
 
             });
-            
-            const previousUnpaidOrdersValue = allOrdersSnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as Order))
-                .filter(order => {
-                    const orderDate = order.timestamp.toDate();
-                    return orderDate < todayStart && order.balanceDue > 0 && order.status === 'Completed';
-                })
-                .reduce((sum, order) => sum + order.balanceDue, 0);
-
 
             let miscCashExpenses = 0, miscMomoExpenses = 0;
             miscExpensesSnapshot.forEach(doc => {
@@ -776,7 +779,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         return stats.expectedCash + stats.settledUnpaidOrdersValue - stats.previousDaysChangeGiven;
     }, [stats]);
 
-    if (showReconciliation && stats) {
+    if (showReconciliation) {
         return <ReconciliationView stats={stats} adjustedExpectedCash={adjustedExpectedCash} onBack={() => setShowReconciliation(false)} />;
     }
 
