@@ -100,7 +100,7 @@ const ReconciliationView: React.FC<{
     }, [stats]);
     
     const availableCash = useMemo(() => {
-        if (!deductCustomerChange || !stats) return totalCountedCash;
+        if (!deductCustomerChange || !stats) return 0;
         return totalCountedCash - stats.changeOwedForPeriod;
     }, [totalCountedCash, stats, deductCustomerChange]);
 
@@ -150,8 +150,7 @@ const ReconciliationView: React.FC<{
             await addDoc(collection(db, "reconciliationReports"), reportData);
             toast({ 
                 title: "Day Closed Successfully", 
-                description: "The financial report has been saved.",
-                type: "success"
+                description: "The financial report has been saved."
             });
             resetForm();
             setShowConfirm(false);
@@ -161,7 +160,7 @@ const ReconciliationView: React.FC<{
             toast({ 
                 title: "Save Failed", 
                 description: "Could not save the report. Please try again.",
-                type: "error"
+                variant: "destructive"
             });
         } finally {
             setIsSubmitting(false);
@@ -615,76 +614,95 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         setStats(null);
         
         try {
-            const startDateTimestamp = Timestamp.fromDate(todayStart);
-            const endDateTimestamp = Timestamp.fromDate(todayEnd);
+            const startDate = todayStart;
+            const endDate = todayEnd;
+            const startDateTimestamp = Timestamp.fromDate(startDate);
+            const endDateTimestamp = Timestamp.fromDate(endDate);
             
-            const ordersInPeriodQuery = query(collection(db, "orders"), where('timestamp', '>=', startDateTimestamp), where('timestamp', '<=', endDateTimestamp));
-            
-            const allUnpaidOrdersQuery = query(
-                collection(db, "orders"), 
-                where("status", "==", "Completed"),
-                where("paymentStatus", "in", ["Unpaid", "Partially Paid"])
-            );
+            const allOrdersQuery = query(collection(db, "orders"));
 
-            const settledTodayQuery = query(collection(db, "orders"), where("settledOn", ">=", startDateTimestamp), where("settledOn", "<=", endDateTimestamp));
             const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', startDateTimestamp), where('timestamp', '<=', endDateTimestamp));
 
             const [
-                ordersInPeriodSnapshot,
-                allUnpaidOrdersSnapshot,
-                settledTodaySnapshot,
+                allOrdersSnapshot,
                 miscExpensesSnapshot
             ] = await Promise.all([
-                getDocs(ordersInPeriodQuery),
-                getDocs(allUnpaidOrdersQuery),
-                getDocs(settledTodayQuery),
-                getDocs(miscExpensesQuery)
+                getDocs(allOrdersQuery),
+                getDocs(miscExpensesSnapshot)
             ]);
 
-            let totalSales = 0, totalItemsSold = 0, cashSales = 0, momoSales = 0, allTimeUnpaidOrdersValue = 0, todayUnpaidOrdersValue = 0, totalPardonedAmount = 0, changeOwedForPeriod = 0, settledUnpaidOrdersValue = 0, previousDaysChangeGiven = 0;
+            let totalSales = 0, totalItemsSold = 0, cashSales = 0, momoSales = 0;
+            let allTimeUnpaidOrdersValue = 0, todayUnpaidOrdersValue = 0;
+            let totalPardonedAmount = 0, changeOwedForPeriod = 0;
+            let settledUnpaidOrdersValue = 0, previousDaysChangeGiven = 0;
+            
             const todayOrders: Order[] = [];
             const itemStats: Record<string, { count: number; totalValue: number }> = {};
             
-            allUnpaidOrdersSnapshot.forEach(doc => {
-                const order = doc.data() as Order;
-                if(order.balanceDue > 0) {
-                    allTimeUnpaidOrdersValue += order.balanceDue;
-                }
-            });
+            allOrdersSnapshot.forEach(doc => {
+                const order = { id: doc.id, ...doc.data() } as Order;
+                const orderDate = order.timestamp.toDate();
 
-            settledTodaySnapshot.forEach(doc => {
-                const order = doc.data() as Order;
-                if (order.timestamp.toDate() < todayStart) {
-                    settledUnpaidOrdersValue += order.amountPaid;
-                    if (order.changeGiven && order.changeGiven > 0) {
+                // Check if the order was created today
+                if (orderDate >= startDate && orderDate <= endDate) {
+                    todayOrders.push(order);
+                    
+                    if (order.status === "Completed") {
+                        totalSales += order.total;
+                        
+                        order.items.forEach(item => {
+                            totalItemsSold += item.quantity;
+                            const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                            itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
+                        });
+
+                        if(order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid'){
+                             if(order.paymentMethod === 'cash'){
+                                cashSales += order.amountPaid;
+                            } else if(order.paymentMethod === 'momo'){
+                                momoSales += order.amountPaid;
+                            }
+                        }
+
+                        if(order.balanceDue > 0) {
+                            todayUnpaidOrdersValue += order.balanceDue;
+                        }
+                    }
+
+                    if (order.pardonedAmount && order.pardonedAmount > 0) {
+                        totalPardonedAmount += order.pardonedAmount;
+                    }
+
+                    if (order.balanceDue < 0) {
+                        changeOwedForPeriod += Math.abs(order.balanceDue);
+                    }
+                }
+
+                // Check for collections on old debts that happened today
+                const paymentDate = order.lastPaymentTimestamp?.toDate();
+                if(paymentDate && paymentDate >= startDate && paymentDate <= endDate && orderDate < startDate) {
+                     if(order.lastPaymentAmount && order.lastPaymentAmount > 0){
+                        settledUnpaidOrdersValue += order.lastPaymentAmount;
+                     }
+                }
+
+                // Check for change given today for old orders
+                const settledDate = order.settledOn?.toDate();
+                if(settledDate && settledDate >= startDate && settledDate <= endDate && orderDate < startDate) {
+                    if(order.changeGiven && order.changeGiven > 0){
                         previousDaysChangeGiven += order.changeGiven;
                     }
                 }
             });
 
-            ordersInPeriodSnapshot.forEach(doc => {
-                const order = { id: doc.id, ...doc.data() } as Order;
-                todayOrders.push(order);
-                if (order.pardonedAmount && order.pardonedAmount > 0) totalPardonedAmount += order.pardonedAmount;
-                if (order.balanceDue < 0) changeOwedForPeriod += Math.abs(order.balanceDue);
-                if (order.status === "Completed" && order.balanceDue > 0) todayUnpaidOrdersValue += order.balanceDue;
-
-                if (order.status === 'Completed') {
-                    totalSales += order.total;
-                    order.items.forEach(item => {
-                        totalItemsSold += item.quantity;
-                        const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
-                        itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
-                    });
-                }
-
-                const paymentDate = order.lastPaymentTimestamp ? order.lastPaymentTimestamp.toDate() : order.timestamp.toDate();
-                if (paymentDate >= todayStart && paymentDate <= todayEnd && (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid')) {
-                    const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
-                    if (order.paymentMethod === 'cash') cashSales += paidAmount;
-                    if (order.paymentMethod === 'momo') momoSales += paidAmount;
+            // Recalculate all-time unpaid orders value
+            allOrdersSnapshot.forEach(doc => {
+                const order = doc.data() as Order;
+                if(order.status === 'Completed' && order.balanceDue > 0) {
+                    allTimeUnpaidOrdersValue += order.balanceDue;
                 }
             });
+
 
             let miscCashExpenses = 0, miscMomoExpenses = 0;
             miscExpensesSnapshot.forEach(doc => {
@@ -833,5 +851,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+    
 
     
