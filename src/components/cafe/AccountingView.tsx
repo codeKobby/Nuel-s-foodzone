@@ -205,7 +205,7 @@ const ReconciliationView: React.FC<{
     };
 
     const confirmationDescription = useMemo(() => {
-        const baseText = "You are about to finalize the financial report for today. This action cannot be undone.";
+        let baseText = "You are about to finalize the financial report for today. This action cannot be undone.";
         if (!stats || stats.changeOwedForPeriod <= 0) {
             return baseText;
         }
@@ -588,15 +588,6 @@ const ReconciliationView: React.FC<{
                             <CardFooter className="bg-green-500/10 p-4"><div className="w-full flex justify-between items-center"><span className="font-bold text-green-700 dark:text-green-300 text-lg">Total Available:</span><span className="font-extrabold text-green-600 dark:text-green-400 text-xl">{formatCurrency(availableCash + totalCountedMomo)}</span></div></CardFooter>
                         </Card>
 
-                        <div className="grid grid-cols-1 gap-4">
-                            <Card className={`border-2 ${getBalanceStatus(cashDiscrepancy).bg}`}>
-                                <CardContent className="p-4"><div className="text-center"><div className="flex items-center justify-center mb-1">{React.createElement(getBalanceStatus(cashDiscrepancy).icon, { className: `h-5 w-5 ${getBalanceStatus(cashDiscrepancy).color}` })}</div><p className="text-sm font-medium">Cash Balance</p><p className={`text-lg font-bold ${getBalanceStatus(cashDiscrepancy).color}`}>{getBalanceStatus(cashDiscrepancy).text}</p></div></CardContent>
-                            </Card>
-                            <Card className={`border-2 ${getBalanceStatus(momoDiscrepancy).bg}`}>
-                                <CardContent className="p-4"><div className="text-center"><div className="flex items-center justify-center mb-1">{React.createElement(getBalanceStatus(momoDiscrepancy).icon, { className: `h-5 w-5 ${getBalanceStatus(momoDiscrepancy).color}` })}</div><p className="text-sm font-medium">MoMo Balance</p><p className={`text-lg font-bold ${getBalanceStatus(momoDiscrepancy).color}`}>{getBalanceStatus(momoDiscrepancy).text}</p></div></CardContent>
-                            </Card>
-                        </div>
-
                         <Card className={`border-2 ${getBalanceStatus(totalDiscrepancy).bg}`}>
                             <CardContent className="p-6"><div className="flex items-center justify-center space-x-3">{React.createElement(getBalanceStatus(totalDiscrepancy).icon, { className: `h-8 w-8 ${getBalanceStatus(totalDiscrepancy).color}` })}<div className="text-center"><p className="text-lg font-semibold">Overall Status</p><p className={`text-2xl font-bold ${getBalanceStatus(totalDiscrepancy).color}`}>{getBalanceStatus(totalDiscrepancy).text}</p></div></div></CardContent>
                         </Card>
@@ -630,6 +621,7 @@ const ReconciliationView: React.FC<{
                 </AlertDialogContent>
             </AlertDialog>
         )}
+        {isAdvancedModalOpen && <AdvancedReconciliationModal />}
         </>
     );
 }
