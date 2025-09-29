@@ -21,13 +21,15 @@ import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 
-const AddCustomerForm = ({ onAdd, isAdding, newCustomerName, setNewCustomerName, newCustomerPhone, setNewCustomerPhone }: {
+const AddCustomerForm = ({ onAdd, isAdding, newCustomerName, setNewCustomerName, newCustomerPhone, setNewCustomerPhone, initialBags, setInitialBags }: {
     onAdd: () => void;
     isAdding: boolean;
     newCustomerName: string;
     setNewCustomerName: (name: string) => void;
     newCustomerPhone: string;
     setNewCustomerPhone: (phone: string) => void;
+    initialBags: string;
+    setInitialBags: (bags: string) => void;
 }) => (
     <div className="space-y-4">
         <div className="space-y-2">
@@ -47,6 +49,17 @@ const AddCustomerForm = ({ onAdd, isAdding, newCustomerName, setNewCustomerName,
                 placeholder="+233 XX XXX XXXX"
                 value={newCustomerPhone}
                 onChange={e => setNewCustomerPhone(e.target.value)}
+                disabled={isAdding}
+            />
+        </div>
+        <div className="space-y-2">
+            <Label htmlFor="initial-bags">Initial Bag Quantity (Optional)</Label>
+            <Input
+                id="initial-bags"
+                type="number"
+                placeholder="e.g., 5"
+                value={initialBags}
+                onChange={e => setInitialBags(e.target.value)}
                 disabled={isAdding}
             />
         </div>
@@ -267,6 +280,7 @@ const RewardsView = () => {
     const [isAddingCustomer, setIsAddingCustomer] = useState(false);
     const [newCustomerName, setNewCustomerName] = useState('');
     const [newCustomerPhone, setNewCustomerPhone] = useState('');
+    const [initialBags, setInitialBags] = useState('');
     const [updatingCustomerId, setUpdatingCustomerId] = useState<string | null>(null);
     const [bagsToAdd, setBagsToAdd] = useState('');
     const { toast } = useToast();
@@ -291,18 +305,21 @@ const RewardsView = () => {
     const handleAddCustomer = async () => {
         if (!newCustomerName.trim()) return;
         setIsAddingCustomer(true);
+        const initialBagCount = parseInt(initialBags, 10) || 0;
+
         try {
             await addDoc(collection(db, 'rewards'), {
                 customerTag: newCustomerName,
                 phone: newCustomerPhone,
-                bagCount: 0,
+                bagCount: initialBagCount,
                 totalRedeemed: 0,
                 joinedDate: serverTimestamp(),
                 updatedAt: serverTimestamp(),
             });
-            toast({ title: 'Customer Added', description: `${newCustomerName} can now earn rewards.` });
+            toast({ title: 'Customer Added', description: `${newCustomerName} has been added with ${initialBagCount} bags.` });
             setNewCustomerName('');
             setNewCustomerPhone('');
+            setInitialBags('');
             setIsAddSheetOpen(false);
         } catch (e) {
             console.error(e);
@@ -417,6 +434,8 @@ const RewardsView = () => {
                                     setNewCustomerName={setNewCustomerName}
                                     newCustomerPhone={newCustomerPhone}
                                     setNewCustomerPhone={setNewCustomerPhone}
+                                    initialBags={initialBags}
+                                    setInitialBags={setInitialBags}
                                 />
                             </div>
                         </SheetContent>
