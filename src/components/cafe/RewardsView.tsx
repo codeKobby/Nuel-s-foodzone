@@ -282,7 +282,7 @@ const RewardsView = () => {
         }, (error) => {
             console.error(error);
             setLoading(false);
-            toast({ type: 'error', title: 'Error', description: 'Could not load rewards data.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not load rewards data.' });
         });
         return unsubscribe;
     }, [toast]);
@@ -299,13 +299,13 @@ const RewardsView = () => {
                 joinedDate: serverTimestamp(),
                 updatedAt: serverTimestamp(),
             });
-            toast({ type: 'success', title: 'Customer Added', description: `${newCustomerName} can now earn rewards.` });
+            toast({ title: 'Customer Added', description: `${newCustomerName} can now earn rewards.` });
             setNewCustomerName('');
             setNewCustomerPhone('');
             setIsAddSheetOpen(false);
         } catch (e) {
             console.error(e);
-            toast({ type: 'error', title: 'Error', description: 'Could not add new customer.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not add new customer.' });
         } finally {
             setIsAddingCustomer(false);
         }
@@ -314,7 +314,7 @@ const RewardsView = () => {
     const handleAddBags = async (customerId: string, currentBags: number) => {
         const numBags = parseInt(bagsToAdd, 10);
         if (isNaN(numBags) || numBags <= 0) {
-            toast({ type: 'error', title: 'Invalid number', description: 'Please enter a valid number of bags.' });
+            toast({ variant: 'destructive', title: 'Invalid number', description: 'Please enter a valid number of bags.' });
             return;
         };
 
@@ -324,18 +324,21 @@ const RewardsView = () => {
                 bagCount: currentBags + numBags,
                 updatedAt: serverTimestamp(),
             });
-            toast({ type: 'success', title: 'Bags Updated', description: `Added ${numBags} bag(s).` });
+            toast({ title: 'Bags Updated', description: `Added ${numBags} bag(s).` });
             setBagsToAdd('');
         } catch (e) {
             console.error(e);
-            toast({ type: 'error', title: 'Error', description: 'Failed to update bag count.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to update bag count.' });
         } finally {
             setUpdatingCustomerId(null);
         }
     };
     
     const handleRedeemDiscount = async (customerId: string, discountAmount: number) => {
-        const bagsToRedeem = (discountAmount / 10) * 5;
+        // For now, assume redeeming the smallest unit (10 GHS) which costs 5 bags.
+        const bagsToRedeem = 5;
+        const redeemedValue = 10;
+    
         try {
             await runTransaction(db, async (transaction) => {
                 const customerRef = doc(db, 'rewards', customerId);
@@ -348,17 +351,17 @@ const RewardsView = () => {
                 if (currentData.bagCount < bagsToRedeem) {
                     throw new Error("Not enough bags to redeem this discount.");
                 }
-
+    
                 transaction.update(customerRef, {
                     bagCount: currentData.bagCount - bagsToRedeem,
-                    totalRedeemed: currentData.totalRedeemed + discountAmount,
+                    totalRedeemed: currentData.totalRedeemed + redeemedValue,
                     updatedAt: serverTimestamp()
                 });
             });
-             toast({ type: 'success', title: 'Discount Marked as Redeemed', description: 'The customer\'s bag count has been updated.' });
+             toast({ title: 'Discount Marked as Redeemed', description: 'The customer\'s bag count has been updated.' });
         } catch (e) {
             console.error(e);
-            toast({ type: 'error', title: 'Redemption Failed', description: e instanceof Error ? e.message : 'An unknown error occurred.' });
+            toast({ variant: 'destructive', title: 'Redemption Failed', description: e instanceof Error ? e.message : 'An unknown error occurred.' });
         }
     };
 
