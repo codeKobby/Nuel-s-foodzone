@@ -13,6 +13,7 @@ interface SidebarProps {
     theme: string;
     setTheme: () => void;
     pendingOrdersCount: number;
+    lowStockCount: number;
     role: 'manager' | 'cashier';
     onLogout: () => void;
 }
@@ -36,15 +37,15 @@ const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: s
                 <p>{item.label}</p>
             </TooltipContent>
         </Tooltip>
-        {item.badge > 0 && (
-            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse border-2 border-card">
+        {item.badge != undefined && item.badge > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse border-2 border-card">
                 {item.badge}
             </span>
         )}
     </li>
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, setTheme, pendingOrdersCount, role, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, setTheme, pendingOrdersCount, lowStockCount, role, onLogout }) => {
     
     const navItemsConfig = {
         manager: [
@@ -54,7 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
         cashier: [
             { id: 'pos', icon: Home, label: 'POS' },
             { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
-            { id: 'stock', icon: Package, label: 'Stock' },
+            { id: 'stock', icon: Package, label: 'Stock', badge: lowStockCount },
             { id: 'rewards', icon: Gift, label: 'Rewards' },
             { id: 'accounting', icon: Scale, label: 'Accounting' },
             { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },

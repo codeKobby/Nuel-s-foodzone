@@ -27,6 +27,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Separator } from '@/components/ui/separator';
 import { OrderEditingProvider } from '@/context/OrderEditingContext';
 import { AuthContext } from '@/context/AuthContext';
+import type { MenuItem } from '@/lib/types';
 
 const MobileNav = ({
     activeView,
@@ -34,6 +35,7 @@ const MobileNav = ({
     theme,
     setTheme,
     pendingOrdersCount,
+    lowStockCount,
     role,
     onLogout
 }: {
@@ -42,6 +44,7 @@ const MobileNav = ({
     theme: string;
     setTheme: () => void;
     pendingOrdersCount: number;
+    lowStockCount: number;
     role: 'manager' | 'cashier';
     onLogout: () => void;
 }) => {
@@ -55,7 +58,7 @@ const MobileNav = ({
         cashier: [
             { id: 'pos', icon: Home, label: 'POS' },
             { id: 'orders', icon: ClipboardList, label: 'Orders', badge: pendingOrdersCount },
-            { id: 'stock', icon: Package, label: 'Stock' },
+            { id: 'stock', icon: Package, label: 'Stock', badge: lowStockCount },
             { id: 'rewards', icon: Gift, label: 'Rewards' },
             { id: 'accounting', icon: Scale, label: 'Accounting' },
             { id: 'misc', icon: Briefcase, label: 'Miscellaneous' },
@@ -101,8 +104,8 @@ const MobileNav = ({
                                 >
                                     <item.icon className="mr-3 h-5 w-5" />
                                     {item.label}
-                                     {item.badge > 0 && (
-                                        <span className="ml-auto bg-green-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                                     {item.badge != undefined && item.badge > 0 && (
+                                        <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                                             {item.badge}
                                         </span>
                                     )}
@@ -143,6 +146,7 @@ function CafePage() {
     const [authError, setAuthError] = useState<string | null>(null);
     const [theme, setTheme] = useState('light');
     const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+    const [lowStockCount, setLowStockCount] = useState(0);
     const isMobile = useIsMobile();
 
     useEffect(() => {
@@ -208,13 +212,29 @@ function CafePage() {
     
     useEffect(() => {
         if (!isAuthReady || !db) return;
-        const q = query(collection(db, "orders"), where("status", "==", "Pending"));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        
+        // Listen for pending orders
+        const ordersQuery = query(collection(db, "orders"), where("status", "==", "Pending"));
+        const unsubscribeOrders = onSnapshot(ordersQuery, (snapshot) => {
             setPendingOrdersCount(snapshot.size);
         }, (error) => {
             console.error("Error fetching pending orders count:", error);
         });
-        return () => unsubscribe();
+
+        // Listen for low stock items
+        const menuQuery = query(collection(db, "menuItems"), where("category", "in", ["Drinks", "Breakfast Drinks"]));
+        const unsubscribeMenu = onSnapshot(menuQuery, (snapshot) => {
+            const items = snapshot.docs.map(doc => doc.data() as MenuItem);
+            const lowStock = items.filter(item => (item.stock ?? 0) <= 5).length;
+            setLowStockCount(lowStock);
+        }, (error) => {
+            console.error("Error fetching menu items for stock count:", error);
+        });
+
+        return () => {
+            unsubscribeOrders();
+            unsubscribeMenu();
+        };
     }, [isAuthReady]);
 
 
@@ -269,6 +289,7 @@ function CafePage() {
                 theme={theme} 
                 setTheme={toggleTheme} 
                 pendingOrdersCount={pendingOrdersCount}
+                lowStockCount={lowStockCount}
                 role={role}
                 onLogout={handleLogout}
             />
@@ -286,6 +307,7 @@ function CafePage() {
                 theme={theme}
                 setTheme={toggleTheme}
                 pendingOrdersCount={pendingOrdersCount}
+                lowStockCount={lowStockCount}
                 role={role}
                 onLogout={handleLogout}
             />
