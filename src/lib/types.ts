@@ -56,7 +56,10 @@ export interface Order {
 export interface CustomerReward {
   id: string;
   customerTag: string;
+  phone?: string;
   bagCount: number;
+  joinedDate: Timestamp;
+  totalRedeemed: number;
   updatedAt: Timestamp;
 }
 
@@ -231,5 +234,7 @@ export interface DashboardStats {
     incompleteAccountingDays: string[];
     pardonedOrders: Order[];
 }
+
+    
 
     

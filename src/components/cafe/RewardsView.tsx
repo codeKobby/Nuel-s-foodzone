@@ -11,47 +11,270 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, User, UserPlus, PlusCircle, Gift, Package, BadgeCheck } from 'lucide-react';
-import { EmptyState } from '@/components/shared/ErrorPages';
+import { Search, User, UserPlus, PlusCircle, Gift, Package, BadgeCheck, Trophy, TrendingUp, Clock, CheckCircle2, History } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 
-const AddCustomerForm = ({ onAdd, isAdding, newCustomerTag, setNewCustomerTag }: {
+const AddCustomerForm = ({ onAdd, isAdding, newCustomerName, setNewCustomerName, newCustomerPhone, setNewCustomerPhone }: {
     onAdd: () => void;
     isAdding: boolean;
-    newCustomerTag: string;
-    setNewCustomerTag: (tag: string) => void;
+    newCustomerName: string;
+    setNewCustomerName: (name: string) => void;
+    newCustomerPhone: string;
+    setNewCustomerPhone: (phone: string) => void;
 }) => (
-    <div className="flex flex-col gap-3">
-        <Input 
-            placeholder="New customer name..." 
-            value={newCustomerTag} 
-            onChange={e => setNewCustomerTag(e.target.value)} 
-            disabled={isAdding} 
-        />
-        <Button onClick={onAdd} disabled={isAdding || !newCustomerTag.trim()}>
-            {isAdding ? <LoadingSpinner/> : "Add Customer"}
+    <div className="space-y-4">
+        <div className="space-y-2">
+            <Label htmlFor="customer-name">Customer Name *</Label>
+            <Input
+                id="customer-name"
+                placeholder="Enter customer name"
+                value={newCustomerName}
+                onChange={e => setNewCustomerName(e.target.value)}
+                disabled={isAdding}
+            />
+        </div>
+        <div className="space-y-2">
+            <Label htmlFor="customer-phone">Phone Number (Optional)</Label>
+            <Input
+                id="customer-phone"
+                placeholder="+233 XX XXX XXXX"
+                value={newCustomerPhone}
+                onChange={e => setNewCustomerPhone(e.target.value)}
+                disabled={isAdding}
+            />
+        </div>
+        <Button onClick={onAdd} disabled={isAdding || !newCustomerName.trim()} className="w-full">
+            {isAdding ? <LoadingSpinner /> : <>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add Customer
+            </>}
         </Button>
     </div>
 );
 
-const RewardsView: React.FC = () => {
+const RewardProgressBar = ({ bagCount, showLabel = true }: { bagCount: number, showLabel?: boolean }) => {
+    const progress = (bagCount % 5) * 20;
+    const remainingBags = 5 - (bagCount % 5);
+
+    return (
+        <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Progress to next reward</span>
+                <span>{remainingBags === 5 ? '5' : remainingBags} bags to go</span>
+            </div>
+            <Progress value={progress} className="h-2" />
+            {showLabel && (
+                <div className="text-xs text-center text-muted-foreground">
+                    {bagCount % 5}/5 bags
+                </div>
+            )}
+        </div>
+    );
+};
+
+const CustomerCard = ({ reward, onAddBags, onRedeemDiscount, updatingCustomerId, bagsToAdd, setBagsToAdd }: {
+    reward: CustomerReward;
+    onAddBags: (customerId: string, currentBags: number) => void;
+    onRedeemDiscount: (customerId: string, discount: number) => void;
+    updatingCustomerId: string | null;
+    bagsToAdd: string;
+    setBagsToAdd: (bags: string) => void;
+}) => {
+    const discount = Math.floor(reward.bagCount / 5) * 10;
+    const canClaim = discount > 0;
+    const completedRewards = Math.floor(reward.bagCount / 5);
+
+    return (
+        <Card className="hover:shadow-md transition-shadow duration-200">
+            <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                            <User className="h-5 w-5 text-primary" />
+                            <h3 className="font-semibold text-lg">{reward.customerTag}</h3>
+                            {completedRewards > 0 && (
+                                <Badge variant="secondary" className="ml-2">
+                                    <Trophy className="h-3 w-3 mr-1" />
+                                    {completedRewards}x Rewards
+                                </Badge>
+                            )}
+                        </div>
+                        {reward.phone && (
+                            <p className="text-sm text-muted-foreground mb-2">{reward.phone}</p>
+                        )}
+                        <div className="flex items-center gap-4 mb-3">
+                            <div className="flex items-center gap-1.5">
+                                <Package className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm font-medium">{reward.bagCount} bags returned</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">
+                                    Joined {reward.joinedDate.toDate().toLocaleDateString()}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mb-4">
+                    <RewardProgressBar bagCount={reward.bagCount} />
+                </div>
+
+                {canClaim && (
+                    <div className="mb-4 p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Gift className="h-5 w-5 text-green-600" />
+                                <span className="font-medium text-green-800 dark:text-green-200">
+                                    {formatCurrency(discount)} discount available!
+                                </span>
+                            </div>
+                            <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => onRedeemDiscount(reward.id, discount)}
+                            >
+                                <CheckCircle2 className="h-4 w-4 mr-1" />
+                                Mark as Redeemed
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex gap-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="flex-1">
+                                <PlusCircle className="h-4 w-4 mr-2" />
+                                Add Bags
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72">
+                            <div className="space-y-4">
+                                <div>
+                                    <h4 className="font-medium mb-2">Record Returned Bags</h4>
+                                    <p className="text-sm text-muted-foreground">For {reward.customerTag}</p>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <Label htmlFor={`bags-${reward.id}`}>Number of bags returned</Label>
+                                        <Input
+                                            id={`bags-${reward.id}`}
+                                            type="number"
+                                            placeholder="e.g., 3"
+                                            value={bagsToAdd}
+                                            onChange={(e) => setBagsToAdd(e.target.value)}
+                                            autoFocus
+                                            min="1"
+                                            disabled={updatingCustomerId === reward.id}
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                    <Button
+                                        onClick={() => onAddBags(reward.id, reward.bagCount)}
+                                        disabled={updatingCustomerId === reward.id || !bagsToAdd}
+                                        className="w-full"
+                                    >
+                                        {updatingCustomerId === reward.id ? <LoadingSpinner /> : 'Record Return'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                                <History className="h-4 w-4" />
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Customer History - {reward.customerTag}</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4 p-4 bg-secondary/50 rounded-lg">
+                                    <div>
+                                        <p className="text-sm font-medium">Total Bags Returned</p>
+                                        <p className="text-2xl font-bold">{reward.bagCount}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium">Total Discounts Redeemed</p>
+                                        <p className="text-2xl font-bold">{formatCurrency(reward.totalRedeemed)}</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="font-medium mb-2">Recent Activity</h4>
+                                    <div className="space-y-2 text-sm text-muted-foreground">
+                                        <p>Note: Detailed activity history is coming soon.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
+const StatsCards = ({ rewards }: { rewards: CustomerReward[] }) => {
+    const totalCustomers = rewards.length;
+    const totalBags = rewards.reduce((sum, r) => sum + r.bagCount, 0);
+    const totalPendingDiscounts = rewards.reduce((sum, r) => sum + Math.floor(r.bagCount / 5) * 10, 0);
+    const totalRedeemed = rewards.reduce((sum, r) => sum + r.totalRedeemed, 0);
+
+    const stats = [
+        { label: 'Total Customers', value: totalCustomers, icon: User, color: 'text-blue-600' },
+        { label: 'Bags Returned', value: totalBags, icon: Package, color: 'text-green-600' },
+        { label: 'Pending Discounts', value: formatCurrency(totalPendingDiscounts), icon: Gift, color: 'text-orange-600' },
+        { label: 'Total Redeemed', value: formatCurrency(totalRedeemed), icon: TrendingUp, color: 'text-purple-600' },
+    ];
+
+    return (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {stats.map((stat, index) => (
+                <Card key={index}>
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-full bg-secondary ${stat.color}`}>
+                                <stat.icon className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold">{stat.value}</p>
+                                <p className="text-xs text-muted-foreground">{stat.label}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+    );
+};
+
+const RewardsView = () => {
     const [rewards, setRewards] = useState<CustomerReward[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [isAddingCustomer, setIsAddingCustomer] = useState(false);
-    const [newCustomerTag, setNewCustomerTag] = useState('');
+    const [newCustomerName, setNewCustomerName] = useState('');
+    const [newCustomerPhone, setNewCustomerPhone] = useState('');
     const [updatingCustomerId, setUpdatingCustomerId] = useState<string | null>(null);
     const [bagsToAdd, setBagsToAdd] = useState('');
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
-
+    const [activeTab, setActiveTab] = useState('all');
 
     useEffect(() => {
+        setLoading(true);
         const q = query(collection(db, "rewards"), orderBy('updatedAt', 'desc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setRewards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerReward)));
@@ -65,16 +288,20 @@ const RewardsView: React.FC = () => {
     }, [toast]);
 
     const handleAddCustomer = async () => {
-        if (!newCustomerTag.trim()) return;
+        if (!newCustomerName.trim()) return;
         setIsAddingCustomer(true);
         try {
             await addDoc(collection(db, 'rewards'), {
-                customerTag: newCustomerTag,
+                customerTag: newCustomerName,
+                phone: newCustomerPhone,
                 bagCount: 0,
+                totalRedeemed: 0,
+                joinedDate: serverTimestamp(),
                 updatedAt: serverTimestamp(),
             });
-            toast({ type: 'success', title: 'Customer Added', description: `${newCustomerTag} can now earn rewards.` });
-            setNewCustomerTag('');
+            toast({ type: 'success', title: 'Customer Added', description: `${newCustomerName} can now earn rewards.` });
+            setNewCustomerName('');
+            setNewCustomerPhone('');
             setIsAddSheetOpen(false);
         } catch (e) {
             console.error(e);
@@ -83,14 +310,14 @@ const RewardsView: React.FC = () => {
             setIsAddingCustomer(false);
         }
     };
-    
-    const handleUpdateBags = async (customerId: string, currentBags: number) => {
+
+    const handleAddBags = async (customerId: string, currentBags: number) => {
         const numBags = parseInt(bagsToAdd, 10);
         if (isNaN(numBags) || numBags <= 0) {
-            toast({type: 'error', title: 'Invalid number', description: 'Please enter a valid number of bags.'});
+            toast({ type: 'error', title: 'Invalid number', description: 'Please enter a valid number of bags.' });
             return;
         };
-        
+
         setUpdatingCustomerId(customerId);
         try {
             await updateDoc(doc(db, 'rewards', customerId), {
@@ -99,158 +326,175 @@ const RewardsView: React.FC = () => {
             });
             toast({ type: 'success', title: 'Bags Updated', description: `Added ${numBags} bag(s).` });
             setBagsToAdd('');
-            setUpdatingCustomerId(null); // This will close the popover
         } catch (e) {
             console.error(e);
-             toast({ type: 'error', title: 'Error', description: 'Failed to update bag count.' });
+            toast({ type: 'error', title: 'Error', description: 'Failed to update bag count.' });
         } finally {
-            // State is set to null on success, but also set it here in case of error
-             setUpdatingCustomerId(null); 
+            setUpdatingCustomerId(null);
+        }
+    };
+    
+    const handleRedeemDiscount = async (customerId: string, discountAmount: number) => {
+        const bagsToRedeem = (discountAmount / 10) * 5;
+        try {
+            await runTransaction(db, async (transaction) => {
+                const customerRef = doc(db, 'rewards', customerId);
+                const customerDoc = await transaction.get(customerRef);
+                if (!customerDoc.exists()) {
+                    throw new Error("Customer not found");
+                }
+                const currentData = customerDoc.data() as CustomerReward;
+                
+                if (currentData.bagCount < bagsToRedeem) {
+                    throw new Error("Not enough bags to redeem this discount.");
+                }
+
+                transaction.update(customerRef, {
+                    bagCount: currentData.bagCount - bagsToRedeem,
+                    totalRedeemed: currentData.totalRedeemed + discountAmount,
+                    updatedAt: serverTimestamp()
+                });
+            });
+             toast({ type: 'success', title: 'Discount Marked as Redeemed', description: 'The customer\'s bag count has been updated.' });
+        } catch (e) {
+            console.error(e);
+            toast({ type: 'error', title: 'Redemption Failed', description: e instanceof Error ? e.message : 'An unknown error occurred.' });
         }
     };
 
     const filteredRewards = useMemo(() => {
-        return rewards.filter(r => r.customerTag.toLowerCase().includes(searchQuery.toLowerCase()));
-    }, [rewards, searchQuery]);
-    
-    const renderCustomerList = () => {
-        if (loading) return <div className="flex justify-center py-10"><LoadingSpinner/></div>;
-        
-        if (filteredRewards.length === 0) {
-            return (
-                <EmptyState 
-                  title={searchQuery ? "No Customers Found" : "No Customers in Program"}
-                  description={searchQuery ? "No customers match your search." : "Add a customer to get started with the rewards program."} 
-                  icon={Gift} 
-                />
-            );
-        }
-        
-        return (
-            <div className="space-y-3">
-                {filteredRewards.map(reward => {
-                    const discount = Math.floor(reward.bagCount / 5) * 10;
-                    const canClaim = discount > 0;
-                    
-                    return (
-                        <div key={reward.id} className="p-4 bg-card rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                            <div className="flex-grow">
-                                <p className="font-bold text-lg flex items-center gap-2">
-                                    <User className="h-4 w-4 text-muted-foreground"/> 
-                                    {reward.customerTag}
-                                </p>
-                                <div className="flex items-center gap-4 mt-2">
-                                    <Badge variant="secondary" className="text-sm">
-                                        <Package className="h-3 w-3 mr-1.5"/>
-                                        {reward.bagCount} Bags
-                                    </Badge>
-                                    <Badge variant={canClaim ? "default" : "outline"} className={`text-sm ${canClaim ? 'bg-green-500 hover:bg-green-500' : ''}`}>
-                                        <BadgeCheck className="h-3 w-3 mr-1.5"/>
-                                        {formatCurrency(discount)} Discount
-                                    </Badge>
-                                </div>
-                            </div>
-
-                             <Popover onOpenChange={(open) => { if(!open) setUpdatingCustomerId(null)}}>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                        <PlusCircle className="h-4 w-4 mr-2"/> Add Bags
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-60">
-                                    <div className="grid gap-4">
-                                        <div className="space-y-2">
-                                            <h4 className="font-medium leading-none">Add Returned Bags</h4>
-                                            <p className="text-sm text-muted-foreground">For {reward.customerTag}</p>
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor={`bags-${reward.id}`}>Bags to Add</Label>
-                                            <Input 
-                                                id={`bags-${reward.id}`}
-                                                type="number" 
-                                                placeholder="e.g., 5" 
-                                                value={bagsToAdd} 
-                                                onChange={(e) => setBagsToAdd(e.target.value)} 
-                                                autoFocus
-                                                disabled={updatingCustomerId === reward.id}
-                                            />
-                                            <Button onClick={() => handleUpdateBags(reward.id, reward.bagCount)} disabled={updatingCustomerId === reward.id || !bagsToAdd}>
-                                                {updatingCustomerId === reward.id ? <LoadingSpinner/> : 'Save'}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                    );
-                })}
-            </div>
+        let filtered = rewards.filter(r =>
+            r.customerTag.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (r.phone && r.phone.includes(searchQuery))
         );
-    }
+
+        if (activeTab === 'eligible') {
+            filtered = filtered.filter(r => Math.floor(r.bagCount / 5) > 0);
+        }
+
+        return filtered.sort((a, b) => {
+            if (activeTab === 'eligible') {
+                const aDiscount = Math.floor(a.bagCount / 5);
+                const bDiscount = Math.floor(b.bagCount / 5);
+                if (bDiscount !== aDiscount) return bDiscount - aDiscount;
+            }
+            return b.bagCount - a.bagCount;
+        });
+    }, [rewards, searchQuery, activeTab]);
     
+    const eligibleCustomersCount = useMemo(() => rewards.filter(r => Math.floor(r.bagCount / 5) > 0).length, [rewards]);
+
     return (
-        <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
-            <div className="flex-1 p-4 md:p-6 overflow-y-auto">
-                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl md:text-3xl font-bold">Customer Rewards</h2>
-                    {isMobile && (
-                        <Sheet open={isAddSheetOpen} onOpenChange={setIsAddSheetOpen}>
-                            <SheetTrigger asChild>
-                                <Button size="icon"><UserPlus /></Button>
-                            </SheetTrigger>
-                            <SheetContent side="bottom" className="h-auto">
-                                <SheetHeader>
-                                    <SheetTitle className="text-2xl">Add New Customer</SheetTitle>
-                                </SheetHeader>
-                                <div className="p-4">
-                                <AddCustomerForm 
+        <div className="min-h-screen bg-background p-4 md:p-6">
+            <div className="max-w-7xl mx-auto">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                    <div>
+                        <h1 className="text-3xl font-bold">Customer Rewards</h1>
+                        <p className="text-muted-foreground">
+                            Track bag returns • 5 bags = {formatCurrency(10)} discount
+                        </p>
+                    </div>
+
+                    <Sheet open={isAddSheetOpen} onOpenChange={setIsAddSheetOpen}>
+                        <SheetTrigger asChild>
+                            <Button>
+                                <UserPlus className="h-4 w-4 mr-2" />
+                                Add Customer
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent side="right" className="w-full sm:max-w-md">
+                            <SheetHeader>
+                                <SheetTitle>Add New Customer</SheetTitle>
+                            </SheetHeader>
+                            <div className="mt-6">
+                                <AddCustomerForm
                                     onAdd={handleAddCustomer}
                                     isAdding={isAddingCustomer}
-                                    newCustomerTag={newCustomerTag}
-                                    setNewCustomerTag={setNewCustomerTag}
+                                    newCustomerName={newCustomerName}
+                                    setNewCustomerName={setNewCustomerName}
+                                    newCustomerPhone={newCustomerPhone}
+                                    setNewCustomerPhone={setNewCustomerPhone}
                                 />
-                                </div>
-                            </SheetContent>
-                        </Sheet>
-                    )}
-                 </div>
+                            </div>
+                        </SheetContent>
+                    </Sheet>
+                </div>
 
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Rewards Program</CardTitle>
-                        <CardDescription>Track customer bag returns. 5 bags = {formatCurrency(10)} discount.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Search customers by name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+                {/* Stats */}
+                <StatsCards rewards={rewards} />
+
+                {/* Search and Filters */}
+                <Card className="mb-6">
+                    <CardContent className="p-6">
+                        <div className="flex flex-col lg:flex-row gap-4">
+                            <div className="flex-1 relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search by name or phone number..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-10"
+                                />
+                            </div>
+                            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                                <TabsList>
+                                    <TabsTrigger value="all">All Customers</TabsTrigger>
+                                    <TabsTrigger value="eligible">
+                                        Eligible ({eligibleCustomersCount})
+                                    </TabsTrigger>
+                                </TabsList>
+                            </Tabs>
                         </div>
                     </CardContent>
-                 </Card>
-
-                 <div className="mt-6">
-                    {renderCustomerList()}
-                </div>
-            </div>
-
-            {!isMobile && (
-                 <Card className="w-full md:w-80 lg:w-96 rounded-none border-t md:border-t-0 md:border-l">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><UserPlus/> Add New Customer</CardTitle>
-                        <CardDescription>Add a new customer to the rewards program.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <AddCustomerForm 
-                            onAdd={handleAddCustomer}
-                            isAdding={isAddingCustomer}
-                            newCustomerTag={newCustomerTag}
-                            setNewCustomerTag={setNewCustomerTag}
-                        />
-                    </CardContent>
                 </Card>
-            )}
+
+                {/* Customer List */}
+                {loading ? (
+                    <div className="flex justify-center py-12">
+                        <LoadingSpinner />
+                    </div>
+                ) : filteredRewards.length === 0 ? (
+                    <Card>
+                        <CardContent className="py-12 text-center">
+                            <Gift className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                            <h3 className="font-semibold mb-2">
+                                {searchQuery ? "No customers found" : "No customers yet"}
+                            </h3>
+                            <p className="text-muted-foreground mb-4">
+                                {searchQuery
+                                    ? "Try adjusting your search terms"
+                                    : "Add your first customer to get started with the rewards program"
+                                }
+                            </p>
+                            {!searchQuery && (
+                                <Button onClick={() => setIsAddSheetOpen(true)}>
+                                    <UserPlus className="h-4 w-4 mr-2" />
+                                    Add Customer
+                                </Button>
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                        {filteredRewards.map(reward => (
+                            <CustomerCard
+                                key={reward.id}
+                                reward={reward}
+                                onAddBags={handleAddBags}
+                                onRedeemDiscount={handleRedeemDiscount}
+                                updatingCustomerId={updatingCustomerId}
+                                bagsToAdd={bagsToAdd}
+                                setBagsToAdd={setBagsToAdd}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
 
 export default RewardsView;
+
+    
