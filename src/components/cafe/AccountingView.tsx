@@ -357,6 +357,7 @@ const ReconciliationView: React.FC<{
     };
 
     return (
+        <>
         <Dialog open={true} onOpenChange={onBack}>
             <DialogContent className="max-w-7xl max-h-[90vh]">
                 <DialogHeader className="pb-4 border-b">
@@ -601,6 +602,24 @@ const ReconciliationView: React.FC<{
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        {showConfirm && (
+            <AlertDialog open onOpenChange={setShowConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            You are about to finalize the financial report for today. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleSaveReport}>Continue</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        )}
+        </>
     );
 }
 
@@ -663,18 +682,22 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     
                     if (order.status === "Completed") {
                         totalSales += order.total;
-                        cashSales += order.paymentMethod === 'cash' ? order.amountPaid : 0;
-                        momoSales += order.paymentMethod === 'momo' ? order.amountPaid : 0;
-                        
                         order.items.forEach(item => {
                             totalItemsSold += item.quantity;
                             const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
                             itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
                         });
-                        
-                        if (order.balanceDue > 0) {
-                            todayUnpaidOrdersValue += order.balanceDue;
-                        }
+                    }
+
+                    // Sum payments made for orders CREATED today
+                    if (order.paymentMethod === 'cash') {
+                        cashSales += order.amountPaid;
+                    } else if (order.paymentMethod === 'momo') {
+                        momoSales += order.amountPaid;
+                    }
+
+                    if (order.status === 'Completed' && order.balanceDue > 0) {
+                        todayUnpaidOrdersValue += order.balanceDue;
                     }
 
                     if (order.pardonedAmount && order.pardonedAmount > 0) {
