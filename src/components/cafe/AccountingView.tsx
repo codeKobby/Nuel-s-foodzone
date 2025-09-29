@@ -204,6 +204,17 @@ const ReconciliationView: React.FC<{
         }
     };
 
+    const confirmationDescription = useMemo(() => {
+        const baseText = "You are about to finalize the financial report for today. This action cannot be undone.";
+        if (!stats || stats.changeOwedForPeriod <= 0) {
+            return baseText;
+        }
+
+        const changeText = `You have indicated that customer change of ${formatCurrency(stats.changeOwedForPeriod)} will be ${deductCustomerChange ? 'DEDUCTED from the available cash' : 'LEFT IN the cash drawer'}.`;
+
+        return `${changeText} ${baseText}`;
+    }, [stats, deductCustomerChange]);
+
     const AdvancedReconciliationModal = () => {
         const [checkedOrderIds, setCheckedOrderIds] = useState(new Set<string>());
         const [searchQuery, setSearchQuery] = useState('');
@@ -597,7 +608,7 @@ const ReconciliationView: React.FC<{
                 <DialogFooter className="pt-6 border-t">
                     <Button variant="secondary" onClick={onBack} disabled={isSubmitting}>Cancel</Button>
                     <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting || !stats} className="w-full md:w-auto h-12 text-lg font-bold bg-green-600 hover:bg-green-700">
-                        {isSubmitting ? <LoadingSpinner /> : 'Save &amp; Finalize Report'}
+                        {isSubmitting ? <LoadingSpinner /> : 'Save & Finalize Report'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -609,7 +620,7 @@ const ReconciliationView: React.FC<{
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            You are about to finalize the financial report for today. This action cannot be undone.
+                            {confirmationDescription}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -646,8 +657,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         setStats(null);
         
         try {
-            const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', todayStart), where('timestamp', '<=', todayEnd));
             const allOrdersQuery = query(collection(db, "orders"));
+            const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', todayStart), where('timestamp', '<=', todayEnd));
 
             const [
                 allOrdersSnapshot,
