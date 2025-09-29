@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { CustomerReward } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
@@ -116,7 +116,7 @@ const CustomerCard = ({ reward, onAddBags, onRedeemDiscount, updatingCustomerId,
                             <div className="flex items-center gap-1.5">
                                 <Clock className="h-4 w-4 text-muted-foreground" />
                                 <span className="text-sm text-muted-foreground">
-                                    Joined {reward.joinedDate.toDate().toLocaleDateString()}
+                                    Joined {reward.joinedDate ? reward.joinedDate.toDate().toLocaleDateString() : ''}
                                 </span>
                             </div>
                         </div>
