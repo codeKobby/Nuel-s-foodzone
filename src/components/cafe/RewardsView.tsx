@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 const AddCustomerForm = ({ onAdd, isAdding, newCustomerName, setNewCustomerName, newCustomerPhone, setNewCustomerPhone }: {
     onAdd: () => void;
@@ -139,10 +140,10 @@ const CustomerCard = ({ reward, onAddBags, onRedeemDiscount, updatingCustomerId,
                             <Button
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700"
-                                onClick={() => onRedeemDiscount(reward.id, discount)}
+                                onClick={() => onRedeemDiscount(reward.id, 10)} // Redeem in 10 GHS increments
                             >
                                 <CheckCircle2 className="h-4 w-4 mr-1" />
-                                Mark as Redeemed
+                                Redeem
                             </Button>
                         </div>
                     </div>
@@ -335,9 +336,7 @@ const RewardsView = () => {
     };
     
     const handleRedeemDiscount = async (customerId: string, discountAmount: number) => {
-        // For now, assume redeeming the smallest unit (10 GHS) which costs 5 bags.
-        const bagsToRedeem = 5;
-        const redeemedValue = 10;
+        const bagsToRedeem = 5; // Fixed at 5 bags for a 10 GHS discount.
     
         try {
             await runTransaction(db, async (transaction) => {
@@ -354,7 +353,7 @@ const RewardsView = () => {
     
                 transaction.update(customerRef, {
                     bagCount: currentData.bagCount - bagsToRedeem,
-                    totalRedeemed: currentData.totalRedeemed + redeemedValue,
+                    totalRedeemed: (currentData.totalRedeemed || 0) + discountAmount,
                     updatedAt: serverTimestamp()
                 });
             });
@@ -388,7 +387,7 @@ const RewardsView = () => {
     const eligibleCustomersCount = useMemo(() => rewards.filter(r => Math.floor(r.bagCount / 5) > 0).length, [rewards]);
 
     return (
-        <div className="min-h-screen bg-background p-4 md:p-6">
+        <div className="bg-background p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -479,7 +478,7 @@ const RewardsView = () => {
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {filteredRewards.map(reward => (
                             <CustomerCard
                                 key={reward.id}
@@ -499,5 +498,3 @@ const RewardsView = () => {
 };
 
 export default RewardsView;
-
-    
