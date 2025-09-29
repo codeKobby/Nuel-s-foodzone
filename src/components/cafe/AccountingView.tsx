@@ -71,20 +71,20 @@ const ReconciliationView: React.FC<{
     onBack: () => void 
 }> = ({ stats, adjustedExpectedCash, onBack }) => {
     const [notes, setNotes] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [showConfirm, setShowConfirm] = useState(false);
-    const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
-    const [deductCustomerChange, setDeductCustomerChange] = useState(true);
+    const [isSubmitting, setIsSubmitting = useState(false);
+    const [showConfirm, setShowConfirm = useState(false);
+    const [isAdvancedModalOpen, setIsAdvancedModalOpen = useState(false);
+    const [deductCustomerChange, setDeductCustomerChange = useState(true);
     const { session } = useContext(AuthContext);
     const { toast } = useToast();
     const today = useMemo(() => new Date(), []);
     
     const cashDenominations = [200, 100, 50, 20, 10, 5, 2, 1];
-    const [denominationQuantities, setDenominationQuantities] = useState<Record<string, string>>(
+    const [denominationQuantities, setDenominationQuantities = useState<Record<string, string>>(
         cashDenominations.reduce((acc, val) => ({ ...acc, [val]: '' }), {})
     );
-    const [momoTransactions, setMomoTransactions] = useState<number[]>([]);
-    const [momoInput, setMomoInput] = useState('');
+    const [momoTransactions, setMomoTransactions = useState<number[]>([]);
+    const [momoInput, setMomoInput = useState('');
 
     const totalCountedCash = useMemo(() => {
         return cashDenominations.reduce((total, den) => {
@@ -216,8 +216,8 @@ const ReconciliationView: React.FC<{
     }, [stats, deductCustomerChange]);
 
     const AdvancedReconciliationModal = () => {
-        const [checkedOrderIds, setCheckedOrderIds] = useState(new Set<string>());
-        const [searchQuery, setSearchQuery] = useState('');
+        const [checkedOrderIds, setCheckedOrderIds = useState(new Set<string>());
+        const [searchQuery, setSearchQuery = useState('');
 
         const handleCheckChange = (orderId: string, isChecked: boolean) => {
           setCheckedOrderIds(prev => {
@@ -597,7 +597,7 @@ const ReconciliationView: React.FC<{
                 )}
                 
                 <DialogFooter className="pt-6 border-t">
-                    <Button variant="secondary" onClick={onBack} disabled={isSubmitting}>Cancel</Button>
+                    <Button variant="secondary" onClick={onBack} disabled={isSubmitting)}>Cancel</Button>
                     <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting || !stats} className="w-full md:w-auto h-12 text-lg font-bold bg-green-600 hover:bg-green-700">
                         {isSubmitting ? <LoadingSpinner /> : 'Save & Finalize Report'}
                     </Button>
@@ -628,12 +628,12 @@ const ReconciliationView: React.FC<{
 
 
 const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setActiveView}) => {
-    const [stats, setStats] = useState<PeriodStats | null>(null);
-    const [reports, setReports] = useState<ReconciliationReport[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [showReconciliation, setShowReconciliation] = useState(false);
-    const [showUnpaidOrdersWarning, setShowUnpaidOrdersWarning] = useState(false);
+    const [stats, setStats = useState<PeriodStats | null>(null);
+    const [reports, setReports = useState<ReconciliationReport[]>([]);
+    const [loading, setLoading = useState(true);
+    const [error, setError = useState<string | null>(null);
+    const [showReconciliation, setShowReconciliation = useState(false);
+    const [showUnpaidOrdersWarning, setShowUnpaidOrdersWarning = useState(false);
     
     const today = useMemo(() => new Date(), []);
     const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
@@ -693,9 +693,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     }
 
                     // Sum payments made for orders CREATED today
-                    if (order.paymentMethod === 'cash') {
+                    if (order.paymentMethod === 'cash' && order.amountPaid > 0) {
                         cashSales += order.amountPaid;
-                    } else if (order.paymentMethod === 'momo') {
+                    } else if (order.paymentMethod === 'momo' && order.amountPaid > 0) {
                         momoSales += order.amountPaid;
                     }
 
@@ -924,5 +924,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+    
 
     
