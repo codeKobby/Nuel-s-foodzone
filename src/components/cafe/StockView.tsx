@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -285,7 +286,7 @@ const StockView = () => {
   useEffect(() => {
     requestNotificationPermission();
 
-    const q = query(collection(db, "menuItems"), orderBy('category'), orderBy('name'));
+    const q = query(collection(db, "menuItems"), orderBy('name'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem));
         setMenuItems(items);
@@ -296,7 +297,7 @@ const StockView = () => {
         toast({
             title: "Connection Error",
             description: "Could not sync stock data from the database.",
-            variant: "destructive"
+            type: "error"
         });
         setConnectionStatus(prev => ({ ...prev, isConnected: false }));
         setLoading(false);
@@ -319,7 +320,8 @@ const StockView = () => {
         await updateDoc(doc(db, "menuItems", itemId), { stock: newStock });
         toast({
             title: "Stock Updated",
-            description: `${item.name} stock is now ${newStock}.`
+            description: `${item.name} stock is now ${newStock}.`,
+            type: 'success'
         });
 
         if (notificationsEnabled) {
@@ -331,7 +333,7 @@ const StockView = () => {
           } else if (newStock <= LOW_STOCK_THRESHOLD && newStock > 0 && oldStock > LOW_STOCK_THRESHOLD) {
             sendNotification(
               '🟡 Low Stock Alert',
-              `${item.name} is running low (${newStock} left). Time to restock!`
+              `${item.name} is running low (${newStock} left). Time to restock!'`
             );
           }
         }
@@ -340,7 +342,7 @@ const StockView = () => {
         toast({
             title: "Update Failed",
             description: `Could not update stock for ${item.name}.`,
-            variant: "destructive"
+            type: "error"
         });
     } finally {
         setUpdatingItemId(null);
@@ -353,13 +355,13 @@ const StockView = () => {
       if (permission === 'granted') {
         setNotificationsEnabled(true);
         sendNotification('Notifications Enabled', 'You\'ll now receive stock alerts');
-        toast({ title: 'Alerts Enabled', description: 'You will now receive stock notifications.' });
+        toast({ title: 'Alerts Enabled', description: 'You will now receive stock notifications.', type: 'success' });
       } else {
-        toast({ title: 'Alerts Blocked', description: 'Please enable notifications in your browser settings.', variant: 'destructive' });
+        toast({ title: 'Alerts Blocked', description: 'Please enable notifications in your browser settings.', type: 'error' });
       }
     } else {
       setNotificationsEnabled(false);
-      toast({ title: 'Alerts Disabled' });
+      toast({ title: 'Alerts Disabled', type: 'info' });
     }
   };
 
@@ -505,7 +507,7 @@ const StockView = () => {
           </Alert>
         )}
 
-        {stats.lowStock > 0 && stats.lowStock !== stats.outOfStock && (
+        {stats.lowStock > 0 && stats.outOfStock === 0 && (
           <Alert className="border-yellow-300 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
             <AlertCircle className="h-4 w-4 text-yellow-600" />
             <AlertTitle className="text-yellow-800 dark:text-yellow-200">Warning: Low Stock Items</AlertTitle>
