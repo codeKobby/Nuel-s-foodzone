@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle, Landmark, CreditCard, DollarSign, Hourglass, MinusCircle, Ban } from 'lucide-react';
+import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle, Landmark, CreditCard, DollarSign, Hourglass, MinusCircle, Ban, Separator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isToday } from 'date-fns';
@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
+import { Separator as UiSeparator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Search } from 'lucide-react';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip';
@@ -550,7 +550,7 @@ const ReconciliationView: React.FC<{
                                             <div className="flex justify-between text-red-600"><span>(-) Cash Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscCashExpenses)}</span></div>
                                             {stats.settledUnpaidOrdersValue > 0 && <div className="flex justify-between text-green-600"><span>(+) Settled Old Orders:</span><span className="font-medium">+{formatCurrency(stats.settledUnpaidOrdersValue)}</span></div>}
                                             {stats.previousDaysChangeGiven > 0 && <div className="flex justify-between text-orange-600"><span>(-) Previous Days Change:</span><span className="font-medium">-{formatCurrency(stats.previousDaysChangeGiven)}</span></div>}
-                                            <Separator />
+                                            <UiSeparator />
                                             <div className="flex justify-between font-bold text-blue-700 text-base"><span>Expected Cash:</span><span>{formatCurrency(adjustedExpectedCash)}</span></div>
                                         </div>
                                     </div>
@@ -559,7 +559,7 @@ const ReconciliationView: React.FC<{
                                         <div className="space-y-2 text-sm">
                                             <div className="flex justify-between"><span>Today's MoMo Sales:</span><span className="font-medium">{formatCurrency(stats.momoSales)}</span></div>
                                             <div className="flex justify-between text-red-600"><span>(-) MoMo Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscMomoExpenses)}</span></div>
-                                            <Separator />
+                                            <UiSeparator />
                                             <div className="flex justify-between font-bold text-purple-700 text-base"><span>Expected MoMo:</span><span>{formatCurrency(stats.expectedMomo)}</span></div>
                                         </div>
                                     </div>
@@ -577,7 +577,7 @@ const ReconciliationView: React.FC<{
                                     <h4 className="font-semibold text-base text-green-600">Cash</h4>
                                     <div className="flex justify-between"><span>Cash Counted:</span><span className="font-medium">{formatCurrency(totalCountedCash)}</span></div>
                                     {stats.changeOwedForPeriod > 0 && deductCustomerChange && <div className="flex justify-between text-orange-600"><span>(-) Today's Change:</span><span className="font-medium">-{formatCurrency(stats.changeOwedForPeriod)}</span></div>}
-                                    <Separator />
+                                    <UiSeparator />
                                     <div className="flex justify-between font-bold text-green-700"><span>Available Cash:</span><span>{formatCurrency(availableCash)}</span></div>
                                 </div>
                                 <div className="space-y-2 text-sm">
@@ -858,13 +858,20 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                         <StatCard icon={<Coins className="text-muted-foreground" />} title="Previous Change Given" value={formatCurrency(stats.previousDaysChangeGiven)} description="Change for old orders given today" />
                                     </CardContent>
                                     <CardFooter>
-                                         <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30">
-                                            <Label className="text-lg font-semibold text-green-800 dark:text-green-200">Net Revenue</Label>
-                                            <p className="text-3xl font-bold text-green-700 dark:text-green-300">{formatCurrency(stats.netRevenue)}</p>
+                                        <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30">
+                                            <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Total Net Revenue</Label>
+                                            <p className="text-3xl font-bold text-green-600 dark:text-green-200">{formatCurrency(stats.netRevenue)}</p>
                                             {stats.settledUnpaidOrdersValue > 0 && (
-                                                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                                                    Today's Net: {formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)} | Collections: {formatCurrency(stats.settledUnpaidOrdersValue)}
-                                                </p>
+                                                <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700">
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="font-bold text-green-800 dark:text-green-100">Today's Net:</span>
+                                                        <span className="font-semibold">{formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-xs text-green-700 dark:text-green-300">
+                                                        <span>+ Collections:</span>
+                                                        <span>{formatCurrency(stats.settledUnpaidOrdersValue)}</span>
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
                                     </CardFooter>
@@ -926,5 +933,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
 export default AccountingView;
 
+
+    
 
     
