@@ -180,9 +180,15 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         rewardCustomerTag: reward?.customer.customerTag || '',
       };
       
+      let newPaymentAmount = balances.newPaymentAmount;
+      if (isPaid && paymentMethod === 'momo') {
+          newPaymentAmount = finalTotal - (editingOrder?.amountPaid || 0);
+          if (newPaymentAmount < 0) newPaymentAmount = 0; // Don't process negative payment
+      }
+
       if (isPaid) {
           orderData.lastPaymentTimestamp = serverTimestamp();
-          orderData.lastPaymentAmount = balances.newPaymentAmount;
+          orderData.lastPaymentAmount = newPaymentAmount;
       }
       
       if (pardonedAmount > 0) {
@@ -193,7 +199,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
       if (editingOrder) {
           const orderRef = doc(db, "orders", editingOrder.id);
-          const finalAmountPaid = editingOrder.amountPaid + (isPaid ? balances.newPaymentAmount : 0);
+          const finalAmountPaid = editingOrder.amountPaid + (isPaid ? newPaymentAmount : 0);
           const changeGivenNum = parseFloat(changeGivenInput) || 0;
           const finalChangeGiven = (editingOrder.changeGiven || 0) + changeGivenNum;
           
@@ -223,7 +229,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           finalOrderForPopup = { id: docSnap.id, ...docSnap.data() } as Order;
 
       } else {
-          const { newPaymentAmount } = balances;
           const changeGiven = parseFloat(changeGivenInput) || 0;
           
           orderData.amountPaid = isPaid ? newPaymentAmount : 0;
@@ -600,4 +605,3 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 };
 
 export default OrderOptionsModal;
-
