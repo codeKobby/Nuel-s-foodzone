@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
@@ -860,9 +861,11 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                          <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30">
                                             <Label className="text-lg font-semibold text-green-800 dark:text-green-200">Net Revenue</Label>
                                             <p className="text-3xl font-bold text-green-700 dark:text-green-300">{formatCurrency(stats.netRevenue)}</p>
-                                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                                                Today's Net: {formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)} | Collections: {formatCurrency(stats.settledUnpaidOrdersValue)}
-                                            </p>
+                                            {stats.settledUnpaidOrdersValue > 0 && (
+                                                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                                    Today's Net: {formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)} | Collections: {formatCurrency(stats.settledUnpaidOrdersValue)}
+                                                </p>
+                                            )}
                                         </div>
                                     </CardFooter>
                                 </Card>
@@ -922,3 +925,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+
+    
