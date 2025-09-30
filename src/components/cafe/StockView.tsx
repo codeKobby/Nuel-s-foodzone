@@ -369,9 +369,9 @@ const StockView = () => {
 
   const stats = useMemo(() => {
     const total = drinkItems.length;
-    const outOfStock = drinkItems.filter(i => i.stock === 0).length;
-    const lowStock = drinkItems.filter(i => i.stock > 0 && i.stock <= LOW_STOCK_THRESHOLD).length;
-    const inStock = drinkItems.filter(i => i.stock > LOW_STOCK_THRESHOLD).length;
+    const outOfStock = drinkItems.filter(i => (i.stock ?? 0) === 0).length;
+    const lowStock = drinkItems.filter(i => (i.stock ?? 0) > 0 && (i.stock ?? 0) <= LOW_STOCK_THRESHOLD).length;
+    const inStock = drinkItems.filter(i => (i.stock ?? 0) > LOW_STOCK_THRESHOLD).length;
 
     return { total, outOfStock, lowStock, inStock };
   }, [drinkItems]);
@@ -403,17 +403,19 @@ const StockView = () => {
 
     if (filterView === 'low') {
       filtered = filtered.filter(item => 
-        item.stock > 0 && item.stock <= LOW_STOCK_THRESHOLD
+        (item.stock ?? 0) > 0 && (item.stock ?? 0) <= LOW_STOCK_THRESHOLD
       );
     } else if (filterView === 'out') {
-      filtered = filtered.filter(item => item.stock === 0);
+      filtered = filtered.filter(item => (item.stock ?? 0) === 0);
     }
 
     return filtered.sort((a, b) => {
-      if (a.stock === 0 && b.stock !== 0) return -1;
-      if (a.stock !== 0 && b.stock === 0) return 1;
-      if (a.stock <= LOW_STOCK_THRESHOLD && b.stock > LOW_STOCK_THRESHOLD) return -1;
-      if (a.stock > LOW_STOCK_THRESHOLD && b.stock <= LOW_STOCK_THRESHOLD) return 1;
+      const stockA = a.stock ?? 0;
+      const stockB = b.stock ?? 0;
+      if (stockA === 0 && stockB !== 0) return -1;
+      if (stockA !== 0 && stockB === 0) return 1;
+      if (stockA <= LOW_STOCK_THRESHOLD && stockB > LOW_STOCK_THRESHOLD) return -1;
+      if (stockA > LOW_STOCK_THRESHOLD && stockB <= LOW_STOCK_THRESHOLD) return 1;
       return a.name.localeCompare(b.name);
     });
   }, [drinkItems, searchQuery, filterView]);

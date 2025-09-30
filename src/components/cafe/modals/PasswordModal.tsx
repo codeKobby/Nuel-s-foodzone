@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader, AlertTriangle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast.tsx';
 
 
 interface PasswordModalProps {
@@ -97,4 +97,3 @@ const PasswordModal: React.FC<PasswordModalProps> = ({ role, onSuccess, onClose 
 };
 
 export default PasswordModal;
-

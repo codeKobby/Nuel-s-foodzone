@@ -297,7 +297,7 @@ const RewardsView = () => {
         }, (error) => {
             console.error(error);
             setLoading(false);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not load rewards data.' });
+            toast({ type: 'error', title: 'Error', description: 'Could not load rewards data.' });
         });
         return unsubscribe;
     }, [toast]);
@@ -323,7 +323,7 @@ const RewardsView = () => {
             setIsAddSheetOpen(false);
         } catch (e) {
             console.error(e);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not add new customer.' });
+            toast({ type: 'error', title: 'Error', description: 'Could not add new customer.' });
         } finally {
             setIsAddingCustomer(false);
         }
@@ -332,7 +332,7 @@ const RewardsView = () => {
     const handleAddBags = async (customerId: string, currentBags: number) => {
         const numBags = parseInt(bagsToAdd, 10);
         if (isNaN(numBags) || numBags <= 0) {
-            toast({ variant: 'destructive', title: 'Invalid number', description: 'Please enter a valid number of bags.' });
+            toast({ type: 'error', title: 'Invalid number', description: 'Please enter a valid number of bags.' });
             return;
         };
 
@@ -346,7 +346,7 @@ const RewardsView = () => {
             setBagsToAdd('');
         } catch (e) {
             console.error(e);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to update bag count.' });
+            toast({ type: 'error', title: 'Error', description: 'Failed to update bag count.' });
         } finally {
             setUpdatingCustomerId(null);
         }
@@ -377,7 +377,7 @@ const RewardsView = () => {
              toast({ title: 'Discount Marked as Redeemed', description: 'The customer\'s bag count has been updated.' });
         } catch (e) {
             console.error(e);
-            toast({ variant: 'destructive', title: 'Redemption Failed', description: e instanceof Error ? e.message : 'An unknown error occurred.' });
+            toast({ type: 'error', title: 'Redemption Failed', description: e instanceof Error ? e.message : 'An unknown error occurred.' });
         }
     };
 
