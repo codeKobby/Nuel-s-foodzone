@@ -683,12 +683,13 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                 itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
                             });
                         }
-
-                        if (order.amountPaid > 0 && order.paymentMethod === 'cash') {
-                            cashSales += order.amountPaid;
-                        }
-                        if (order.amountPaid > 0 && order.paymentMethod === 'momo') {
-                            momoSales += order.amountPaid;
+                        
+                        if (order.amountPaid > 0) {
+                            if (order.paymentMethod === 'cash') {
+                                cashSales += order.amountPaid;
+                            } else if (order.paymentMethod === 'momo') {
+                                momoSales += order.amountPaid;
+                            }
                         }
 
                         if (order.status === 'Completed' && order.balanceDue > 0) {
@@ -858,18 +859,18 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                         <StatCard icon={<Coins className="text-muted-foreground" />} title="Previous Change Given" value={formatCurrency(stats.previousDaysChangeGiven)} description="Change for old orders given today" />
                                     </CardContent>
                                     <CardFooter>
-                                        <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30">
-                                            <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Total Net Revenue</Label>
-                                            <p className="text-3xl font-bold text-green-600 dark:text-green-200">{formatCurrency(stats.netRevenue)}</p>
+                                        <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                                            <div className="flex justify-between items-baseline">
+                                                <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Today's Net Revenue</Label>
+                                                {stats.settledUnpaidOrdersValue > 0 && <span className="text-lg font-bold">Total: {formatCurrency(stats.netRevenue)}</span>}
+                                            </div>
+                                            <p className="text-3xl font-bold">{formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)}</p>
+                                            
                                             {stats.settledUnpaidOrdersValue > 0 && (
-                                                <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700">
-                                                    <div className="flex justify-between items-center text-xs">
-                                                        <span className="font-bold text-green-800 dark:text-green-100">Today's Net:</span>
-                                                        <span className="font-semibold">{formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center text-xs text-green-700 dark:text-green-300">
-                                                        <span>+ Collections:</span>
-                                                        <span>{formatCurrency(stats.settledUnpaidOrdersValue)}</span>
+                                                <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 text-xs">
+                                                    <div className="flex justify-between items-center text-green-700 dark:text-green-300">
+                                                        <span>+ Collections on previous debts</span>
+                                                        <span className="font-semibold">{formatCurrency(stats.settledUnpaidOrdersValue)}</span>
                                                     </div>
                                                 </div>
                                             )}
@@ -933,6 +934,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
 export default AccountingView;
 
+
+    
 
     
 
