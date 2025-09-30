@@ -691,7 +691,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         });
                     }
 
-                    // Sum payments made for orders CREATED today
                     if (order.amountPaid > 0) {
                       if (order.paymentMethod === 'cash') {
                           cashSales += order.amountPaid;
@@ -741,7 +740,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
             
             const expectedCash = cashSales - miscCashExpenses;
             const expectedMomo = momoSales - miscMomoExpenses;
-            const netRevenue = (cashSales + momoSales) - (miscCashExpenses + miscMomoExpenses);
+            const netRevenue = (cashSales + momoSales + settledUnpaidOrdersValue) - (miscCashExpenses + miscMomoExpenses);
             
             setStats({ 
                 totalSales, 
@@ -862,10 +861,12 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                         <StatCard icon={<Coins className="text-muted-foreground" />} title="Previous Change Given" value={formatCurrency(stats.previousDaysChangeGiven)} description="Change for old orders given today" />
                                     </CardContent>
                                     <CardFooter>
-                                        <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30">
+                                         <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30">
                                             <Label className="text-lg font-semibold text-green-800 dark:text-green-200">Net Revenue</Label>
                                             <p className="text-3xl font-bold text-green-700 dark:text-green-300">{formatCurrency(stats.netRevenue)}</p>
-                                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">(Today's Payments) - Expenses</p>
+                                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                                Today's Net: {formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)} | Collections: {formatCurrency(stats.settledUnpaidOrdersValue)}
+                                            </p>
                                         </div>
                                     </CardFooter>
                                 </Card>
@@ -925,7 +926,3 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-    
-
-    
