@@ -104,8 +104,13 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
   const balances = calculateBalances();
   const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(parseFloat(amountPaidInput));
+  
+  // Logic to determine if payment input is needed
+  const amountOwedNow = editingOrder ? finalTotal - editingOrder.amountPaid : finalTotal;
+  const isOverpaid = editingOrder && editingOrder.amountPaid >= finalTotal;
+
   const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && balances.deficit > 0;
-  const canConfirmPayment = paymentMethod === 'momo' || (paymentMethod === 'cash' && isAmountPaidEntered);
+  const canConfirmPayment = !isOverpaid && (paymentMethod === 'momo' || (paymentMethod === 'cash' && isAmountPaidEntered));
 
   const handleProceedToPayment = () => {
     if (!orderTag.trim()) {
@@ -181,7 +186,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
       };
       
       let newPaymentAmount = balances.newPaymentAmount;
-      if (isPaid && paymentMethod === 'momo') {
+
+      if (editingOrder && isOverpaid) { // If customer has already overpaid
+        newPaymentAmount = 0; // No new payment is being made
+      } else if (isPaid && paymentMethod === 'momo') {
           newPaymentAmount = finalTotal - (editingOrder?.amountPaid || 0);
           if (newPaymentAmount < 0) newPaymentAmount = 0; // Don't process negative payment
       }
@@ -208,7 +216,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               finalBalance = 0;
           }
           
-          if (finalAmountPaid > finalTotal && changeGivenNum > 0) {
+          if (isOverpaid) {
+            finalBalance = finalTotal - editingOrder.amountPaid;
+          } else if (finalAmountPaid > finalTotal && changeGivenNum > 0) {
               finalBalance = -(changeGivenNum - (finalAmountPaid - finalTotal));
           }
           
@@ -292,8 +302,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   const renderBalanceBreakdown = () => {
     if (!editingOrder) return null;
 
-    const amountOwedNow = finalTotal - editingOrder.amountPaid;
-
     return (
       <Card className="mb-4">
         <CardContent className="p-4">
@@ -318,7 +326,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               <span>Amount Owed Now:</span>
               <span>{formatCurrency(amountOwedNow)}</span>
             </div>
-            {isAmountPaidEntered && (
+            {isAmountPaidEntered && !isOverpaid && (
               <>
                 <hr className="my-2" />
                 <div className="flex justify-between font-semibold">
@@ -482,69 +490,82 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
             <div className="space-y-4">
               {renderBalanceBreakdown()}
               
-              <div className="grid grid-cols-2 gap-2">
-                <Button 
-                  onClick={() => setPaymentMethod('cash')} 
-                  variant={paymentMethod === 'cash' ? 'default' : 'outline'}
-                  size="sm"
-                >
-                  Cash
-                </Button>
-                <Button 
-                  onClick={() => setPaymentMethod('momo')} 
-                  variant={paymentMethod === 'momo' ? 'default' : 'outline'}
-                  size="sm"
-                >
-                  Digital
-                </Button>
-              </div>
-              
-              {paymentMethod === 'cash' && (
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="cashPaid">Amount Received from Customer</Label>
-                    <Input 
-                      id="cashPaid" 
-                      type="number" 
-                      value={amountPaidInput} 
-                      onChange={(e) => setAmountPaidInput(e.target.value)} 
-                      placeholder="Enter amount..." 
-                      onFocus={(e) => e.target.select()} 
-                      autoFocus 
-                      className="text-lg h-12 mt-2" 
-                    />
+              {!isOverpaid ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button 
+                      onClick={() => setPaymentMethod('cash')} 
+                      variant={paymentMethod === 'cash' ? 'default' : 'outline'}
+                      size="sm"
+                    >
+                      Cash
+                    </Button>
+                    <Button 
+                      onClick={() => setPaymentMethod('momo')} 
+                      variant={paymentMethod === 'momo' ? 'default' : 'outline'}
+                      size="sm"
+                    >
+                      Digital
+                    </Button>
                   </div>
                   
-                  {balances.change > 0 && (
-                    <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                      <p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
-                        Change Due: {formatCurrency(balances.change)}
-                      </p>
-                      <Label htmlFor="changeGiven">Amount Given as Change</Label>
-                      <Input 
-                        id="changeGiven" 
-                        type="number" 
-                        value={changeGivenInput} 
-                        onChange={(e) => setChangeGivenInput(e.target.value)} 
-                        placeholder={formatCurrency(balances.change)} 
-                        className="text-center mt-2" 
-                      />
-                      <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
-                        Leave empty or enter less if not giving full change
-                      </p>
+                  {paymentMethod === 'cash' && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="cashPaid">Amount Received from Customer</Label>
+                        <Input 
+                          id="cashPaid" 
+                          type="number" 
+                          value={amountPaidInput} 
+                          onChange={(e) => setAmountPaidInput(e.target.value)} 
+                          placeholder="Enter amount..." 
+                          onFocus={(e) => e.target.select()} 
+                          autoFocus 
+                          className="text-lg h-12 mt-2" 
+                        />
+                      </div>
+                      
+                      {balances.change > 0 && (
+                        <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                          <p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
+                            Change Due: {formatCurrency(balances.change)}
+                          </p>
+                          <Label htmlFor="changeGiven">Amount Given as Change</Label>
+                          <Input 
+                            id="changeGiven" 
+                            type="number" 
+                            value={changeGivenInput} 
+                            onChange={(e) => setChangeGivenInput(e.target.value)} 
+                            placeholder={formatCurrency(balances.change)} 
+                            className="text-center mt-2" 
+                          />
+                          <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
+                            Leave empty or enter less if not giving full change
+                          </p>
+                        </div>
+                      )}
+                      
+                      {showDeficitOptions && (
+                        <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
+                          <AlertTriangle className="h-4 w-4 text-orange-600" />
+                          <AlertTitle className="text-orange-800 dark:text-orange-200">Payment Insufficient</AlertTitle>
+                          <AlertDescription className="text-orange-700 dark:text-orange-300">
+                            Customer still owes: <span className="font-bold">{formatCurrency(balances.deficit)}</span>
+                          </AlertDescription>
+                        </Alert>
+                      )}
                     </div>
                   )}
-                  
-                  {showDeficitOptions && (
-                    <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
-                      <AlertTriangle className="h-4 w-4 text-orange-600" />
-                      <AlertTitle className="text-orange-800 dark:text-orange-200">Payment Insufficient</AlertTitle>
-                      <AlertDescription className="text-orange-700 dark:text-orange-300">
-                        Customer still owes: <span className="font-bold">{formatCurrency(balances.deficit)}</span>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
+                </>
+              ) : (
+                 <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
+                  <Info className="h-4 w-4 text-green-600" />
+                  <AlertTitle className="text-green-800 dark:text-green-200">Customer Overpaid</AlertTitle>
+                  <AlertDescription className="text-green-700 dark:text-green-300">
+                    The customer's previous payment covers the new total. 
+                    A change of <span className="font-bold">{formatCurrency(Math.abs(amountOwedNow))}</span> is now due.
+                  </AlertDescription>
+                </Alert>
               )}
               
               {error && (
@@ -557,10 +578,20 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
             </div>
             
             <DialogFooter className="grid grid-cols-1 gap-3 pt-4">
-              <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
-                  <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
-              </Button>
-              {showDeficitOptions ? (
+              {!isOverpaid && (
+                  <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
+                      <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
+                  </Button>
+              )}
+              {isOverpaid ? (
+                <Button 
+                  onClick={() => processOrder({ isPaid: true })}
+                  disabled={isProcessing}
+                  className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg"
+                >
+                  {isProcessing ? <LoadingSpinner /> : "Confirm & Settle Change"}
+                </Button>
+              ) : showDeficitOptions ? (
                 <div className="grid grid-cols-2 gap-2">
                   <Button 
                     onClick={() => processOrder({ isPaid: true, pardonDeficit: true })} 
@@ -605,3 +636,4 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 };
 
 export default OrderOptionsModal;
+
