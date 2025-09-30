@@ -634,7 +634,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     const [showReconciliation, setShowReconciliation] = useState(false);
     const [showUnpaidOrdersWarning, setShowUnpaidOrdersWarning] = useState(false);
     
-    const today = useMemo(() => new Date(), []);
     const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
     const todayEnd = useMemo(() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; }, []);
 
@@ -642,149 +641,146 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         return reports.some(report => isToday(report.timestamp.toDate()));
     }, [reports]);
 
-    const fetchPeriodData = useCallback(async () => {
+    useEffect(() => {
         setLoading(true);
         setError(null);
-        setStats(null);
-        
-        try {
-            const allOrdersQuery = query(collection(db, "orders"));
-            const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', todayStart), where('timestamp', '<=', todayEnd));
 
-            const [
-                allOrdersSnapshot,
-                miscExpensesSnapshot
-            ] = await Promise.all([
-                getDocs(allOrdersQuery),
-                getDocs(miscExpensesQuery)
-            ]);
+        const allOrdersQuery = query(collection(db, "orders"));
+        const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', todayStart), where('timestamp', '<=', todayEnd));
 
-            let totalSales = 0, totalItemsSold = 0, cashSales = 0, momoSales = 0;
-            let todayUnpaidOrdersValue = 0;
-            let totalPardonedAmount = 0, changeOwedForPeriod = 0;
-            let settledUnpaidOrdersValue = 0, previousDaysChangeGiven = 0;
-            
-            const todayOrders: Order[] = [];
-            let allTimeUnpaidOrdersValue = 0;
-            let previousUnpaidOrdersValue = 0;
-            const itemStats: Record<string, { count: number; totalValue: number }> = {};
-            
-            allOrdersSnapshot.forEach(doc => {
-                const order = { id: doc.id, ...doc.data() } as Order;
-                const orderDate = order.timestamp.toDate();
-
-                // Process all orders for previous unpaid balances
-                if (orderDate < todayStart && (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid')) {
-                     previousUnpaidOrdersValue += order.balanceDue;
-                }
+        const unsubAllOrders = onSnapshot(allOrdersQuery, (allOrdersSnapshot) => {
+            const unsubMiscExpenses = onSnapshot(miscExpensesQuery, (miscExpensesSnapshot) => {
                 
-                // Process orders created today
-                if (orderDate >= todayStart && orderDate <= todayEnd) {
-                    todayOrders.push(order);
+                let totalSales = 0, totalItemsSold = 0, cashSales = 0, momoSales = 0;
+                let todayUnpaidOrdersValue = 0;
+                let totalPardonedAmount = 0, changeOwedForPeriod = 0;
+                let settledUnpaidOrdersValue = 0, previousDaysChangeGiven = 0;
+                
+                const todayOrders: Order[] = [];
+                let allTimeUnpaidOrdersValue = 0;
+                let previousUnpaidOrdersValue = 0;
+                const itemStats: Record<string, { count: number; totalValue: number }> = {};
+                
+                allOrdersSnapshot.forEach(doc => {
+                    const order = { id: doc.id, ...doc.data() } as Order;
+                    const orderDate = order.timestamp.toDate();
+
+                    // Process all orders for previous unpaid balances
+                    if (orderDate < todayStart && (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid')) {
+                         previousUnpaidOrdersValue += order.balanceDue;
+                    }
                     
-                    if (order.status === "Completed") {
-                        totalSales += order.total;
-                        order.items.forEach(item => {
-                            totalItemsSold += item.quantity;
-                            const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
-                            itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
-                        });
+                    // Process orders created today
+                    if (orderDate >= todayStart && orderDate <= todayEnd) {
+                        todayOrders.push(order);
+                        
+                        if (order.status === "Completed") {
+                            totalSales += order.total;
+                            order.items.forEach(item => {
+                                totalItemsSold += item.quantity;
+                                const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
+                                itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
+                            });
+                        }
+
+                        if (order.amountPaid > 0 && order.paymentMethod === 'cash') {
+                            cashSales += order.amountPaid;
+                        }
+                        if (order.amountPaid > 0 && order.paymentMethod === 'momo') {
+                            momoSales += order.amountPaid;
+                        }
+
+                        if (order.status === 'Completed' && order.balanceDue > 0) {
+                            todayUnpaidOrdersValue += order.balanceDue;
+                        }
+
+                        if (order.pardonedAmount && order.pardonedAmount > 0) {
+                            totalPardonedAmount += order.pardonedAmount;
+                        }
+
+                        if (order.balanceDue < 0) {
+                            changeOwedForPeriod += Math.abs(order.balanceDue);
+                        }
                     }
 
-                    if (order.amountPaid > 0) {
-                      if (order.paymentMethod === 'cash') {
-                          cashSales += order.amountPaid;
-                      } else if (order.paymentMethod === 'momo') {
-                          momoSales += order.amountPaid;
-                      }
+                    // Check for collections on old debts that happened today
+                    const paymentDate = order.lastPaymentTimestamp?.toDate();
+                    if(paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd && orderDate < todayStart) {
+                         if(order.lastPaymentAmount && order.lastPaymentAmount > 0){
+                            settledUnpaidOrdersValue += order.lastPaymentAmount;
+                         }
                     }
 
-                    if (order.status === 'Completed' && order.balanceDue > 0) {
-                        todayUnpaidOrdersValue += order.balanceDue;
+                    // Check for change given today for old orders
+                    const settledDate = order.settledOn?.toDate();
+                    if(settledDate && settledDate >= todayStart && settledDate <= todayEnd && orderDate < todayStart) {
+                        if(order.changeGiven && order.changeGiven > 0){
+                            previousDaysChangeGiven += order.changeGiven;
+                        }
                     }
+                });
+                
+                allTimeUnpaidOrdersValue = previousUnpaidOrdersValue + todayUnpaidOrdersValue;
 
-                    if (order.pardonedAmount && order.pardonedAmount > 0) {
-                        totalPardonedAmount += order.pardonedAmount;
-                    }
+                let miscCashExpenses = 0, miscMomoExpenses = 0;
+                miscExpensesSnapshot.forEach(doc => {
+                    const expense = doc.data() as MiscExpense;
+                    if (expense.source === 'cash') miscCashExpenses += expense.amount; else miscMomoExpenses += expense.amount;
+                });
+                
+                const expectedCash = cashSales - miscCashExpenses;
+                const expectedMomo = momoSales - miscMomoExpenses;
+                const netRevenue = (cashSales + momoSales + settledUnpaidOrdersValue) - (miscCashExpenses + miscMomoExpenses);
+                
+                setStats({ 
+                    totalSales, 
+                    totalItemsSold, 
+                    cashSales, 
+                    momoSales, 
+                    miscCashExpenses, 
+                    miscMomoExpenses, 
+                    expectedCash, 
+                    expectedMomo, 
+                    netRevenue, 
+                    todayUnpaidOrdersValue,
+                    allTimeUnpaidOrdersValue,
+                    previousUnpaidOrdersValue,
+                    totalPardonedAmount, 
+                    changeOwedForPeriod, 
+                    settledUnpaidOrdersValue, 
+                    previousDaysChangeGiven, 
+                    orders: todayOrders, 
+                    itemStats 
+                });
 
-                    if (order.balanceDue < 0) {
-                        changeOwedForPeriod += Math.abs(order.balanceDue);
-                    }
-                }
-
-                // Check for collections on old debts that happened today
-                const paymentDate = order.lastPaymentTimestamp?.toDate();
-                if(paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd && orderDate < todayStart) {
-                     if(order.lastPaymentAmount && order.lastPaymentAmount > 0){
-                        settledUnpaidOrdersValue += order.lastPaymentAmount;
-                     }
-                }
-
-                // Check for change given today for old orders
-                const settledDate = order.settledOn?.toDate();
-                if(settledDate && settledDate >= todayStart && settledDate <= todayEnd && orderDate < todayStart) {
-                    if(order.changeGiven && order.changeGiven > 0){
-                        previousDaysChangeGiven += order.changeGiven;
-                    }
-                }
-
+                setLoading(false);
+            }, (error) => {
+                console.error("Error fetching misc expenses:", error);
+                setError("Failed to load miscellaneous expenses data.");
+                setLoading(false);
             });
-            
-            allTimeUnpaidOrdersValue = previousUnpaidOrdersValue + todayUnpaidOrdersValue;
 
-            let miscCashExpenses = 0, miscMomoExpenses = 0;
-            miscExpensesSnapshot.forEach(doc => {
-                const expense = doc.data() as MiscExpense;
-                if (expense.source === 'cash') miscCashExpenses += expense.amount; else miscMomoExpenses += expense.amount;
-            });
-            
-            const expectedCash = cashSales - miscCashExpenses;
-            const expectedMomo = momoSales - miscMomoExpenses;
-            const netRevenue = (cashSales + momoSales + settledUnpaidOrdersValue) - (miscCashExpenses + miscMomoExpenses);
-            
-            setStats({ 
-                totalSales, 
-                totalItemsSold, 
-                cashSales, 
-                momoSales, 
-                miscCashExpenses, 
-                miscMomoExpenses, 
-                expectedCash, 
-                expectedMomo, 
-                netRevenue, 
-                todayUnpaidOrdersValue,
-                allTimeUnpaidOrdersValue,
-                previousUnpaidOrdersValue,
-                totalPardonedAmount, 
-                changeOwedForPeriod, 
-                settledUnpaidOrdersValue, 
-                previousDaysChangeGiven, 
-                orders: todayOrders, 
-                itemStats 
-            });
-        } catch (e) {
-            console.error("Error fetching period data:", e);
-            if (e instanceof Error && e.message.includes('firestore/permission-denied')) {
-                 setError("Permission denied. You may need to create a Firestore index. Check the browser console for a link to create it.");
-            } else {
-                setError("Failed to load financial data for today.");
-            }
-        } finally {
+            return () => unsubMiscExpenses();
+
+        }, (error) => {
+            console.error("Error fetching all orders:", error);
+            setError("Failed to load order data.");
             setLoading(false);
-        }
-    }, [todayStart, todayEnd]);
-    
-    useEffect(() => {
-        fetchPeriodData();
-    }, [fetchPeriodData]);
-    
-    useEffect(() => {
-        const reportsQuery = query(collection(db, "reconciliationReports"), orderBy('timestamp', 'desc'));
-        const unsubscribe = onSnapshot(reportsQuery, (snapshot) => {
-            setReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReconciliationReport)));
         });
-        return () => unsubscribe();
-    }, []);
+
+        const reportsQuery = query(collection(db, "reconciliationReports"), orderBy('timestamp', 'desc'));
+        const unsubReports = onSnapshot(reportsQuery, (snapshot) => {
+            setReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReconciliationReport)));
+        }, (error) => {
+            console.error("Error fetching reports:", error);
+            setError("Failed to load reconciliation reports.");
+        });
+
+        return () => {
+            unsubAllOrders();
+            unsubReports();
+        };
+    }, [todayStart, todayEnd]);
 
     const handleStartEndDay = () => {
         if (stats?.todayUnpaidOrdersValue && stats.todayUnpaidOrdersValue > 0) {

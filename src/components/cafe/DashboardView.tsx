@@ -122,8 +122,6 @@ const DashboardView: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authChecking, setAuthChecking] = useState(true);
   const [date, setDate] = useState<DateRange | undefined>({ 
     from: startOfWeek(new Date(), { weekStartsOn: 1 }), 
     to: endOfToday() 
@@ -149,171 +147,147 @@ const DashboardView: React.FC = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      setIsAuthenticated(!!user);
-      setAuthChecking(false);
-      if (!user) {
-        setError("Authentication required to access the dashboard.");
-        setLoading(false);
-      }
-    });
-    return () => unsubscribeAuth();
-  }, []);
-
-   useEffect(() => {
-    if (authChecking || !isAuthenticated) return;
-
     setLoading(true);
+    setError(null);
+    if (!date?.from) return;
 
-    const fetchDashboardData = async () => {
-        try {
-            const startDate = date?.from!;
-            const endDate = date?.to || date?.from!;
-            
-            const ordersInPeriodQuery = query(
-                collection(db, "orders"), 
-                where('timestamp', '>=', startDate), 
-                where('timestamp', '<=', endDate)
-            );
-            const allUnpaidOrdersQuery = query(collection(db, "orders"), where("balanceDue", ">", 0));
-            const expensesQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
-            const reportsQuery = query(collection(db, "reconciliationReports"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
+    const startDate = date.from;
+    const endDate = date.to || date.from;
 
-            const [
-                ordersInPeriodSnapshot,
-                allUnpaidOrdersSnapshot,
-                expensesSnapshot, 
-                reportsSnapshot
-            ] = await Promise.all([
-                getDocs(ordersInPeriodQuery),
-                getDocs(allUnpaidOrdersQuery),
-                getDocs(expensesQuery),
-                getDocs(reportsQuery),
-            ]);
+    const ordersQuery = query(collection(db, "orders"));
+    const expensesQuery = query(collection(db, "miscExpenses"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
+    const reportsQuery = query(collection(db, "reconciliationReports"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
 
-            const ordersCreatedInPeriod = ordersInPeriodSnapshot.docs.map(d => ({...d.data(), id: d.id})) as Order[];
-            const unpaidOrders = allUnpaidOrdersSnapshot.docs.map(d => ({...d.data(), id: d.id})) as Order[];
-            setAllUnpaidOrders(unpaidOrders);
-            const unpaidOrdersValue = unpaidOrders.reduce((sum, o) => sum + o.balanceDue, 0);
-            const overdueOrdersCount = unpaidOrders.filter(o => differenceInDays(new Date(), o.timestamp.toDate()) > 2).length;
+    const unsubOrders = onSnapshot(ordersQuery, (ordersSnapshot) => {
+        const unsubExpenses = onSnapshot(expensesQuery, (expensesSnapshot) => {
+            const unsubReports = onSnapshot(reportsQuery, (reportsSnapshot) => {
+                try {
+                    const allOrders = ordersSnapshot.docs.map(d => ({...d.data(), id: d.id})) as Order[];
+                    
+                    const ordersCreatedInPeriod = allOrders.filter(o => 
+                        o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate
+                    );
+                    
+                    const unpaidOrders = allOrders.filter(o => o.balanceDue > 0);
+                    setAllUnpaidOrders(unpaidOrders);
+                    const unpaidOrdersValue = unpaidOrders.reduce((sum, o) => sum + o.balanceDue, 0);
+                    const overdueOrdersCount = unpaidOrders.filter(o => differenceInDays(new Date(), o.timestamp.toDate()) > 2).length;
 
-            const periodExpenses = expensesSnapshot.docs.map(d => d.data()) as MiscExpense[];
-            const periodReports = reportsSnapshot.docs.map(d => d.data()) as EnhancedReconciliationReport[];
-            
-            const totalSales = ordersCreatedInPeriod
-                .filter(o => o.status === 'Completed')
-                .reduce((sum, o) => sum + o.total, 0);
-            
-            const totalOrders = ordersCreatedInPeriod.length;
-            const totalItemsSold = ordersCreatedInPeriod
-                .filter(o => o.status === 'Completed')
-                .reduce((sum, o) => sum + o.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0);
+                    const periodExpenses = expensesSnapshot.docs.map(d => d.data()) as MiscExpense[];
+                    const periodReports = reportsSnapshot.docs.map(d => d.data()) as EnhancedReconciliationReport[];
+                    
+                    const totalSales = ordersCreatedInPeriod
+                        .filter(o => o.status === 'Completed')
+                        .reduce((sum, o) => sum + o.total, 0);
+                    
+                    const totalOrders = ordersCreatedInPeriod.length;
+                    const totalItemsSold = ordersCreatedInPeriod
+                        .filter(o => o.status === 'Completed')
+                        .reduce((sum, o) => sum + o.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0);
 
-            let newSalesRevenue = 0;
-            let collections = 0;
+                    let newSalesRevenue = 0;
+                    let collections = 0;
 
-            // This logic needs to query all orders to correctly differentiate collections vs new sales
-            const allOrdersSnapshot = await getDocs(collection(db, "orders"));
-            allOrdersSnapshot.docs.forEach(doc => {
-              const o = doc.data() as Order;
-              const paymentDate = o.lastPaymentTimestamp?.toDate();
-              if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
-                  const paymentAmount = o.lastPaymentAmount || 0;
-                  const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
-                  if (isOrderFromPeriod) {
-                      newSalesRevenue += paymentAmount;
-                  } else {
-                      collections += paymentAmount;
-                  }
-              }
-            });
+                    allOrders.forEach(o => {
+                      const paymentDate = o.lastPaymentTimestamp?.toDate();
+                      if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                          const paymentAmount = o.lastPaymentAmount || 0;
+                          const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
+                          if (isOrderFromPeriod) {
+                              newSalesRevenue += paymentAmount;
+                          } else {
+                              collections += paymentAmount;
+                          }
+                      }
+                    });
 
-            const totalMiscExpenses = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
-            const totalNetRevenue = (newSalesRevenue + collections) - totalMiscExpenses;
-            
-            const totalVariance = periodReports.reduce((sum, r) => sum + r.totalDiscrepancy, 0);
+                    const totalMiscExpenses = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
+                    const totalNetRevenue = (newSalesRevenue + collections) - totalMiscExpenses;
+                    
+                    const totalVariance = periodReports.reduce((sum, r) => sum + r.totalDiscrepancy, 0);
 
-            const salesDataMap: Record<string, { newSales: number; collections: number; expenses: number; netRevenue: number; cashierNames: Set<string> }> = {};
-            const daysInRange = differenceInDays(endDate, startDate) + 1;
-            for (let i = 0; i < daysInRange; i++) {
-                const day = format(addDays(startDate, i), 'MMM d');
-                salesDataMap[day] = { newSales: 0, collections: 0, netRevenue: 0, expenses: 0, cashierNames: new Set() };
-            }
-
-            allOrdersSnapshot.docs.forEach(doc => {
-                const o = doc.data() as Order;
-                const paymentDate = o.lastPaymentTimestamp?.toDate();
-                if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
-                     const day = format(paymentDate, 'MMM d');
-                     if (salesDataMap[day]) {
-                        const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
-                        const paymentAmount = o.lastPaymentAmount || 0;
-                        if(isOrderFromPeriod) {
-                            salesDataMap[day].newSales += paymentAmount;
-                        } else {
-                            salesDataMap[day].collections += paymentAmount;
-                        }
-                        if (o.cashierName) salesDataMap[day].cashierNames.add(o.cashierName);
-                     }
-                }
-            });
-
-            periodExpenses.forEach(e => {
-                const day = format(e.timestamp.toDate(), 'MMM d');
-                if (salesDataMap[day]) {
-                    salesDataMap[day].expenses += e.amount;
-                    if(e.cashierName) salesDataMap[day].cashierNames.add(e.cashierName);
-                }
-            });
-            
-             const salesData = Object.entries(salesDataMap).map(([date, values]) => ({
-                date,
-                ...values,
-                netRevenue: values.newSales + values.collections - values.expenses,
-                cashierNames: Array.from(values.cashierNames).join(', ')
-            }));
-            
-             const itemPerformance = ordersCreatedInPeriod
-                .filter(o => o.status === 'Completed')
-                .flatMap(o => o.items)
-                .reduce((acc, item) => {
-                    if (!acc[item.name]) {
-                        acc[item.name] = { name: item.name, count: 0, totalValue: 0 };
+                    const salesDataMap: Record<string, { newSales: number; collections: number; expenses: number; netRevenue: number; cashierNames: Set<string> }> = {};
+                    const daysInRange = differenceInDays(endDate, startDate) + 1;
+                    for (let i = 0; i < daysInRange; i++) {
+                        const day = format(addDays(startDate, i), 'MMM d');
+                        salesDataMap[day] = { newSales: 0, collections: 0, netRevenue: 0, expenses: 0, cashierNames: new Set() };
                     }
-                    acc[item.name].count += item.quantity;
-                    acc[item.name].totalValue += item.quantity * item.price;
-                    return acc;
-                }, {} as Record<string, { name: string; count: number; totalValue: number }>);
 
-            setStats({
-                totalSales,
-                netRevenue: totalNetRevenue,
-                previousDayCollections: collections,
-                totalOrders,
-                totalItemsSold,
-                unpaidOrdersValue,
-                overdueOrdersCount: overdueOrdersCount,
-                totalMiscExpenses,
-                totalVariance: totalVariance,
-                enhancedReports: periodReports,
-                salesData,
-                itemPerformance: Object.values(itemPerformance),
-            } as DashboardStats);
+                    allOrders.forEach(o => {
+                        const paymentDate = o.lastPaymentTimestamp?.toDate();
+                        if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                            const day = format(paymentDate, 'MMM d');
+                            if (salesDataMap[day]) {
+                                const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
+                                const paymentAmount = o.lastPaymentAmount || 0;
+                                if(isOrderFromPeriod) {
+                                    salesDataMap[day].newSales += paymentAmount;
+                                } else {
+                                    salesDataMap[day].collections += paymentAmount;
+                                }
+                                if (o.cashierName) salesDataMap[day].cashierNames.add(o.cashierName);
+                            }
+                        }
+                    });
 
-        } catch (err) {
-            console.error(err);
-            if (err instanceof Error) {
-                 setError(`Failed to fetch dashboard data: ${err.message}. Check console for details.`);
-            } else {
-                 setError("An unknown error occurred while fetching dashboard data.");
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
+                    periodExpenses.forEach(e => {
+                        const day = format(e.timestamp.toDate(), 'MMM d');
+                        if (salesDataMap[day]) {
+                            salesDataMap[day].expenses += e.amount;
+                            if(e.cashierName) salesDataMap[day].cashierNames.add(e.cashierName);
+                        }
+                    });
+                    
+                    const salesData = Object.entries(salesDataMap).map(([date, values]) => ({
+                        date,
+                        ...values,
+                        netRevenue: values.newSales + values.collections - values.expenses,
+                        cashierNames: Array.from(values.cashierNames).join(', ')
+                    }));
+                    
+                    const itemPerformance = ordersCreatedInPeriod
+                        .filter(o => o.status === 'Completed')
+                        .flatMap(o => o.items)
+                        .reduce((acc, item) => {
+                            if (!acc[item.name]) {
+                                acc[item.name] = { name: item.name, count: 0, totalValue: 0 };
+                            }
+                            acc[item.name].count += item.quantity;
+                            acc[item.name].totalValue += item.quantity * item.price;
+                            return acc;
+                        }, {} as Record<string, { name: string; count: number; totalValue: number }>);
 
-    fetchDashboardData();
-  }, [date, authChecking, isAuthenticated]);
+                    setStats({
+                        totalSales,
+                        netRevenue: totalNetRevenue,
+                        previousDayCollections: collections,
+                        totalOrders,
+                        totalItemsSold,
+                        unpaidOrdersValue,
+                        overdueOrdersCount: overdueOrdersCount,
+                        totalMiscExpenses,
+                        totalVariance: totalVariance,
+                        enhancedReports: periodReports,
+                        salesData,
+                        itemPerformance: Object.values(itemPerformance),
+                    } as DashboardStats);
+                } catch(err) {
+                    console.error(err);
+                    if (err instanceof Error) {
+                        setError(`Failed to process dashboard data: ${err.message}.`);
+                    } else {
+                        setError("An unknown error occurred while processing dashboard data.");
+                    }
+                } finally {
+                    setLoading(false);
+                }
+            });
+            return () => unsubReports();
+        });
+        return () => unsubExpenses();
+    });
+    return () => unsubOrders();
+  }, [date]);
 
   const setDateRange = (rangeType: PresetDateRange) => {
     const today = new Date();
@@ -373,7 +347,7 @@ const DashboardView: React.FC = () => {
         toast({
             title: "AI Analysis Error",
             description: "Could not generate the report. Please try again later.",
-            type: "error",
+            variant: "destructive",
         });
     } finally {
         setIsGeneratingAnalysis(false);
@@ -515,14 +489,12 @@ const DashboardView: React.FC = () => {
     </Dialog>
   );
 
-  if (authChecking) {
-    return <div className="p-6 h-full flex items-center justify-center"><LoadingSpinner /></div>;
-  }
-  if (error) {
-    return <div className="p-6"><Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert></div>;
-  }
   if (loading || !stats) {
     return <div className="p-6 h-full flex items-center justify-center"><LoadingSpinner /></div>;
+  }
+
+  if (error) {
+    return <div className="p-6"><Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert></div>;
   }
 
   return (
@@ -683,5 +655,3 @@ const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
-
-    
