@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { format } from 'date-fns';
 import { Alert, AlertDescription as UiAlertDescription } from '@/components/ui/alert';
-import { useToast } from '@/hooks/use-toast.tsx';
+import { useToast } from '@/hooks/use-toast';
 
 interface PeriodStats {
     totalSales: number;
