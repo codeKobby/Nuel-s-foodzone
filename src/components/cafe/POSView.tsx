@@ -435,7 +435,7 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                 <OrderOptionsModal
                     total={total}
                     orderItems={currentOrder}
-                    editingOrder={editingOrder}
+                    editingOrder={editingOrder ?? null}
                     onClose={() => setShowOrderOptionsModal(false)}
                     onOrderPlaced={handleOrderPlaced}
                 />
@@ -482,3 +482,5 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
 };
 
 export default POSView;
+
+    
