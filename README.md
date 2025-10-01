@@ -1,11 +1,37 @@
-# Nuel's Cafe - Point of Sale System
+# Nuel's Cafe - Full-Stack Solution
 
-This is a comprehensive, Next.js-based Point of Sale (POS) application designed for Nuel's Food Zone. It provides a robust solution for managing menu items, processing orders with complex payment scenarios, tracking stock, managing customer rewards, and analyzing sales data with powerful, AI-driven insights.
+This repository contains the complete full-stack application for Nuel's Food Zone, a modern cafe. The solution is built with Next.js and Firebase and is divided into two primary components:
 
-## Core Features
+1.  **Customer-Facing Web Application**: A professional, multi-page website where customers can browse the menu, learn about the cafe, and place orders online.
+2.  **Backoffice POS System**: An internal, feature-rich Point of Sale (POS) application for staff to manage in-store operations, including order processing, accounting, and inventory.
+
+---
+
+## 1. Customer-Facing Web Application
+
+Inspired by leading online ordering platforms, this portion of the app provides a seamless and professional experience for customers.
+
+### Key Features
+
+- **Professional, Multi-Page Design**: A complete website with a modern aesthetic, including:
+    - A welcoming **Homepage** (`/`) featuring highlights, popular dishes, and catering information.
+    - An interactive **Menu Page** (`/menu`) for browsing and ordering.
+    - Placeholder pages for **Catering** (`/catering`) and **Contact** (`/contact`).
+- **Dynamic Online Menu & Ordering**:
+    - Fetches menu items in real-time from the Firestore database.
+    - Allows customers to filter items by category and use a search bar for easy navigation.
+    - A persistent **Order Cart** sidebar (on desktop) or a floating mobile button allows users to add items, adjust quantities, and view their total before checking out.
+- **Responsive Design**: The customer-facing site is fully responsive, offering an optimal experience on both desktop and mobile devices.
+
+---
+
+## 2. Backoffice POS System (`/backoffice`)
+
+This is the comprehensive, internal tool for cafe staff, accessible via the `/backoffice` route. It provides a robust solution for managing menu items, processing orders with complex payment scenarios, tracking stock, managing customer rewards, and analyzing sales data with powerful, AI-driven insights.
+
+### Core Backoffice Features
 
 - **Dual-Role Interface**: Separate, tailored views for `Manager` and `Cashier` roles to ensure staff have access to the tools they need.
-- **Responsive Design**: Fully responsive UI that works seamlessly on both desktop and mobile devices.
 
 ### Cashier-Focused Features
 
