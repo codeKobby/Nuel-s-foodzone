@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, Suspense, useContext } from 'react';
@@ -11,7 +12,7 @@ import Image from 'next/image';
 import logo from '@/app/logo.png';
 
 import Sidebar from '@/components/cafe/Sidebar';
-import PosView from '@/components/cafe/PosView';
+import POSView from '@/components/cafe/POSView';
 import OrdersView from '@/components/cafe/OrdersView';
 import DashboardView from '@/components/cafe/DashboardView';
 import AdminView from '@/components/cafe/AdminView';
@@ -245,7 +246,7 @@ function CafePage() {
 
         switch (activeView) {
             // Cashier Views
-            case 'pos': return isCashier ? <PosView setActiveView={setActiveView} /> : null;
+            case 'pos': return isCashier ? <POSView setActiveView={setActiveView} /> : null;
             case 'orders': return isCashier ? <OrdersView setActiveView={setActiveView} /> : null;
             case 'accounting': return isCashier ? <AccountingView setActiveView={setActiveView}/> : null;
             case 'misc': return isCashier ? <MiscView /> : null;
