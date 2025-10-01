@@ -136,13 +136,15 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
     const [showCustomOrderModal, setShowCustomOrderModal] = useState(false);
     const [isCartSheetOpen, setIsCartSheetOpen] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
-    const { editingOrder, clearEditingOrder } = useContext(OrderEditingContext);
+    const orderEditingContext = useContext(OrderEditingContext);
+    const editingOrder = orderEditingContext?.editingOrder;
+    const clearEditingOrder = orderEditingContext?.clearEditingOrder;
     const [orderWithChangeDue, setOrderWithChangeDue] = useState<Order | null>(null);
 
 
     useEffect(() => {
         if(editingOrder) {
-            const orderItemsAsCart = editingOrder.items.reduce((acc, item) => {
+            const orderItemsAsCart = editingOrder.items.reduce((acc: Record<string, OrderItem>, item: Omit<OrderItem, 'id' | 'category'>) => {
                 const id = crypto.randomUUID();
                 acc[id] = {
                     ...item,
@@ -150,7 +152,7 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                     category: 'N/A' // Category is not stored on order items, default it
                 };
                 return acc;
-            }, {} as Record<string, OrderItem>);
+            }, {});
             setCurrentOrder(orderItemsAsCart);
         }
     }, [editingOrder]);
@@ -259,7 +261,9 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
 
     const handleClearOrder = () => {
         setCurrentOrder({});
-        clearEditingOrder();
+        if (clearEditingOrder) {
+            clearEditingOrder();
+        }
         setShowClearConfirm(false);
     };
 
@@ -271,7 +275,9 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
     const handleOrderPlaced = (order: Order) => {
         setCurrentOrder({});
         setShowOrderOptionsModal(false);
-        clearEditingOrder();
+        if (clearEditingOrder) {
+            clearEditingOrder();
+        }
         if (order.balanceDue < 0) {
             setOrderWithChangeDue(order);
         } else {
