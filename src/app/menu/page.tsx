@@ -16,6 +16,7 @@ import Image from 'next/image';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useRouter } from 'next/navigation';
+import logo from '@/app/logo.png';
 
 const MenuPage = () => {
     const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -127,7 +128,7 @@ const MenuPage = () => {
         <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b">
             <div className="container mx-auto px-4 h-20 flex justify-between items-center">
                 <Link href="/" className="flex items-center gap-2">
-                    <Image src="/logo.png" alt="Nuel's Cafe Logo" width={40} height={40} className="rounded-lg"/>
+                    <Image src={logo} alt="Nuel's Cafe Logo" width={40} height={40} className="rounded-lg"/>
                     <h1 className="text-xl font-bold">Nuel's Cafe</h1>
                 </Link>
                 <nav className="hidden md:flex items-center gap-6">
@@ -148,7 +149,6 @@ const MenuPage = () => {
                             <CartSidebar />
                         </SheetContent>
                     </Sheet>
-                    <Button onClick={() => router.push('/backoffice')} variant="outline">Staff Login</Button>
                 </div>
             </div>
         </header>
@@ -220,3 +220,5 @@ const MenuPage = () => {
 };
 
 export default MenuPage;
+
+    

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+import logo from '@/app/logo.png';
 
 const menuHighlights = [
   { name: 'Jollof Rice & Chicken', image: 'https://picsum.photos/seed/jollof/600/400', hint: 'jollof rice' },
@@ -30,7 +31,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 h-20 flex justify-between items-center">
             <Link href="/" className="flex items-center gap-2">
-                <Image src="/logo.png" alt="Nuel's Cafe Logo" width={40} height={40} className="rounded-lg"/>
+                <Image src={logo} alt="Nuel's Cafe Logo" width={40} height={40} className="rounded-lg"/>
                 <h1 className="text-xl font-bold">Nuel's Cafe</h1>
             </Link>
           <nav className="hidden md:flex items-center gap-6">
@@ -40,8 +41,7 @@ export default function LandingPage() {
             <Link href="/contact" className="text-sm font-medium hover:text-primary transition-colors">Contact</Link>
           </nav>
           <div className="flex items-center gap-2">
-            <Button onClick={() => router.push('/menu')} className="hidden sm:inline-flex">Order Now</Button>
-            <Button onClick={() => router.push('/backoffice')} variant="outline">Staff Login</Button>
+            <Button onClick={() => router.push('/menu')}>Order Now</Button>
           </div>
         </div>
       </header>
@@ -149,7 +149,7 @@ export default function LandingPage() {
       <footer className="bg-card border-t py-12">
           <div className="container mx-auto px-4 text-center text-muted-foreground">
             <div className="flex justify-center mb-4">
-                <Image src="/logo.png" alt="Nuel's Cafe Logo" width={50} height={50} className="rounded-lg"/>
+                <Image src={logo} alt="Nuel's Cafe Logo" width={50} height={50} className="rounded-lg"/>
             </div>
             <p className="font-semibold text-foreground mb-2">Nuel's Cafe</p>
             <p className="text-sm">Authentic Ghanaian Cuisine</p>
@@ -164,3 +164,5 @@ export default function LandingPage() {
     </div>
   );
 }
+
+    
