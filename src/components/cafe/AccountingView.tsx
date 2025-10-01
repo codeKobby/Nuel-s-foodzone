@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle, Landmark, CreditCard, DollarSign, Hourglass, MinusCircle, Ban } from 'lucide-react';
+import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle, Landmark, CreditCard, DollarSign, Hourglass, MinusCircle, Ban, Gift } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isToday } from 'date-fns';
@@ -48,6 +48,7 @@ interface PeriodStats {
     changeOwedForPeriod: number;
     settledUnpaidOrdersValue: number;
     previousDaysChangeGiven: number;
+    totalRewardDiscount: number;
     orders: Order[];
     itemStats: Record<string, { count: number; totalValue: number }>;
 }
@@ -656,6 +657,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 let todayUnpaidOrdersValue = 0;
                 let totalPardonedAmount = 0, changeOwedForPeriod = 0;
                 let settledUnpaidOrdersValue = 0, previousDaysChangeGiven = 0;
+                let totalRewardDiscount = 0;
                 
                 const todayOrders: Order[] = [];
                 let allTimeUnpaidOrdersValue = 0;
@@ -703,6 +705,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         if (order.balanceDue < 0) {
                             changeOwedForPeriod += Math.abs(order.balanceDue);
                         }
+
+                        if (order.rewardDiscount && order.rewardDiscount > 0) {
+                            totalRewardDiscount += order.rewardDiscount;
+                        }
                     }
 
                     // Check for collections on old debts that happened today
@@ -732,7 +738,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 
                 const expectedCash = cashSales - miscCashExpenses;
                 const expectedMomo = momoSales - miscMomoExpenses;
-                const netRevenue = (cashSales + momoSales + settledUnpaidOrdersValue) - (miscCashExpenses + miscMomoExpenses);
+                
+                // Corrected Net Revenue: Sum of all payments received today (from new sales and old debts) minus all expenses and discounts.
+                const netRevenue = (cashSales + momoSales + settledUnpaidOrdersValue) - (miscCashExpenses + miscMomoExpenses) - totalPardonedAmount - totalRewardDiscount;
                 
                 setStats({ 
                     totalSales, 
@@ -751,6 +759,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     changeOwedForPeriod, 
                     settledUnpaidOrdersValue, 
                     previousDaysChangeGiven, 
+                    totalRewardDiscount,
                     orders: todayOrders, 
                     itemStats 
                 });
@@ -797,9 +806,18 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         return Object.entries(stats.itemStats).sort(([, a], [, b]) => b.count - a.count);
     }, [stats]);
     
+    // Corrected Expected Cash calculation for Reconciliation View
     const adjustedExpectedCash = useMemo(() => {
         if (!stats) return 0;
-        return stats.expectedCash + stats.settledUnpaidOrdersValue - stats.previousDaysChangeGiven;
+        // Start with cash payments from today's orders
+        let expected = stats.cashSales;
+        // Add cash collected for old debts
+        expected += stats.settledUnpaidOrdersValue; // Assuming collections are cash, might need refinement
+        // Subtract cash expenses for today
+        expected -= stats.miscCashExpenses;
+        // Subtract change given today for orders from previous days
+        expected -= stats.previousDaysChangeGiven;
+        return expected;
     }, [stats]);
 
     if (showReconciliation && stats) {
@@ -854,6 +872,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                             } 
                                         />
                                         <StatCard icon={<MinusCircle className="text-muted-foreground" />} title="Total Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`} />
+                                        <StatCard icon={<Gift className="text-muted-foreground" />} title="Reward Discounts" value={formatCurrency(stats.totalRewardDiscount)} description="Total discounts from rewards" />
                                         <StatCard icon={<Ban className="text-muted-foreground" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} description="Unplanned discounts given today" />
                                         <StatCard icon={<ArrowRightLeft className="text-muted-foreground" />} title="Change Owed" value={formatCurrency(stats.changeOwedForPeriod)} description="Total change owed to customers today" />
                                         <StatCard icon={<Coins className="text-muted-foreground" />} title="Previous Change Given" value={formatCurrency(stats.previousDaysChangeGiven)} description="Change for old orders given today" />
@@ -933,9 +952,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 
 export default AccountingView;
 
-
     
 
     
 
     
+
