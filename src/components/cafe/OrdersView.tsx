@@ -41,7 +41,6 @@ import {
 import { Separator } from '../ui/separator';
 import { cn } from '@/lib/utils';
 import { EmptyState, LoadingError, NoSearchResults } from '@/components/shared/ErrorPages';
-import { useToast } from '@/hooks/use-toast.tsx';
 import { ScrollArea } from '../ui/scroll-area';
 
 
@@ -283,7 +282,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
     showUnpaidOnly: false,
   });
 
-  const { loadOrderForEditing } = useContext(OrderEditingContext);
+  const orderEditingContext = useContext(OrderEditingContext);
 
    useEffect(() => {
         setLoading(true);
@@ -346,8 +345,8 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
   };
 
   const handleEditOrder = (order: Order) => {
-    if(order.status === 'Pending') {
-      loadOrderForEditing(order);
+    if(order.status === 'Pending' && orderEditingContext) {
+      orderEditingContext.loadOrderForEditing(order);
       setActiveView('pos');
     }
   };
