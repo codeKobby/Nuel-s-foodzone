@@ -50,7 +50,7 @@ export const generateSimpleOrderId = (count: number): string => {
   return `NFZ-${month}${day}-${num}`;
 };
 
-export const groupOrdersByDate = <T extends Order | MiscExpense>(items: T[]): Record<string, T[]> => {
+export const groupOrdersByDate = <T extends { timestamp: any }>(items: T[]): Record<string, T[]> => {
     const grouped: Record<string, T[]> = {};
 
     items.forEach(item => {

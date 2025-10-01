@@ -32,7 +32,7 @@ const HistoryView: React.FC = () => {
         return () => unsubscribe();
     }, []);
 
-    const groupedReports = groupOrdersByDate(reports);
+    const groupedReports = groupOrdersByDate<ReconciliationReport>(reports);
 
     if (loading) {
         return <div className="flex justify-center items-center h-full"><LoadingSpinner /></div>;
