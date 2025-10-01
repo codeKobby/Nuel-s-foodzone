@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/popover"
 import { Badge } from '../ui/badge';
 import { formatDistanceToNow } from 'date-fns';
+import type { Order } from '@/lib/types';
 
 const BackofficeHeader = ({ role }: { role: 'manager' | 'cashier' }) => {
   const [newOrdersCount, setNewOrdersCount] = useState(0);
@@ -30,7 +32,6 @@ const BackofficeHeader = ({ role }: { role: 'manager' | 'cashier' }) => {
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
     const q = query(
       collection(db, "orders"),
-      where("orderType", "in", ["Delivery", "Pickup"]),
       where("timestamp", ">", twoMinutesAgo)
     );
 
@@ -40,8 +41,11 @@ const BackofficeHeader = ({ role }: { role: 'manager' | 'cashier' }) => {
       
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
-          newOrders++;
-          shouldNotify = true;
+          const order = change.doc.data() as Order;
+          if (order.orderType === 'Delivery' || order.orderType === 'Pickup') {
+            newOrders++;
+            shouldNotify = true;
+          }
         }
       });
       
@@ -60,6 +64,9 @@ const BackofficeHeader = ({ role }: { role: 'manager' | 'cashier' }) => {
           audio.play().catch(e => console.error("Error playing sound:", e));
         }
       }
+    }, (error) => {
+        // Firestore error handling
+        console.error("Error fetching new orders:", error);
     });
 
     return () => {
