@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle, Landmark, CreditCard, DollarSign, Hourglass, MinusCircle, Ban, Separator } from 'lucide-react';
+import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle, Landmark, CreditCard, DollarSign, Hourglass, MinusCircle, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isToday } from 'date-fns';
@@ -128,7 +128,7 @@ const ReconciliationView: React.FC<{
             toast({ 
                 title: "Error saving report",
                 description: "Cannot save report, financial stats are missing.",
-                variant: "destructive"
+                type: "error"
             });
             return;
         }
@@ -167,7 +167,7 @@ const ReconciliationView: React.FC<{
             toast({ 
                 title: "Save Failed", 
                 description: "Could not save the report. Please try again.",
-                variant: "destructive"
+                type: "error"
             });
         } finally {
             setIsSubmitting(false);
@@ -692,7 +692,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             }
                         }
 
-                        if (order.status === 'Completed' && order.balanceDue > 0) {
+                        if (order.paymentStatus === 'Unpaid' || (order.paymentStatus === 'Partially Paid' && order.balanceDue > 0)) {
                             todayUnpaidOrdersValue += order.balanceDue;
                         }
 
@@ -861,16 +861,15 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     <CardFooter>
                                         <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
                                             <div className="flex justify-between items-baseline">
-                                                <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Today's Net Revenue</Label>
-                                                {stats.settledUnpaidOrdersValue > 0 && <span className="text-lg font-bold">Total: {formatCurrency(stats.netRevenue)}</span>}
+                                                <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Total Net Revenue</Label>
+                                                <p className="text-3xl font-bold">{formatCurrency(stats.netRevenue)}</p>
                                             </div>
-                                            <p className="text-3xl font-bold">{formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)}</p>
                                             
                                             {stats.settledUnpaidOrdersValue > 0 && (
-                                                <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 text-xs">
+                                                <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 text-sm">
                                                     <div className="flex justify-between items-center text-green-700 dark:text-green-300">
-                                                        <span>+ Collections on previous debts</span>
-                                                        <span className="font-semibold">{formatCurrency(stats.settledUnpaidOrdersValue)}</span>
+                                                        <span className="font-bold">Today's Net: {formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)}</span>
+                                                        <span className="font-semibold">+ Collections: {formatCurrency(stats.settledUnpaidOrdersValue)}</span>
                                                     </div>
                                                 </div>
                                             )}
