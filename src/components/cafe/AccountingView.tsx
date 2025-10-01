@@ -678,7 +678,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         todayOrders.push(order);
                         
                         if (order.status === "Completed") {
-                            totalSales += order.total;
+                            // Total Sales is the base cost of completed orders
+                            totalSales += (order.total + (order.rewardDiscount || 0));
+
                             order.items.forEach(item => {
                                 totalItemsSold += item.quantity;
                                 const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
@@ -687,10 +689,14 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         }
                         
                         if (order.amountPaid > 0) {
+                             const orderValue = order.total;
+                             const amountReceived = order.lastPaymentAmount || order.amountPaid;
+                             const revenuePortion = Math.min(amountReceived, orderValue);
+                            
                             if (order.paymentMethod === 'cash') {
-                                cashSales += order.amountPaid;
+                                cashSales += revenuePortion;
                             } else if (order.paymentMethod === 'momo') {
-                                momoSales += order.amountPaid;
+                                momoSales += revenuePortion;
                             }
                         }
 
@@ -739,8 +745,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const expectedCash = cashSales - miscCashExpenses;
                 const expectedMomo = momoSales - miscMomoExpenses;
                 
-                 const netRevenue = (totalSales - todayUnpaidOrdersValue - (miscCashExpenses + miscMomoExpenses) - totalRewardDiscount - totalPardonedAmount - previousDaysChangeGiven) + settledUnpaidOrdersValue;
-
+                const netRevenue = (totalSales - todayUnpaidOrdersValue - (miscCashExpenses + miscMomoExpenses) - totalRewardDiscount - totalPardonedAmount - previousDaysChangeGiven) + settledUnpaidOrdersValue;
                 
                 setStats({ 
                     totalSales, 
@@ -957,5 +962,6 @@ export default AccountingView;
     
 
     
+
 
 
