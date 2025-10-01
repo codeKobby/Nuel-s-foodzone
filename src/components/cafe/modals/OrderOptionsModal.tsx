@@ -203,8 +203,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         orderData.notes = `Deficit of ${formatCurrency(pardonedAmount)} pardoned. ${orderData.notes}`.trim();
       }
 
-      let finalOrderForPopup: Order;
-
       if (editingOrder) {
           const orderRef = doc(db, "orders", editingOrder.id);
           const finalAmountPaid = editingOrder.amountPaid + (isPaid ? newPaymentAmount : 0);
@@ -236,37 +234,38 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           
           await updateDoc(orderRef, orderData);
           const docSnap = await getDoc(orderRef);
-          finalOrderForPopup = { id: docSnap.id, ...docSnap.data() } as Order;
+          const finalOrderForPopup = { id: docSnap.id, ...docSnap.data() } as Order;
+          onOrderPlaced(finalOrderForPopup);
 
       } else {
-          const changeGiven = parseFloat(changeGivenInput) || 0;
-          
-          orderData.amountPaid = isPaid ? newPaymentAmount : 0;
-          orderData.changeGiven = isPaid && newPaymentAmount > finalTotal ? changeGiven : 0;
-          
-          let finalBalance = finalTotal - orderData.amountPaid;
-           if (pardonDeficit) {
-              finalBalance = 0;
-          }
-          
-          if (orderData.changeGiven > 0) {
-              finalBalance = - (orderData.changeGiven - (orderData.amountPaid - finalTotal));
-          }
-
-          orderData.balanceDue = finalBalance;
-          
-          if (isPaid && finalBalance <= 0) {
-            orderData.paymentStatus = 'Paid';
-          } else if (isPaid && finalBalance > 0) {
-            orderData.paymentStatus = 'Partially Paid';
-          } else {
-            orderData.paymentStatus = 'Unpaid';
-          }
-
-          const counterRef = doc(db, "counters", "orderIdCounter");
-          const newOrderRef = doc(collection(db, "orders"));
-          
           await runTransaction(db, async (transaction) => {
+              const changeGiven = parseFloat(changeGivenInput) || 0;
+              
+              orderData.amountPaid = isPaid ? newPaymentAmount : 0;
+              orderData.changeGiven = isPaid && newPaymentAmount > finalTotal ? changeGiven : 0;
+              
+              let finalBalance = finalTotal - orderData.amountPaid;
+              if (pardonDeficit) {
+                  finalBalance = 0;
+              }
+              
+              if (orderData.changeGiven > 0) {
+                  finalBalance = - (orderData.changeGiven - (orderData.amountPaid - finalTotal));
+              }
+
+              orderData.balanceDue = finalBalance;
+              
+              if (isPaid && finalBalance <= 0) {
+                orderData.paymentStatus = 'Paid';
+              } else if (isPaid && finalBalance > 0) {
+                orderData.paymentStatus = 'Partially Paid';
+              } else {
+                orderData.paymentStatus = 'Unpaid';
+              }
+
+              const counterRef = doc(db, "counters", "orderIdCounter");
+              const newOrderRef = doc(collection(db, "orders"));
+              
               if (reward) {
                 const rewardRef = doc(db, 'rewards', reward.customer.id);
                 const newBagCount = reward.customer.bagCount - reward.bagsUsed;
@@ -284,12 +283,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               transaction.set(newOrderRef, newOrderWithId);
               transaction.set(counterRef, { count: newCount }, { merge: true });
               
-              finalOrderForPopup = { ...newOrderWithId, id: newOrderRef.id, timestamp: Timestamp.now(), balanceDue: finalBalance };
+              const finalOrderForPopup: Order = { ...newOrderWithId, id: newOrderRef.id, timestamp: Timestamp.now(), balanceDue: finalBalance };
+              onOrderPlaced(finalOrderForPopup);
           });
       }
-      
-      onOrderPlaced(finalOrderForPopup);
-      
     } catch (e) {
       console.error("Error processing order:", e);
       setError("Failed to process order. Please try again.");
