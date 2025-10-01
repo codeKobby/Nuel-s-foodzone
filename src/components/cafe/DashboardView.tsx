@@ -184,9 +184,12 @@ const DashboardView: React.FC = () => {
                     const totalItemsSold = ordersCreatedInPeriod
                         .filter(o => o.status === 'Completed')
                         .reduce((sum, o) => sum + o.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0);
-
+                    
+                    let cashSales = 0;
+                    let momoSales = 0;
                     let newSalesRevenue = 0;
                     let collections = 0;
+                    let totalPardonedAmount = 0;
 
                     allOrders.forEach(o => {
                       const paymentDate = o.lastPaymentTimestamp?.toDate();
@@ -198,13 +201,24 @@ const DashboardView: React.FC = () => {
                           } else {
                               collections += paymentAmount;
                           }
+
+                          if (o.paymentMethod === 'cash') cashSales += paymentAmount;
+                          if (o.paymentMethod === 'momo') momoSales += paymentAmount;
+                      }
+
+                      if (o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate) {
+                        totalPardonedAmount += (o.pardonedAmount || 0);
                       }
                     });
 
                     const totalMiscExpenses = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
+                    const netRevenueFromNewSales = newSalesRevenue - totalMiscExpenses;
                     const totalNetRevenue = (newSalesRevenue + collections) - totalMiscExpenses;
                     
                     const totalVariance = periodReports.reduce((sum, r) => sum + r.totalDiscrepancy, 0);
+                    const totalSurplus = periodReports.reduce((sum, r) => sum + (r.totalDiscrepancy > 0 ? r.totalDiscrepancy : 0), 0);
+                    const totalDeficit = periodReports.reduce((sum, r) => sum + (r.totalDiscrepancy < 0 ? r.totalDiscrepancy : 0), 0);
+
 
                     const salesDataMap: Record<string, { newSales: number; collections: number; expenses: number; netRevenue: number; cashierNames: Set<string> }> = {};
                     const daysInRange = differenceInDays(endDate, startDate) + 1;
@@ -256,21 +270,37 @@ const DashboardView: React.FC = () => {
                             acc[item.name].totalValue += item.quantity * item.price;
                             return acc;
                         }, {} as Record<string, { name: string; count: number; totalValue: number }>);
-
-                    setStats({
+                    
+                    const finalStats: DashboardStats = {
                         totalSales,
-                        netRevenue: totalNetRevenue,
+                        netRevenue: totalNetRevenue, // Legacy, for compatibility
                         previousDayCollections: collections,
                         totalOrders,
                         totalItemsSold,
                         unpaidOrdersValue,
-                        overdueOrdersCount: overdueOrdersCount,
+                        overdueOrdersCount,
                         totalMiscExpenses,
-                        totalVariance: totalVariance,
+                        totalVariance,
                         enhancedReports: periodReports,
                         salesData,
                         itemPerformance: Object.values(itemPerformance),
-                    } as DashboardStats);
+                        netRevenueFromNewSales,
+                        totalNetRevenue,
+                        cashSales,
+                        momoSales,
+                        changeFundImpact: 0, 
+                        changeFundHealth: 'healthy', 
+                        totalPardonedAmount,
+                        totalSurplus,
+                        totalDeficit,
+                        dailyStats: [], 
+                        businessMetrics: [],
+                        orderAgeAnalysis: [],
+                        incompleteAccountingDays: [],
+                        pardonedOrders: [],
+                    };
+
+                    setStats(finalStats);
                 } catch(err) {
                     console.error(err);
                     if (err instanceof Error) {
@@ -331,7 +361,7 @@ const DashboardView: React.FC = () => {
         const input = {
             period,
             totalSales: stats.totalSales,
-            netRevenue: stats.netRevenue,
+            netRevenue: stats.totalNetRevenue,
             totalOrders: stats.totalOrders,
             avgOrderValue,
             itemPerformance,
@@ -347,7 +377,7 @@ const DashboardView: React.FC = () => {
         toast({
             title: "AI Analysis Error",
             description: "Could not generate the report. Please try again later.",
-            variant: "destructive",
+            type: "error",
         });
     } finally {
         setIsGeneratingAnalysis(false);
@@ -534,7 +564,7 @@ const DashboardView: React.FC = () => {
         <TabsContent value="overview" className="mt-6 space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalOrders} orders in period`} />
-            <StatCard icon={<TrendingUp className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.netRevenue)} description={`+${formatCurrency(stats.previousDayCollections)} from collections`} />
+            <StatCard icon={<TrendingUp className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.totalNetRevenue)} description={`+${formatCurrency(stats.previousDayCollections)} from collections`} />
             <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Expenses" value={formatCurrency(stats.totalMiscExpenses)} description="Misc. cash/momo outs" />
             <StatCard 
               icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
