@@ -6,7 +6,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, update
 import { db } from '@/lib/firebase';
 import type { CustomerReward } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast.tsx';
+import { useToast } from '@/hooks/use-toast';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
