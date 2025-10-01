@@ -25,33 +25,32 @@ interface RewardApplication {
 
 const RewardContent = ({ totalToPay, onApplyReward, onBack }: { totalToPay: number; onApplyReward: (reward: RewardApplication) => void; onBack: () => void; }) => {
     const [rewardSearch, setRewardSearch] = useState('');
-    const [rewardCustomers, setRewardCustomers] = useState<CustomerReward[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+    const [allEligibleCustomers, setAllEligibleCustomers] = useState<CustomerReward[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const handleRewardSearch = async () => {
-            if (!rewardSearch.trim()) {
-                setRewardCustomers([]);
-                return;
-            }
+        const fetchEligibleCustomers = async () => {
             setIsLoading(true);
             const q = query(
                 collection(db, 'rewards'),
-                where('customerTag', '>=', rewardSearch.trim()),
-                where('customerTag', '<=', rewardSearch.trim() + '\uf8ff')
+                where('bagCount', '>=', 5)
             );
             const snapshot = await getDocs(q);
             const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerReward));
-            setRewardCustomers(customers);
+            setAllEligibleCustomers(customers);
             setIsLoading(false);
         };
+        fetchEligibleCustomers();
+    }, []);
 
-        const debounceTimer = setTimeout(() => {
-            handleRewardSearch();
-        }, 300); // Debounce to avoid too many queries while typing
-
-        return () => clearTimeout(debounceTimer);
-    }, [rewardSearch]);
+    const filteredCustomers = useMemo(() => {
+        if (!rewardSearch.trim()) {
+            return allEligibleCustomers;
+        }
+        return allEligibleCustomers.filter(customer =>
+            customer.customerTag.toLowerCase().includes(rewardSearch.trim().toLowerCase())
+        );
+    }, [rewardSearch, allEligibleCustomers]);
 
     const handleSelectRewardCustomer = (customer: CustomerReward) => {
         const availableDiscount = Math.floor(customer.bagCount / 5) * 10;
@@ -70,25 +69,27 @@ const RewardContent = ({ totalToPay, onApplyReward, onBack }: { totalToPay: numb
      <>
         <DialogHeader>
           <DialogTitle>Apply Customer Reward</DialogTitle>
-          <DialogDescription>Search for a customer to apply their bag return discount.</DialogDescription>
+          <DialogDescription>Search for a customer or select from the eligible list.</DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
-            <div className="flex gap-2">
+            <div className="relative">
+                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
-                    placeholder="Search customer name..." 
+                    placeholder="Search eligible customer..." 
                     value={rewardSearch} 
                     onChange={(e) => setRewardSearch(e.target.value)} 
                     autoFocus
+                    className="pl-10"
                 />
             </div>
             <ScrollArea className="h-60 border rounded-md">
                 {isLoading ? (
                     <div className="flex justify-center items-center h-full"><LoadingSpinner/></div>
-                ) : rewardCustomers.length > 0 ? (
-                    rewardCustomers.map(customer => {
+                ) : filteredCustomers.length > 0 ? (
+                    filteredCustomers.map(customer => {
                         const discount = Math.floor(customer.bagCount / 5) * 10;
                         return (
-                            <div key={customer.id} className="p-3 border-b flex justify-between items-center">
+                            <div key={customer.id} className="p-3 border-b flex justify-between items-center hover:bg-secondary">
                                 <div>
                                     <p className="font-semibold">{customer.customerTag}</p>
                                     <p className="text-sm text-muted-foreground">Bags: {customer.bagCount} | Discount: {formatCurrency(discount)}</p>
@@ -101,7 +102,7 @@ const RewardContent = ({ totalToPay, onApplyReward, onBack }: { totalToPay: numb
                     })
                 ) : (
                     <p className="p-4 text-center text-muted-foreground">
-                        {rewardSearch.trim() ? 'No customers found.' : 'Start typing to search.'}
+                        {rewardSearch.trim() ? 'No customers match your search.' : 'No customers are currently eligible for a reward.'}
                     </p>
                 )}
             </ScrollArea>
@@ -230,9 +231,15 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                  if(reward) {
                     const rewardRef = doc(db, 'rewards', reward.customer.id);
                     const newBagCount = reward.customer.bagCount - reward.bagsUsed;
-                    batch.update(rewardRef, { bagCount: newBagCount, updatedAt: serverTimestamp() });
+                    const newTotalRedeemed = (reward.customer.totalRedeemed || 0) + reward.discount;
+                    batch.update(rewardRef, { 
+                        bagCount: newBagCount, 
+                        totalRedeemed: newTotalRedeemed, 
+                        updatedAt: serverTimestamp() 
+                    });
+                    
                     batch.update(lastOrderRef, {
-                        rewardDiscount: reward.discount,
+                        rewardDiscount: (lastOrder.rewardDiscount || 0) + reward.discount,
                         rewardCustomerTag: reward.customer.customerTag,
                     });
                  }
