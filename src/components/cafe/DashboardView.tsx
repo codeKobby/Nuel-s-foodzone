@@ -273,7 +273,6 @@ const DashboardView: React.FC = () => {
                     
                     const finalStats: DashboardStats = {
                         totalSales,
-                        netRevenue: totalNetRevenue, // Legacy, for compatibility
                         previousDayCollections: collections,
                         totalOrders,
                         totalItemsSold,
