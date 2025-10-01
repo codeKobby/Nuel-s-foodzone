@@ -28,7 +28,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { updatePassword } from '@/lib/auth-tools';
-import { useToast } from '@/hooks/use-toast.tsx';
+import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { initialMenuData } from '@/data/initial-data';
 
