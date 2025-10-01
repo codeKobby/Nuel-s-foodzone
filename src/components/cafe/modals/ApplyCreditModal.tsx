@@ -16,7 +16,7 @@ import { Search, AlertCircle } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { applyChangeAsCreditToOrders } from '@/lib/customer-credit';
-import { useToast } from '@/hooks/use-toast.tsx';
+import { useToast } from '@/hooks/use-toast';
 
 interface ApplyCreditModalProps {
     sourceOrder: Order;
