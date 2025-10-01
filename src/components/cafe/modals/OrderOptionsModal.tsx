@@ -27,6 +27,97 @@ interface RewardApplication {
     bagsUsed: number;
 }
 
+const RewardContent = ({ total, onApplyReward, onBack }: { total: number; onApplyReward: (reward: RewardApplication) => void; onBack: () => void; }) => {
+    const [rewardSearch, setRewardSearch] = useState('');
+    const [rewardCustomers, setRewardCustomers] = useState<CustomerReward[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        const handleRewardSearch = async () => {
+            if (!rewardSearch.trim()) {
+                setRewardCustomers([]);
+                return;
+            }
+            setIsLoading(true);
+            const q = query(
+                collection(db, 'rewards'),
+                where('customerTag', '>=', rewardSearch.trim()),
+                where('customerTag', '<=', rewardSearch.trim() + '\uf8ff')
+            );
+            const snapshot = await getDocs(q);
+            const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerReward));
+            setRewardCustomers(customers);
+            setIsLoading(false);
+        };
+
+        const debounceTimer = setTimeout(() => {
+            handleRewardSearch();
+        }, 300); // Debounce to avoid too many queries while typing
+
+        return () => clearTimeout(debounceTimer);
+    }, [rewardSearch]);
+
+    const handleSelectRewardCustomer = (customer: CustomerReward) => {
+        const availableDiscount = Math.floor(customer.bagCount / 5) * 10;
+        if (availableDiscount > 0) {
+            const discountToApply = Math.min(availableDiscount, total);
+            const bagsUsed = Math.ceil((discountToApply / 10)) * 5;
+            onApplyReward({
+                customer,
+                discount: discountToApply,
+                bagsUsed,
+            });
+        }
+    };
+
+    return (
+     <>
+        <DialogHeader>
+          <DialogTitle>Apply Customer Reward</DialogTitle>
+          <DialogDescription>Search for a customer to apply their bag return discount.</DialogDescription>
+        </DialogHeader>
+        <div className="py-4 space-y-4">
+            <div className="flex gap-2">
+                <Input 
+                    placeholder="Search customer name..." 
+                    value={rewardSearch} 
+                    onChange={(e) => setRewardSearch(e.target.value)} 
+                    autoFocus
+                />
+            </div>
+            <ScrollArea className="h-60 border rounded-md">
+                {isLoading ? (
+                    <div className="flex justify-center items-center h-full"><LoadingSpinner/></div>
+                ) : rewardCustomers.length > 0 ? (
+                    rewardCustomers.map(customer => {
+                        const discount = Math.floor(customer.bagCount / 5) * 10;
+                        return (
+                            <div key={customer.id} className="p-3 border-b flex justify-between items-center">
+                                <div>
+                                    <p className="font-semibold">{customer.customerTag}</p>
+                                    <p className="text-sm text-muted-foreground">Bags: {customer.bagCount} | Discount: {formatCurrency(discount)}</p>
+                                </div>
+                                <Button size="sm" onClick={() => handleSelectRewardCustomer(customer)} disabled={discount <= 0}>
+                                    Apply
+                                </Button>
+                            </div>
+                        )
+                    })
+                ) : (
+                     <p className="p-4 text-center text-muted-foreground">
+                        {rewardSearch.trim() ? 'No customers found.' : 'Start typing to search.'}
+                    </p>
+                )}
+            </ScrollArea>
+        </div>
+        <DialogFooter>
+            <Button variant="secondary" onClick={onBack}>Back to Payment</Button>
+        </DialogFooter>
+     </>
+    );
+};
+
+
 interface OrderOptionsModalProps {
     total: number;
     orderItems: Record<string, OrderItem>;
@@ -52,8 +143,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const { session } = useContext(AuthContext);
   const [isApplyingReward, setIsApplyingReward] = useState(false);
-  const [rewardSearch, setRewardSearch] = useState('');
-  const [rewardCustomers, setRewardCustomers] = useState<CustomerReward[]>([]);
   const [reward, setReward] = useState<RewardApplication | null>(null);
 
   useEffect(() => {
@@ -130,30 +219,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     processOrder({ isPaid: false });
   };
   
-    const handleRewardSearch = async () => {
-    if (!rewardSearch.trim()) {
-      setRewardCustomers([]);
-      return;
-    }
-    const q = query(collection(db, 'rewards'), where('customerTag', '>=', rewardSearch), where('customerTag', '<=', rewardSearch + '\uf8ff'));
-    const snapshot = await getDocs(q);
-    const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerReward));
-    setRewardCustomers(customers);
+  const handleApplyReward = (appliedReward: RewardApplication) => {
+    setReward(appliedReward);
+    setIsApplyingReward(false);
   };
 
-  const handleSelectRewardCustomer = (customer: CustomerReward) => {
-    const availableDiscount = Math.floor(customer.bagCount / 5) * 10;
-    if (availableDiscount > 0) {
-      const discountToApply = Math.min(availableDiscount, total);
-      const bagsUsed = Math.ceil((discountToApply / 10)) * 5;
-      setReward({
-        customer,
-        discount: discountToApply,
-        bagsUsed,
-      });
-      setIsApplyingReward(false);
-    }
-  };
 
   const processOrder = async (options: { isPaid: boolean, pardonDeficit?: boolean }) => {
     setIsProcessing(true);
@@ -341,48 +411,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     );
   };
   
-  const RewardContent = () => (
-     <>
-        <DialogHeader>
-          <DialogTitle>Apply Customer Reward</DialogTitle>
-          <DialogDescription>Search for a customer to apply their bag return discount.</DialogDescription>
-        </DialogHeader>
-        <div className="py-4 space-y-4">
-            <div className="flex gap-2">
-                <Input placeholder="Search customer name..." value={rewardSearch} onChange={(e) => setRewardSearch(e.target.value)} />
-                <Button onClick={handleRewardSearch}><SearchIcon /></Button>
-            </div>
-            <ScrollArea className="h-60 border rounded-md">
-                {rewardCustomers.length > 0 ? (
-                    rewardCustomers.map(customer => {
-                        const discount = Math.floor(customer.bagCount / 5) * 10;
-                        return (
-                            <div key={customer.id} className="p-3 border-b flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold">{customer.customerTag}</p>
-                                    <p className="text-sm text-muted-foreground">Bags: {customer.bagCount} | Discount: {formatCurrency(discount)}</p>
-                                </div>
-                                <Button size="sm" onClick={() => handleSelectRewardCustomer(customer)} disabled={discount <= 0}>
-                                    Apply
-                                </Button>
-                            </div>
-                        )
-                    })
-                ) : (
-                    <p className="p-4 text-center text-muted-foreground">No customers found.</p>
-                )}
-            </ScrollArea>
-        </div>
-        <DialogFooter>
-            <Button variant="secondary" onClick={() => setIsApplyingReward(false)}>Back to Payment</Button>
-        </DialogFooter>
-     </>
-  );
-
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
-        {isApplyingReward ? <RewardContent /> : step === 1 ? (
+        {isApplyingReward ? <RewardContent total={total} onApplyReward={handleApplyReward} onBack={() => setIsApplyingReward(false)} /> : step === 1 ? (
           <>
             <DialogHeader>
               <DialogTitle>
