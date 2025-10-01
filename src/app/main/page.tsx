@@ -7,7 +7,7 @@ import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Menu, LogOut, Package, Users, Gift } from 'lucide-react';
+import { Menu, LogOut, Package, Users, Gift, LucideIcon } from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/app/logo.png';
 
@@ -30,6 +30,13 @@ import { OrderEditingProvider } from '@/context/OrderEditingContext';
 import { AuthContext } from '@/context/AuthContext';
 import type { MenuItem } from '@/lib/types';
 
+type NavItem = {
+    id: string;
+    icon: LucideIcon;
+    label: string;
+    badge?: number;
+}
+
 const MobileNav = ({
     activeView,
     setActiveView,
@@ -51,7 +58,7 @@ const MobileNav = ({
 }) => {
     const [isOpen, setIsOpen] = useState(false);
 
-    const navItemsConfig = {
+    const navItemsConfig: Record<'manager' | 'cashier', NavItem[]> = {
         manager: [
             { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
             { id: 'admin', icon: Settings, label: 'Admin Panel' },
@@ -331,3 +338,5 @@ export default function CafePageWrapper() {
         </Suspense>
     )
 }
+
+    
