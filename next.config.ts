@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 import 'dotenv/config';
 
@@ -20,6 +21,12 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'i.imgur.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
         port: '',
         pathname: '/**',
       },
