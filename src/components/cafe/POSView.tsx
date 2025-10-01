@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
@@ -124,7 +123,7 @@ const OrderCart: React.FC<OrderCartProps> = ({ currentOrder, total, updateQuanti
 };
 
 
-const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveView }) => {
+const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveView }) => {
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [currentOrder, setCurrentOrder] = useState<Record<string, OrderItem>>({});
     const [loading, setLoading] = useState(true);
@@ -144,7 +143,7 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
 
     useEffect(() => {
         if(editingOrder) {
-            const orderItemsAsCart = editingOrder.items.reduce((acc: Record<string, OrderItem>, item: Omit<OrderItem, 'id' | 'category'>) => {
+            const orderItemsAsCart: Record<string, OrderItem> = editingOrder.items.reduce((acc: Record<string, OrderItem>, item: Omit<OrderItem, 'id' | 'category'>) => {
                 const id = crypto.randomUUID();
                 acc[id] = {
                     ...item,
@@ -482,4 +481,4 @@ const PosView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
     );
 };
 
-export default PosView;
+export default POSView;
