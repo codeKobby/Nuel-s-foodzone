@@ -14,7 +14,7 @@ const DEFAULT_PASSWORDS = {
     manager: 'Graceland18',
 };
 
-const MASTER_PASSWORD = "RichBoy";
+const MASTER_PASSWORD = "Richboy";
 
 // Hashes a password using SHA256.
 export async function hashPassword(password: string): Promise<string> {
