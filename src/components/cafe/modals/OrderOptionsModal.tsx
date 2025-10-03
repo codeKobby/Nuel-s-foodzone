@@ -47,7 +47,7 @@ const RewardContent = ({ total, onApplyReward, onBack }: { total: number; onAppl
         fetchEligibleCustomers();
     }, []);
 
-    const filteredCustomers = useMemo(() => {
+    const filteredCustomers = React.useMemo(() => {
         if (!rewardSearch.trim()) {
             return allEligibleCustomers;
         }
@@ -170,6 +170,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     const finalAmountPaid = totalPaidSoFar + newPaymentAmount;
     const finalChangeGiven = changeGivenSoFar + changeGivenNum;
     
+    // Correct logic: The effective amount paid is what the customer gave minus what they got back.
     const amountEffectivelyPaid = finalAmountPaid - finalChangeGiven;
     const newBalance = finalTotal - amountEffectivelyPaid;
     
@@ -233,7 +234,14 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     const { isPaid, pardonDeficit = false } = options;
     
     try {
-      const pardonedAmount = isPaid && pardonDeficit && balances.deficit > 0 ? balances.deficit : 0;
+        const {
+            finalAmountPaid,
+            finalChangeGiven,
+            newPaymentAmount,
+            newBalance,
+        } = calculateBalances();
+      
+      const pardonedAmount = isPaid && pardonDeficit && newBalance > 0 ? newBalance : 0;
       
       const orderData: any = {
         tag: orderTag,
@@ -256,18 +264,18 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         rewardCustomerTag: reward?.customer.customerTag || editingOrder?.rewardCustomerTag || '',
       };
       
-      let newPaymentAmount = balances.newPaymentAmount;
+      let effectiveNewPayment = newPaymentAmount;
 
       if (isOverpaid) { 
-        newPaymentAmount = 0;
+        effectiveNewPayment = 0;
       } else if (isPaid && paymentMethod === 'momo') {
-          newPaymentAmount = finalTotal - (editingOrder?.amountPaid || 0);
-          if (newPaymentAmount < 0) newPaymentAmount = 0;
+          effectiveNewPayment = finalTotal - (editingOrder?.amountPaid || 0);
+          if (effectiveNewPayment < 0) effectiveNewPayment = 0;
       }
 
       if (isPaid) {
           orderData.lastPaymentTimestamp = serverTimestamp();
-          orderData.lastPaymentAmount = newPaymentAmount;
+          orderData.lastPaymentAmount = effectiveNewPayment;
       }
       
       if (pardonedAmount > 0) {
@@ -276,15 +284,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
       if (editingOrder) {
           const orderRef = doc(db, "orders", editingOrder.id);
-          const finalAmountPaid = editingOrder.amountPaid + (isPaid ? newPaymentAmount : 0);
-          const changeGivenNum = parseFloat(changeGivenInput) || 0;
-          const finalChangeGiven = (editingOrder.changeGiven || 0) + changeGivenNum;
           
           orderData.amountPaid = finalAmountPaid;
           orderData.changeGiven = finalChangeGiven;
 
-          const amountEffectivelyPaid = finalAmountPaid - finalChangeGiven;
-          orderData.balanceDue = finalTotal - amountEffectivelyPaid;
+          orderData.balanceDue = newBalance;
            if (pardonDeficit) {
               orderData.balanceDue = 0;
           }
@@ -309,8 +313,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               orderData.amountPaid = isPaid ? newPaymentAmount : 0;
               orderData.changeGiven = isPaid ? changeGivenNum : 0;
               
-              const amountEffectivelyPaid = orderData.amountPaid - orderData.changeGiven;
-              orderData.balanceDue = finalTotal - amountEffectivelyPaid;
+              orderData.balanceDue = newBalance;
+
               if (pardonDeficit) {
                   orderData.balanceDue = 0;
               }
