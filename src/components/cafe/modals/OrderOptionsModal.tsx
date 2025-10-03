@@ -170,17 +170,18 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     const finalAmountPaid = totalPaidSoFar + newPaymentAmount;
     const finalChangeGiven = changeGivenSoFar + changeGivenNum;
     
-    let newBalance = finalTotal - finalAmountPaid;
+    const amountEffectivelyPaid = finalAmountPaid - finalChangeGiven;
+    const newBalance = finalTotal - amountEffectivelyPaid;
     
     const deficit = newBalance > 0 ? newBalance : 0;
     let change = 0;
-     if (paymentMethod === 'cash' && newPaymentAmount > 0) {
-      const amountOwedNow = editingOrder ? finalTotal - editingOrder.amountPaid : finalTotal;
-      if(newPaymentAmount > amountOwedNow) {
+
+    if (paymentMethod === 'cash' && newPaymentAmount > 0) {
+      const amountOwedNow = editingOrder ? finalTotal - (editingOrder.amountPaid - (editingOrder.changeGiven || 0)) : finalTotal;
+      if (newPaymentAmount > amountOwedNow) {
         change = newPaymentAmount - amountOwedNow;
       }
     }
-
     
     return {
       finalAmountPaid,
@@ -195,9 +196,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   const balances = calculateBalances();
   const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(parseFloat(amountPaidInput));
   
-  // Logic to determine if payment input is needed
-  const amountOwedNow = editingOrder ? finalTotal - editingOrder.amountPaid : finalTotal;
-  const isOverpaid = editingOrder && editingOrder.amountPaid >= finalTotal;
+  const amountOwedNow = editingOrder ? finalTotal - (editingOrder.amountPaid - (editingOrder.changeGiven || 0)) : finalTotal;
+  const isOverpaid = editingOrder && (editingOrder.amountPaid - (editingOrder.changeGiven || 0)) >= finalTotal;
 
   const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && balances.deficit > 0;
   const canConfirmPayment = !isOverpaid && (paymentMethod === 'momo' || (paymentMethod === 'cash' && isAmountPaidEntered));
@@ -243,7 +243,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           price: i.price, 
           quantity: i.quantity 
         })),
-        total: finalTotal,
+        total: finalTotal, // Use the potentially discounted total
         paymentMethod: isPaid ? paymentMethod : 'Unpaid',
         pardonedAmount: (editingOrder?.pardonedAmount || 0) + pardonedAmount,
         notes: editingOrder?.notes || '',
@@ -252,17 +252,17 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         creditSource: editingOrder?.creditSource || [],
         cashierId: session?.uid || 'unknown',
         cashierName: session?.fullName || session?.username || 'Unknown',
-        rewardDiscount: reward?.discount || 0,
-        rewardCustomerTag: reward?.customer.customerTag || '',
+        rewardDiscount: (editingOrder?.rewardDiscount || 0) + (reward?.discount || 0),
+        rewardCustomerTag: reward?.customer.customerTag || editingOrder?.rewardCustomerTag || '',
       };
       
       let newPaymentAmount = balances.newPaymentAmount;
 
-      if (editingOrder && isOverpaid) { // If customer has already overpaid
-        newPaymentAmount = 0; // No new payment is being made
+      if (isOverpaid) { 
+        newPaymentAmount = 0;
       } else if (isPaid && paymentMethod === 'momo') {
           newPaymentAmount = finalTotal - (editingOrder?.amountPaid || 0);
-          if (newPaymentAmount < 0) newPaymentAmount = 0; // Don't process negative payment
+          if (newPaymentAmount < 0) newPaymentAmount = 0;
       }
 
       if (isPaid) {
@@ -280,22 +280,16 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           const changeGivenNum = parseFloat(changeGivenInput) || 0;
           const finalChangeGiven = (editingOrder.changeGiven || 0) + changeGivenNum;
           
-          let finalBalance = finalTotal - finalAmountPaid;
-          if(pardonDeficit){
-              finalBalance = 0;
-          }
-          
-          if (isOverpaid) {
-            finalBalance = finalTotal - editingOrder.amountPaid;
-          } else if (finalAmountPaid > finalTotal && changeGivenNum > 0) {
-              finalBalance = -(changeGivenNum - (finalAmountPaid - finalTotal));
-          }
-          
           orderData.amountPaid = finalAmountPaid;
-          orderData.balanceDue = finalBalance;
           orderData.changeGiven = finalChangeGiven;
+
+          const amountEffectivelyPaid = finalAmountPaid - finalChangeGiven;
+          orderData.balanceDue = finalTotal - amountEffectivelyPaid;
+           if (pardonDeficit) {
+              orderData.balanceDue = 0;
+          }
           
-          if (finalBalance <= 0) {
+          if (orderData.balanceDue <= 0) {
               orderData.paymentStatus = 'Paid';
           } else if (finalAmountPaid > 0) {
               orderData.paymentStatus = 'Partially Paid';
@@ -310,25 +304,20 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
       } else {
           await runTransaction(db, async (transaction) => {
-              const changeGiven = parseFloat(changeGivenInput) || 0;
+              const changeGivenNum = parseFloat(changeGivenInput) || 0;
               
               orderData.amountPaid = isPaid ? newPaymentAmount : 0;
-              orderData.changeGiven = isPaid && newPaymentAmount > finalTotal ? changeGiven : 0;
+              orderData.changeGiven = isPaid ? changeGivenNum : 0;
               
-              let finalBalance = finalTotal - orderData.amountPaid;
+              const amountEffectivelyPaid = orderData.amountPaid - orderData.changeGiven;
+              orderData.balanceDue = finalTotal - amountEffectivelyPaid;
               if (pardonDeficit) {
-                  finalBalance = 0;
+                  orderData.balanceDue = 0;
               }
               
-              if (orderData.changeGiven > 0) {
-                  finalBalance = - (orderData.changeGiven - (orderData.amountPaid - finalTotal));
-              }
-
-              orderData.balanceDue = finalBalance;
-              
-              if (isPaid && finalBalance <= 0) {
+              if (isPaid && orderData.balanceDue <= 0) {
                 orderData.paymentStatus = 'Paid';
-              } else if (isPaid && finalBalance > 0) {
+              } else if (isPaid && orderData.balanceDue > 0) {
                 orderData.paymentStatus = 'Partially Paid';
               } else {
                 orderData.paymentStatus = 'Unpaid';
@@ -359,7 +348,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               transaction.set(newOrderRef, newOrderWithId);
               transaction.set(counterRef, { count: newCount }, { merge: true });
               
-              const finalOrderForPopup: Order = { ...newOrderWithId, id: newOrderRef.id, timestamp: Timestamp.now(), balanceDue: finalBalance };
+              const finalOrderForPopup: Order = { ...newOrderWithId, id: newOrderRef.id, timestamp: Timestamp.now(), balanceDue: orderData.balanceDue };
               onOrderPlaced(finalOrderForPopup);
           });
       }
@@ -394,6 +383,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Already Paid:</span>
               <span>{formatCurrency(editingOrder.amountPaid)}</span>
+            </div>
+             <div className="flex justify-between">
+              <span className="text-muted-foreground">Change Already Given:</span>
+              <span>-{formatCurrency(editingOrder.changeGiven || 0)}</span>
             </div>
             <div className="flex justify-between font-bold text-base mt-2 pt-2 border-t">
               <span>Amount Owed Now:</span>

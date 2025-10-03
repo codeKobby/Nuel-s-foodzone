@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useContext } from 'react';
@@ -67,16 +68,22 @@ const OrderCard: React.FC<OrderCardProps> = ({
   onDelete, 
   onChangeDueClick 
 }) => {
+  const isBalanceOwedByCustomer = order.balanceDue > 0;
+  const isChangeOwedToCustomer = order.balanceDue < 0;
+
   const paymentStatusConfig = {
     'Paid': { variant: 'default', className: 'bg-green-500 hover:bg-green-500 text-white' },
     'Unpaid': { variant: 'destructive', className: 'bg-red-500 hover:bg-red-500 text-white' },
     'Partially Paid': { variant: 'secondary', className: 'bg-yellow-500 hover:bg-yellow-500 text-black' },
   } as const;
+  
+  let displayedStatus = order.paymentStatus;
+  if(isChangeOwedToCustomer) {
+    displayedStatus = 'Paid';
+  }
 
-  const isBalanceOwedByCustomer = order.balanceDue > 0;
-  const isChangeOwedToCustomer = order.balanceDue < 0;
-  const isFullyPaid = order.paymentStatus === 'Paid' && order.balanceDue === 0;
-  const canBeSelected = !isFullyPaid && (isBalanceOwedByCustomer || isChangeOwedToCustomer);
+  const isFullyPaid = displayedStatus === 'Paid' && !isBalanceOwedByCustomer && !isChangeOwedToCustomer;
+  const canBeSelected = isBalanceOwedByCustomer || isChangeOwedToCustomer;
 
   const itemSnippet = useMemo(() => {
     return order.items.map(item => `${item.quantity}x ${item.name}`).join(', ').substring(0, 80);
@@ -89,7 +96,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
     if (isBalanceOwedByCustomer) {
       return <Clock className="h-4 w-4 text-yellow-500" />;
     }
-    if (isFullyPaid) {
+    if (displayedStatus === 'Paid') {
       return <CheckCircle2 className="h-4 w-4 text-green-500" />;
     }
     return null;
@@ -100,7 +107,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
       "flex flex-col justify-between transition-all hover:shadow-lg border-2",
       isSelected ? 'border-primary ring-2 ring-primary/20 shadow-md' : 'border-border',
       order.status === 'Completed' ? 'bg-card/50' : 'bg-card',
-      !canBeSelected && 'opacity-75'
+      !canBeSelected && !isFullyPaid && 'opacity-75'
     )}>
       <CardHeader className="p-3 sm:p-4">
         <div className="flex justify-between items-start gap-3">
@@ -136,10 +143,10 @@ const OrderCard: React.FC<OrderCardProps> = ({
             </div>
           </div>
           <Badge 
-            variant={paymentStatusConfig[order.paymentStatus].variant} 
-            className={cn(paymentStatusConfig[order.paymentStatus].className, "text-xs flex-shrink-0")}
+            variant={paymentStatusConfig[displayedStatus].variant} 
+            className={cn(paymentStatusConfig[displayedStatus].className, "text-xs flex-shrink-0")}
           >
-            {order.paymentStatus}
+            {displayedStatus}
           </Badge>
         </div>
 
@@ -174,18 +181,17 @@ const OrderCard: React.FC<OrderCardProps> = ({
         <p className="text-muted-foreground text-xs truncate mb-2" title={itemSnippet}>
           {itemSnippet}
         </p>
-        <p className="text-lg sm:text-xl font-bold text-primary">
-          {formatCurrency(order.total)}
-        </p>
+         <div className="flex justify-between items-baseline">
+            <p className="text-lg sm:text-xl font-bold text-primary">
+              {formatCurrency(order.total)}
+            </p>
+            {order.rewardDiscount && order.rewardDiscount > 0 &&
+                <Badge variant="outline" className="text-green-600 border-green-300">-{formatCurrency(order.rewardDiscount)}</Badge>
+            }
+        </div>
         
         {/* Payment Details */}
         <div className="space-y-1 mt-2 text-xs text-muted-foreground">
-          {order.rewardDiscount && order.rewardDiscount > 0 && (
-             <div className="flex justify-between text-green-600">
-                <span>Reward Discount:</span>
-                <span>-{formatCurrency(order.rewardDiscount)}</span>
-            </div>
-          )}
           <div className="flex justify-between">
             <span>Paid:</span>
             <span>{formatCurrency(order.amountPaid)}</span>
