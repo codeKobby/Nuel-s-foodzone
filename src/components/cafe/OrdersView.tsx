@@ -84,7 +84,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
 
   const getOrderStatusIcon = () => {
     if (isChangeOwedToCustomer) {
-      return <Coins className="h-4 w-4 text-red-500" />;
+      return <Coins className="h-4 w-4 text-primary" />;
     }
     if (isBalanceOwedByCustomer) {
       return <Clock className="h-4 w-4 text-yellow-500" />;
@@ -175,7 +175,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
           {itemSnippet}
         </p>
         <p className="text-lg sm:text-xl font-bold text-primary">
-          {formatCurrency(order.total + (order.rewardDiscount || 0))}
+          {formatCurrency(order.total)}
         </p>
         
         {/* Payment Details */}
@@ -190,12 +190,10 @@ const OrderCard: React.FC<OrderCardProps> = ({
             <span>Paid:</span>
             <span>{formatCurrency(order.amountPaid)}</span>
           </div>
-          {order.changeGiven > 0 && (
-            <div className="flex justify-between">
-              <span>Change Given:</span>
-              <span>{formatCurrency(order.changeGiven)}</span>
-            </div>
-          )}
+          <div className="flex justify-between">
+            <span>Change Given:</span>
+            <span>{formatCurrency(order.changeGiven)}</span>
+          </div>
           {order.pardonedAmount && order.pardonedAmount > 0 && (
             <div className="flex justify-between text-green-600">
               <span>Pardoned:</span>
@@ -774,5 +772,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
 };
 
 export default OrdersView;
+
+    
 
     
