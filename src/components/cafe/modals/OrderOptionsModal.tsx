@@ -17,7 +17,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { AuthContext } from '@/context/AuthContext';
 import { useContext } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
@@ -157,35 +157,23 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
   const calculateBalances = () => {
     const newPaymentAmount = parseFloat(amountPaidInput) || 0;
-    const changeGivenNum = parseFloat(changeGivenInput) || 0;
+    const newChangeGivenNum = parseFloat(changeGivenInput) || 0;
 
-    let totalPaidSoFar = 0;
-    let changeGivenSoFar = 0;
+    let alreadyPaid = 0;
+    let alreadyGivenChange = 0;
 
     if (editingOrder) {
-        totalPaidSoFar = editingOrder.amountPaid;
-        changeGivenSoFar = editingOrder.changeGiven || 0;
+        alreadyPaid = editingOrder.amountPaid;
+        alreadyGivenChange = editingOrder.changeGiven || 0;
     }
 
-    const finalAmountPaid = totalPaidSoFar + newPaymentAmount;
-    const finalChangeGiven = changeGivenSoFar + changeGivenNum;
+    const finalAmountPaid = alreadyPaid + newPaymentAmount;
+    const finalChangeGiven = alreadyGivenChange + newChangeGivenNum;
+    const effectivePayment = finalAmountPaid - finalChangeGiven;
+    const newBalance = finalTotal - effectivePayment;
 
-    // This is the CRITICAL part. Effective payment is what the cashier keeps.
-    const amountEffectivelyPaid = finalAmountPaid - finalChangeGiven;
-
-    const newBalance = finalTotal - amountEffectivelyPaid;
-    
     const deficit = newBalance > 0 ? newBalance : 0;
-    
-    // Calculate potential change based on this specific transaction only
-    let change = 0;
-    if (paymentMethod === 'cash' && newPaymentAmount > 0) {
-      // Amount owed for this transaction
-      const amountOwedNow = finalTotal - (totalPaidSoFar - changeGivenSoFar);
-      if (newPaymentAmount > amountOwedNow) {
-        change = newPaymentAmount - amountOwedNow;
-      }
-    }
+    const change = newBalance < 0 ? Math.abs(newBalance) : 0;
     
     return {
       finalAmountPaid,
@@ -272,7 +260,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
       if (isOverpaid) { 
         effectiveNewPayment = 0;
       } else if (isPaid && paymentMethod === 'momo') {
-          effectiveNewPayment = finalTotal - (editingOrder?.amountPaid || 0);
+          effectiveNewPayment = amountOwedNow;
           if (effectiveNewPayment < 0) effectiveNewPayment = 0;
       }
 
@@ -290,8 +278,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           
           orderData.amountPaid = finalAmountPaid;
           orderData.changeGiven = finalChangeGiven;
-
           orderData.balanceDue = newBalance;
+
            if (pardonDeficit) {
               orderData.balanceDue = 0;
           }

@@ -78,11 +78,11 @@ const OrderCard: React.FC<OrderCardProps> = ({
   } as const;
   
   let displayedStatus = order.paymentStatus;
-  if(isChangeOwedToCustomer) {
+  if (isChangeOwedToCustomer) {
     displayedStatus = 'Paid';
   }
 
-  const isFullyPaid = displayedStatus === 'Paid' && !isBalanceOwedByCustomer && !isChangeOwedToCustomer;
+  const isFullyPaidAndSettled = displayedStatus === 'Paid' && !isBalanceOwedByCustomer && !isChangeOwedToCustomer;
   const canBeSelected = isBalanceOwedByCustomer || isChangeOwedToCustomer;
 
   const itemSnippet = useMemo(() => {
@@ -107,7 +107,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
       "flex flex-col justify-between transition-all hover:shadow-lg border-2",
       isSelected ? 'border-primary ring-2 ring-primary/20 shadow-md' : 'border-border',
       order.status === 'Completed' ? 'bg-card/50' : 'bg-card',
-      !canBeSelected && !isFullyPaid && 'opacity-75'
+      !canBeSelected && !isFullyPaidAndSettled && 'opacity-75'
     )}>
       <CardHeader className="p-3 sm:p-4">
         <div className="flex justify-between items-start gap-3">
@@ -143,8 +143,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
             </div>
           </div>
           <Badge 
-            variant={paymentStatusConfig[displayedStatus].variant} 
-            className={cn(paymentStatusConfig[displayedStatus].className, "text-xs flex-shrink-0")}
+            variant={paymentStatusConfig[displayedStatus]?.variant || 'secondary'} 
+            className={cn(paymentStatusConfig[displayedStatus]?.className, "text-xs flex-shrink-0")}
           >
             {displayedStatus}
           </Badge>
@@ -313,8 +313,8 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
       const newSet = new Set(prev);
       const order = orders.find(o => o.id === orderId);
       
-      const isFullyPaid = order?.paymentStatus === 'Paid' && order.balanceDue === 0;
-      if (isFullyPaid) return prev; 
+      const isFullyPaidAndSettled = order?.paymentStatus === 'Paid' && order.balanceDue === 0;
+      if (isFullyPaidAndSettled) return prev; 
 
       if (isSelected) {
         newSet.add(orderId);
@@ -782,3 +782,4 @@ export default OrdersView;
     
 
     
+
