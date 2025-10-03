@@ -158,27 +158,30 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   const calculateBalances = () => {
     const newPaymentAmount = parseFloat(amountPaidInput) || 0;
     const changeGivenNum = parseFloat(changeGivenInput) || 0;
-    
+
     let totalPaidSoFar = 0;
     let changeGivenSoFar = 0;
-    
+
     if (editingOrder) {
-      totalPaidSoFar = editingOrder.amountPaid;
-      changeGivenSoFar = editingOrder.changeGiven || 0;
+        totalPaidSoFar = editingOrder.amountPaid;
+        changeGivenSoFar = editingOrder.changeGiven || 0;
     }
-    
+
     const finalAmountPaid = totalPaidSoFar + newPaymentAmount;
     const finalChangeGiven = changeGivenSoFar + changeGivenNum;
-    
-    // Correct logic: The effective amount paid is what the customer gave minus what they got back.
+
+    // This is the CRITICAL part. Effective payment is what the cashier keeps.
     const amountEffectivelyPaid = finalAmountPaid - finalChangeGiven;
+
     const newBalance = finalTotal - amountEffectivelyPaid;
     
     const deficit = newBalance > 0 ? newBalance : 0;
+    
+    // Calculate potential change based on this specific transaction only
     let change = 0;
-
     if (paymentMethod === 'cash' && newPaymentAmount > 0) {
-      const amountOwedNow = editingOrder ? finalTotal - (editingOrder.amountPaid - (editingOrder.changeGiven || 0)) : finalTotal;
+      // Amount owed for this transaction
+      const amountOwedNow = finalTotal - (totalPaidSoFar - changeGivenSoFar);
       if (newPaymentAmount > amountOwedNow) {
         change = newPaymentAmount - amountOwedNow;
       }
@@ -192,7 +195,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
       deficit,
       change,
     };
-  };
+};
 
   const balances = calculateBalances();
   const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(parseFloat(amountPaidInput));
@@ -308,12 +311,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
       } else {
           await runTransaction(db, async (transaction) => {
-              const changeGivenNum = parseFloat(changeGivenInput) || 0;
               
               orderData.amountPaid = isPaid ? newPaymentAmount : 0;
-              orderData.changeGiven = isPaid ? changeGivenNum : 0;
+              orderData.changeGiven = isPaid ? (parseFloat(changeGivenInput) || 0) : 0;
               
-              orderData.balanceDue = newBalance;
+              orderData.balanceDue = finalTotal - (orderData.amountPaid - orderData.changeGiven);
 
               if (pardonDeficit) {
                   orderData.balanceDue = 0;
