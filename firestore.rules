@@ -1,39 +1,10 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    match /menuItems/{document=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    match /orders/{document=**} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /miscExpenses/{document=**} {
-        allow read, write: if isAuthenticated();
-    }
-    
-    match /reconciliationReports/{document=**} {
-        allow read, write: if isAuthenticated();
-    }
-
-    match /cashierAccounts/{document=**} {
-      allow read, create, update, delete: if isAuthenticated();
-    }
-    
-    match /credentials/{document=**} {
-        allow read, write: if isAuthenticated();
-    }
-    
-    match /counters/{document=**} {
-        allow read, write: if isAuthenticated();
+    // Allow read and write access to all documents
+    // if the user is authenticated (even anonymously).
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
