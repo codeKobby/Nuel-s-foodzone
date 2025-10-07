@@ -184,10 +184,10 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 let newBalanceDue = orderBalance - amountToPayForOrder;
                 
                 const updateData: any = {
-                    paymentMethod: paymentMethod,
                     amountPaid: newAmountPaid,
                     lastPaymentTimestamp: now,
                     lastPaymentAmount: amountToPayForOrder,
+                    paymentMethod: paymentMethod, // Set the method for THIS payment
                     pardonedAmount: order.pardonedAmount || 0,
                 };
                 
@@ -345,3 +345,5 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 };
 
 export default CombinedPaymentModal;
+
+    
