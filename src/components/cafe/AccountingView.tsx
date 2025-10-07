@@ -678,7 +678,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         todayOrders.push(order);
                         
                         if (order.status === "Completed") {
-                            totalSales += (order.total + (order.rewardDiscount || 0));
+                            const orderTotal = order.total + (order.rewardDiscount || 0);
+                            totalSales += orderTotal;
 
                             order.items.forEach(item => {
                                 totalItemsSold += item.quantity;
@@ -689,7 +690,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                         
                         if (order.amountPaid > 0) {
                             const paymentAmount = order.lastPaymentAmount || order.amountPaid;
-                            const revenuePortion = Math.min(paymentAmount, paymentAmount + (order.balanceDue > 0 ? 0 : order.balanceDue));
+                            // This is the CRITICAL fix: only count the portion of the payment that covers the order total as revenue
+                            const revenuePortion = Math.min(paymentAmount, order.total);
                             
                             if (order.paymentMethod === 'cash') {
                                 cashSales += revenuePortion;
@@ -745,7 +747,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const expectedCash = cashSales - miscCashExpenses;
                 const expectedMomo = momoSales - miscMomoExpenses;
                 
-                const netRevenue = totalSales - todayUnpaidOrdersValue - totalMiscExpenses - totalRewardDiscount - totalPardonedAmount;
+                const netRevenue = (totalSales - todayUnpaidOrdersValue - totalMiscExpenses - totalRewardDiscount) + settledUnpaidOrdersValue - totalPardonedAmount;
                 
                 setStats({ 
                     totalSales, 
@@ -962,6 +964,7 @@ export default AccountingView;
     
 
     
+
 
 
 
