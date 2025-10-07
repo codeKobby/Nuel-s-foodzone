@@ -168,83 +168,91 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             const batch = writeBatch(db);
             const now = serverTimestamp();
             const changeGiven = parseFloat(changeGivenInput) || 0;
-
-            let amountToDistribute = finalAmountPaid;
-            
-            const ordersToPay = orders.filter(o => (o.paymentStatus === 'Unpaid' || o.paymentStatus === 'Partially Paid') && o.balanceDue > 0).sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-
-            for (const order of ordersToPay) {
-                if (amountToDistribute <= 0 && !pardonDeficit) break;
-
+    
+            // This is the amount of NEW money being applied in this specific transaction.
+            let paymentBeingApplied = paymentMethod === 'momo' ? finalTotal : amountPaidNum;
+    
+            // Distribute this payment across the selected unpaid orders
+            for (const order of orders) {
+                if (paymentBeingApplied <= 0 && !pardonDeficit) break;
+    
                 const orderRef = doc(db, "orders", order.id);
-                const orderBalance = order.balanceDue;
-                const amountToPayForOrder = Math.min(amountToDistribute, orderBalance);
+                const orderData = (await getDoc(orderRef)).data() as Order;
+                const orderBalance = orderData.balanceDue;
                 
-                const newAmountPaid = order.amountPaid + amountToPayForOrder;
+                if (orderBalance <= 0) continue; // Skip already paid orders
+    
+                const amountToPayForOrder = Math.min(paymentBeingApplied, orderBalance);
+                
+                const newAmountPaid = orderData.amountPaid + amountToPayForOrder;
                 let newBalanceDue = orderBalance - amountToPayForOrder;
-                
+    
                 const updateData: any = {
                     amountPaid: newAmountPaid,
                     lastPaymentTimestamp: now,
                     lastPaymentAmount: amountToPayForOrder,
-                    paymentMethod: paymentMethod, // Set the method for THIS payment
-                    pardonedAmount: order.pardonedAmount || 0,
+                    paymentMethod: paymentMethod, // Set the method for THIS specific payment action
                 };
-                
+    
                 if (newBalanceDue <= 0) {
                     updateData.paymentStatus = 'Paid';
                 } else {
                     updateData.paymentStatus = 'Partially Paid';
                 }
-                
+    
                 updateData.balanceDue = newBalanceDue;
-
+    
                 batch.update(orderRef, updateData);
-                amountToDistribute -= amountToPayForOrder;
+                paymentBeingApplied -= amountToPayForOrder;
             }
-            
-            const remainingDeficit = finalTotal - finalAmountPaid;
-
-            if (ordersToPay.length > 0) {
-                 const lastOrder = ordersToPay[ordersToPay.length - 1];
-                 const lastOrderRef = doc(db, "orders", lastOrder.id);
-                 
-                 // Handle change
-                 const finalBalance = (finalTotal - finalAmountPaid + changeGiven) * -1;
-                 
-                 if (finalAmountPaid > finalTotal) {
-                    batch.update(lastOrderRef, { 
-                        balanceDue: finalBalance, 
-                        changeGiven: (lastOrder.changeGiven || 0) + changeGiven 
-                    });
-                 }
-                 else if (pardonDeficit && remainingDeficit > 0) {
-                    const lastOrderData = (await getDoc(lastOrderRef)).data() as Order;
-                    batch.update(lastOrderRef, {
-                        pardonedAmount: (lastOrderData.pardonedAmount || 0) + remainingDeficit,
-                        notes: `Combined payment deficit of ${formatCurrency(remainingDeficit)} pardoned.`,
-                        balanceDue: 0,
-                        paymentStatus: 'Paid',
-                    });
-                 }
-
-                 if(reward) {
+    
+            // After distributing payments, handle any overall change or deficit on the LAST order.
+            const lastOrder = orders[orders.length - 1];
+            if (lastOrder) {
+                const lastOrderRef = doc(db, "orders", lastOrder.id);
+                const lastOrderData = (await getDoc(lastOrderRef)).data() as Order;
+                let finalUpdate: any = {};
+    
+                // 1. Handle CHANGE owed to customer
+                if (finalAmountPaid > finalTotal) {
+                    const totalChangeDue = finalAmountPaid - finalTotal;
+                    const finalChangeGiven = parseFloat(changeGivenInput) || totalChangeDue;
+                    // The final balance is the amount of change *not* given back
+                    finalUpdate.balanceDue = -(totalChangeDue - finalChangeGiven); 
+                    finalUpdate.changeGiven = (lastOrderData.changeGiven || 0) + finalChangeGiven;
+                    finalUpdate.paymentStatus = 'Paid';
+                }
+                // 2. Handle DEFICIT left by customer
+                else if (finalAmountPaid < finalTotal) {
+                    const remainingDeficit = finalTotal - finalAmountPaid;
+                    if (pardonDeficit) {
+                        finalUpdate.pardonedAmount = (lastOrderData.pardonedAmount || 0) + remainingDeficit;
+                        finalUpdate.notes = `${(lastOrderData.notes || '')} Combined payment deficit of ${formatCurrency(remainingDeficit)} pardoned.`.trim();
+                        finalUpdate.balanceDue = 0;
+                        finalUpdate.paymentStatus = 'Paid';
+                    } else {
+                        // The deficit is already reflected in the balanceDue from the loop above
+                    }
+                }
+    
+                // 3. Handle REWARD if applied
+                if (reward) {
                     const rewardRef = doc(db, 'rewards', reward.customer.id);
-                    const newBagCount = reward.customer.bagCount - reward.bagsUsed;
-                    const newTotalRedeemed = (reward.customer.totalRedeemed || 0) + reward.discount;
-                    batch.update(rewardRef, { 
-                        bagCount: newBagCount, 
-                        totalRedeemed: newTotalRedeemed, 
-                        updatedAt: serverTimestamp() 
+                    batch.update(rewardRef, {
+                        bagCount: reward.customer.bagCount - reward.bagsUsed,
+                        totalRedeemed: (reward.customer.totalRedeemed || 0) + reward.discount,
+                        updatedAt: serverTimestamp()
                     });
-                    
-                    batch.update(lastOrderRef, {
-                        rewardDiscount: (lastOrder.rewardDiscount || 0) + reward.discount,
-                        rewardCustomerTag: reward.customer.customerTag,
-                    });
-                 }
+    
+                    finalUpdate.rewardDiscount = (lastOrderData.rewardDiscount || 0) + reward.discount;
+                    finalUpdate.rewardCustomerTag = reward.customer.customerTag;
+                }
+                
+                if (Object.keys(finalUpdate).length > 0) {
+                    batch.update(lastOrderRef, finalUpdate);
+                }
             }
-
+    
             await batch.commit();
             onOrderPlaced();
         } catch (e) {

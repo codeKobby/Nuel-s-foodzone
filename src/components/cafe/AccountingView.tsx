@@ -646,109 +646,104 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     useEffect(() => {
         setLoading(true);
         setError(null);
-
-        const allOrdersQuery = query(collection(db, "orders"));
-        const miscExpensesQuery = query(collection(db, "miscExpenses"), where('timestamp', '>=', todayStart), where('timestamp', '<=', todayEnd));
-
-        const unsubAllOrders = onSnapshot(allOrdersQuery, (allOrdersSnapshot) => {
+    
+        const ordersQuery = query(collection(db, "orders"));
+        const miscExpensesQuery = query(collection(db, "miscExpenses"));
+    
+        const unsubAllOrders = onSnapshot(ordersQuery, (allOrdersSnapshot) => {
             const unsubMiscExpenses = onSnapshot(miscExpensesQuery, (miscExpensesSnapshot) => {
                 
-                let totalSales = 0, totalItemsSold = 0, cashSales = 0, momoSales = 0;
-                let todayUnpaidOrdersValue = 0;
+                let totalSales = 0, totalItemsSold = 0;
+                let cashSales = 0, momoSales = 0;
+                let todayUnpaidOrdersValue = 0, previousUnpaidOrdersValue = 0;
                 let totalPardonedAmount = 0, changeOwedForPeriod = 0;
                 let settledUnpaidOrdersValue = 0, previousDaysChangeGiven = 0;
                 let totalRewardDiscount = 0;
                 
                 const todayOrders: Order[] = [];
-                let allTimeUnpaidOrdersValue = 0;
-                let previousUnpaidOrdersValue = 0;
                 const itemStats: Record<string, { count: number; totalValue: number }> = {};
                 
-                allOrdersSnapshot.forEach(doc => {
-                    const order = { id: doc.id, ...doc.data() } as Order;
+                const allOrders = allOrdersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+    
+                allOrders.forEach(order => {
                     const orderDate = order.timestamp.toDate();
-
-                    // Process all orders for previous unpaid balances
+                    const isTodayOrder = orderDate >= todayStart && orderDate <= todayEnd;
+    
+                    // Unpaid value from previous days
                     if (orderDate < todayStart && (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid')) {
-                         previousUnpaidOrdersValue += order.balanceDue;
+                        previousUnpaidOrdersValue += order.balanceDue;
                     }
-                    
-                    // Process orders created today
-                    if (orderDate >= todayStart && orderDate <= todayEnd) {
+    
+                    if (isTodayOrder) {
                         todayOrders.push(order);
-                        
+    
+                        // Total Sales for today (from completed orders created today)
                         if (order.status === "Completed") {
-                            const orderTotal = order.total + (order.rewardDiscount || 0);
-                            totalSales += orderTotal;
-
+                            totalSales += order.total;
                             order.items.forEach(item => {
                                 totalItemsSold += item.quantity;
-                                const currentStats = itemStats[item.name] || { count: 0, totalValue: 0 };
-                                itemStats[item.name] = { count: currentStats.count + item.quantity, totalValue: currentStats.totalValue + (item.quantity * item.price) };
+                                itemStats[item.name] = { 
+                                    count: (itemStats[item.name]?.count || 0) + item.quantity, 
+                                    totalValue: (itemStats[item.name]?.totalValue || 0) + (item.quantity * item.price) 
+                                };
                             });
                         }
                         
-                        if (order.amountPaid > 0) {
-                            const paymentAmount = order.lastPaymentAmount || order.amountPaid;
-                            // This is the CRITICAL fix: only count the portion of the payment that covers the order total as revenue
-                            const revenuePortion = Math.min(paymentAmount, order.total);
-                            
-                            if (order.paymentMethod === 'cash') {
-                                cashSales += revenuePortion;
-                            } else if (order.paymentMethod === 'momo') {
-                                momoSales += revenuePortion;
-                            }
-                        }
-
-
-                        if (order.paymentStatus === 'Unpaid' || (order.paymentStatus === 'Partially Paid' && order.balanceDue > 0)) {
+                        // Unpaid value from today's orders
+                        if (order.balanceDue > 0) {
                             todayUnpaidOrdersValue += order.balanceDue;
                         }
-
-                        if (order.pardonedAmount && order.pardonedAmount > 0) {
-                            totalPardonedAmount += order.pardonedAmount;
-                        }
-
+                        
+                        // Other stats for today's orders
+                        totalPardonedAmount += order.pardonedAmount || 0;
+                        totalRewardDiscount += order.rewardDiscount || 0;
                         if (order.balanceDue < 0) {
                             changeOwedForPeriod += Math.abs(order.balanceDue);
                         }
-
-                        if (order.rewardDiscount && order.rewardDiscount > 0) {
-                            totalRewardDiscount += order.rewardDiscount;
+                    }
+    
+                    // Revenue Calculation (payments made today)
+                    if (order.lastPaymentTimestamp) {
+                        const paymentDate = order.lastPaymentTimestamp.toDate();
+                        if (paymentDate >= todayStart && paymentDate <= todayEnd) {
+                            const paymentAmount = order.lastPaymentAmount || 0;
+                            const revenuePortion = Math.min(paymentAmount, order.total);
+    
+                            if (isTodayOrder) { // Payment for today's order
+                                if (order.paymentMethod === 'cash') cashSales += revenuePortion;
+                                else if (order.paymentMethod === 'momo') momoSales += revenuePortion;
+                            } else { // Collection on an old order
+                                settledUnpaidOrdersValue += paymentAmount; 
+                            }
                         }
                     }
-
-                    // Check for collections on old debts that happened today
-                    const paymentDate = order.lastPaymentTimestamp?.toDate();
-                    if(paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd && orderDate < todayStart) {
-                         if(order.lastPaymentAmount && order.lastPaymentAmount > 0){
-                            settledUnpaidOrdersValue += order.lastPaymentAmount;
-                         }
-                    }
-
-                    // Check for change given today for old orders
-                    const settledDate = order.settledOn?.toDate();
-                    if(settledDate && settledDate >= todayStart && settledDate <= todayEnd && orderDate < todayStart) {
-                        if(order.changeGiven && order.changeGiven > 0){
-                            previousDaysChangeGiven += order.changeGiven;
+    
+                    // Change given today for old orders
+                    if (order.settledOn) {
+                        const settledDate = order.settledOn.toDate();
+                        if (settledDate >= todayStart && settledDate <= todayEnd && !isTodayOrder) {
+                            previousDaysChangeGiven += order.changeGiven || 0;
                         }
                     }
                 });
-                
-                allTimeUnpaidOrdersValue = previousUnpaidOrdersValue + todayUnpaidOrdersValue;
-
+    
                 let miscCashExpenses = 0, miscMomoExpenses = 0;
-                miscExpensesSnapshot.forEach(doc => {
+                miscExpensesSnapshot.docs.forEach(doc => {
                     const expense = doc.data() as MiscExpense;
-                    if (expense.source === 'cash') miscCashExpenses += expense.amount; else miscMomoExpenses += expense.amount;
+                    const expenseDate = expense.timestamp.toDate();
+                    if(expenseDate >= todayStart && expenseDate <= todayEnd){
+                       if (expense.source === 'cash') miscCashExpenses += expense.amount;
+                       else miscMomoExpenses += expense.amount;
+                    }
                 });
-                
+    
+                const allTimeUnpaidOrdersValue = previousUnpaidOrdersValue + todayUnpaidOrdersValue;
+    
                 const totalMiscExpenses = miscCashExpenses + miscMomoExpenses;
-                const expectedCash = cashSales - miscCashExpenses;
+                const expectedCash = cashSales - miscCashExpenses + settledUnpaidOrdersValue - previousDaysChangeGiven;
                 const expectedMomo = momoSales - miscMomoExpenses;
-                
-                const netRevenue = (totalSales - todayUnpaidOrdersValue - totalMiscExpenses - totalRewardDiscount) + settledUnpaidOrdersValue - totalPardonedAmount;
-                
+                const netRevenue = totalSales - todayUnpaidOrdersValue - totalMiscExpenses - totalRewardDiscount - totalPardonedAmount + settledUnpaidOrdersValue;
+    
                 setStats({ 
                     totalSales, 
                     totalItemsSold, 
@@ -770,16 +765,16 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     orders: todayOrders, 
                     itemStats 
                 });
-
+    
                 setLoading(false);
             }, (error) => {
                 console.error("Error fetching misc expenses:", error);
                 setError("Failed to load miscellaneous expenses data.");
                 setLoading(false);
             });
-
+    
             return () => unsubMiscExpenses();
-
+    
         }, (error) => {
             console.error("Error fetching all orders:", error);
             setError("Failed to load order data.");
@@ -964,6 +959,7 @@ export default AccountingView;
     
 
     
+
 
 
 
