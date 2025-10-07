@@ -31,7 +31,6 @@ import { updatePassword } from '@/lib/auth-tools';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { initialMenuData } from '@/data/initial-data';
-import { fixIncorrectPaymentData } from '@/lib/data-fix';
 
 
 const AdminForm = ({
@@ -70,51 +69,6 @@ const AdminForm = ({
         </div>
     </form>
 );
-
-const DataCorrectionTools = () => {
-    const { toast } = useToast();
-    const [isFixing, setIsFixing] = useState(false);
-    const [fixCompleted, setFixCompleted] = useState(false);
-
-    const handleRunFix = async () => {
-        setIsFixing(true);
-        const result = await fixIncorrectPaymentData();
-        toast({
-            title: result.success ? "Success" : "Error",
-            description: result.message,
-            type: result.success ? 'success' : 'error',
-        });
-        if (result.success) {
-            setFixCompleted(true);
-        }
-        setIsFixing(false);
-    }
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-xl flex items-center"><Wrench className="mr-2"/>Data Correction</CardTitle>
-                <CardDescription>One-time tools to fix specific data errors in the database.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">This tool will correct the payment distribution for orders #0707 and #0708, attributing GH₵550 to cash and GH₵290 to momo.</p>
-                     <Button
-                        onClick={handleRunFix}
-                        disabled={isFixing || fixCompleted}
-                        className="w-full"
-                        variant="destructive"
-                    >
-                        {isFixing && <Loader className="mr-2 animate-spin" />}
-                        {fixCompleted ? "Fix Completed" : "Run Payment Fix"}
-                    </Button>
-                     {fixCompleted && <p className="text-xs text-green-600 text-center">This data has been corrected.</p>}
-                </div>
-            </CardContent>
-        </Card>
-    );
-};
-
 
 const SecuritySettings = ({ toast }: { toast: any }) => {
     const [currentPassword, setCurrentPassword] = useState('');
@@ -396,10 +350,9 @@ const AdminView: React.FC = () => {
             {!isMobile && (
                 <Card className="w-full md:w-80 lg:w-96 rounded-none border-t md:border-t-0 md:border-l flex flex-col">
                      <Tabs defaultValue="menu" className="w-full flex flex-col flex-grow">
-                        <TabsList className="grid w-full grid-cols-3">
+                        <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="menu">Menu</TabsTrigger>
                             <TabsTrigger value="security">Security</TabsTrigger>
-                            <TabsTrigger value="tools">Tools</TabsTrigger>
                         </TabsList>
                         <TabsContent value="menu" className="flex-grow">
                              <CardHeader>
@@ -428,14 +381,6 @@ const AdminView: React.FC = () => {
                             </CardHeader>
                             <CardContent>
                                 <SecuritySettings toast={toast} />
-                            </CardContent>
-                        </TabsContent>
-                        <TabsContent value="tools" className="flex-grow">
-                            <CardHeader>
-                                <CardTitle className="text-xl md:text-2xl">Tools</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <DataCorrectionTools />
                             </CardContent>
                         </TabsContent>
                      </Tabs>

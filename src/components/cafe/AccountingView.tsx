@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle, Landmark, CreditCard, DollarSign, Hourglass, MinusCircle, Ban, Gift } from 'lucide-react';
+import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle, Landmark, CreditCard, DollarSign, Hourglass, MinusCircle, Ban, Gift, Wrench, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, isToday } from 'date-fns';
@@ -29,6 +29,7 @@ import { Search } from 'lucide-react';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { AuthContext } from '@/context/AuthContext';
 import { formatCurrency } from '@/lib/utils';
+import { fixIncorrectPaymentData } from '@/lib/data-fix';
 
 
 interface PeriodStats {
@@ -52,6 +53,51 @@ interface PeriodStats {
     orders: Order[];
     itemStats: Record<string, { count: number; totalValue: number }>;
 }
+
+const DataCorrectionTools = () => {
+    const { toast } = useToast();
+    const [isFixing, setIsFixing] = useState(false);
+    const [fixCompleted, setFixCompleted] = useState(false);
+
+    const handleRunFix = async () => {
+        setIsFixing(true);
+        const result = await fixIncorrectPaymentData();
+        toast({
+            title: result.success ? "Success" : "Error",
+            description: result.message,
+            type: result.success ? 'success' : 'error',
+        });
+        if (result.success) {
+            setFixCompleted(true);
+        }
+        setIsFixing(false);
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-xl flex items-center"><Wrench className="mr-2"/>Data Correction Tool</CardTitle>
+                <CardDescription>A one-time tool to fix specific data errors in the database.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">This tool will correct the payment distribution for orders <span className="font-mono">#0707</span> and <span className="font-mono">#0708</span>, attributing GH₵550 to cash and GH₵290 to momo.</p>
+                     <Button
+                        onClick={handleRunFix}
+                        disabled={isFixing || fixCompleted}
+                        className="w-full"
+                        variant="destructive"
+                    >
+                        {isFixing && <Loader className="mr-2 animate-spin" />}
+                        {fixCompleted ? "Fix Completed" : "Run Payment Fix"}
+                    </Button>
+                     {fixCompleted && <p className="text-xs text-green-600 text-center mt-2">This data has been corrected. You can now dismiss this card.</p>}
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
 
 const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, color?: string, description?: string | React.ReactNode }> = ({ icon, title, value, color, description }) => (
     <Card>
@@ -850,80 +896,83 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             <AlertDescription>{error}</AlertDescription>
                          </Alert>
                     ) : stats ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="lg:col-span-2 space-y-6">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Financial Summary</CardTitle>
-                                        <CardDescription>Daily financial data for {format(new Date(), "EEEE, MMMM dd, yyyy")}</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <StatCard icon={<DollarSign className="text-muted-foreground" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold from completed orders`} />
-                                        <StatCard icon={<Landmark className="text-muted-foreground" />} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="All cash payments received today" />
-                                        <StatCard icon={<CreditCard className="text-muted-foreground" />} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} description="All momo/card payments received" />
-                                        <StatCard 
-                                            icon={<Hourglass className="text-muted-foreground" />} 
-                                            title="Unpaid Orders (All Time)" 
-                                            value={formatCurrency(stats.allTimeUnpaidOrdersValue)} 
-                                            description={
-                                                <span>
-                                                    <strong className="text-base font-semibold text-foreground">Today: {formatCurrency(stats.todayUnpaidOrdersValue)}</strong>
-                                                    {' | '}
-                                                    Previous: {formatCurrency(stats.previousUnpaidOrdersValue)}
-                                                </span>
-                                            } 
-                                        />
-                                        <StatCard icon={<MinusCircle className="text-muted-foreground" />} title="Total Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`} />
-                                        <StatCard icon={<Gift className="text-muted-foreground" />} title="Reward Discounts" value={formatCurrency(stats.totalRewardDiscount)} description="Total discounts from rewards" />
-                                        <StatCard icon={<Ban className="text-muted-foreground" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} description="Unplanned discounts given today" />
-                                        <StatCard icon={<ArrowRightLeft className="text-muted-foreground" />} title="Change Owed" value={formatCurrency(stats.changeOwedForPeriod)} description="Total change owed to customers today" />
-                                        <StatCard icon={<Coins className="text-muted-foreground" />} title="Previous Change Given" value={formatCurrency(stats.previousDaysChangeGiven)} description="Change for old orders given today" />
-                                    </CardContent>
-                                    <CardFooter>
-                                        <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                                            <div className="flex justify-between items-baseline">
-                                                <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Total Net Revenue</Label>
-                                                <p className="text-3xl font-bold">{formatCurrency(stats.netRevenue)}</p>
-                                            </div>
-                                            
-                                            {stats.settledUnpaidOrdersValue > 0 && (
-                                                <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 text-sm">
-                                                    <div className="flex justify-between items-center text-green-700 dark:text-green-300">
-                                                        <span className="font-bold">Today's Net: {formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)}</span>
-                                                        <span className="font-semibold">+ Collections: {formatCurrency(stats.settledUnpaidOrdersValue)}</span>
-                                                    </div>
+                        <div className="space-y-6">
+                            <DataCorrectionTools />
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <div className="lg:col-span-2 space-y-6">
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>Financial Summary</CardTitle>
+                                            <CardDescription>Daily financial data for {format(new Date(), "EEEE, MMMM dd, yyyy")}</CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <StatCard icon={<DollarSign className="text-muted-foreground" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold from completed orders`} />
+                                            <StatCard icon={<Landmark className="text-muted-foreground" />} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="All cash payments received today" />
+                                            <StatCard icon={<CreditCard className="text-muted-foreground" />} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} description="All momo/card payments received" />
+                                            <StatCard 
+                                                icon={<Hourglass className="text-muted-foreground" />} 
+                                                title="Unpaid Orders (All Time)" 
+                                                value={formatCurrency(stats.allTimeUnpaidOrdersValue)} 
+                                                description={
+                                                    <span>
+                                                        <strong className="text-base font-semibold text-foreground">Today: {formatCurrency(stats.todayUnpaidOrdersValue)}</strong>
+                                                        {' | '}
+                                                        Previous: {formatCurrency(stats.previousUnpaidOrdersValue)}
+                                                    </span>
+                                                } 
+                                            />
+                                            <StatCard icon={<MinusCircle className="text-muted-foreground" />} title="Total Misc. Expenses" value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)} description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`} />
+                                            <StatCard icon={<Gift className="text-muted-foreground" />} title="Reward Discounts" value={formatCurrency(stats.totalRewardDiscount)} description="Total discounts from rewards" />
+                                            <StatCard icon={<Ban className="text-muted-foreground" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} description="Unplanned discounts given today" />
+                                            <StatCard icon={<ArrowRightLeft className="text-muted-foreground" />} title="Change Owed" value={formatCurrency(stats.changeOwedForPeriod)} description="Total change owed to customers today" />
+                                            <StatCard icon={<Coins className="text-muted-foreground" />} title="Previous Change Given" value={formatCurrency(stats.previousDaysChangeGiven)} description="Change for old orders given today" />
+                                        </CardContent>
+                                        <CardFooter>
+                                            <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                                                <div className="flex justify-between items-baseline">
+                                                    <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Total Net Revenue</Label>
+                                                    <p className="text-3xl font-bold">{formatCurrency(stats.netRevenue)}</p>
                                                 </div>
-                                            )}
-                                        </div>
-                                    </CardFooter>
-                                </Card>
-                            </div>
-                            <div className="flex flex-col">
-                                <Card className="flex-1 flex flex-col">
-                                    <CardHeader>
-                                        <CardTitle>Item Sales (Completed Orders)</CardTitle>
-                                        <CardDescription>Total count and value of each item sold today.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="flex-1 overflow-y-auto">
-                                        <div className="space-y-2">
-                                            {sortedItemStats.length > 0 ? (
-                                            sortedItemStats.map(([name, itemStat]) => (
-                                                <div key={name} className="flex justify-between items-center p-3 rounded-lg bg-secondary">
-                                                    <div>
-                                                        <p className="font-semibold">{name}</p>
-                                                        <p className="text-sm text-muted-foreground">{itemStat.count} sold</p>
+                                                
+                                                {stats.settledUnpaidOrdersValue > 0 && (
+                                                    <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 text-sm">
+                                                        <div className="flex justify-between items-center text-green-700 dark:text-green-300">
+                                                            <span className="font-bold">Today's Net: {formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)}</span>
+                                                            <span className="font-semibold">+ Collections: {formatCurrency(stats.settledUnpaidOrdersValue)}</span>
+                                                        </div>
                                                     </div>
-                                                    <Badge variant="destructive">{formatCurrency(itemStat.totalValue)}</Badge>
-                                                </div>
-                                            ))
-                                            ) : (
-                                            <div className="h-full flex items-center justify-center text-muted-foreground">
-                                                <p>No items sold today.</p>
+                                                )}
                                             </div>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
+                                        </CardFooter>
+                                    </Card>
+                                </div>
+                                <div className="flex flex-col">
+                                    <Card className="flex-1 flex flex-col">
+                                        <CardHeader>
+                                            <CardTitle>Item Sales (Completed Orders)</CardTitle>
+                                            <CardDescription>Total count and value of each item sold today.</CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="flex-1 overflow-y-auto">
+                                            <div className="space-y-2">
+                                                {sortedItemStats.length > 0 ? (
+                                                sortedItemStats.map(([name, itemStat]) => (
+                                                    <div key={name} className="flex justify-between items-center p-3 rounded-lg bg-secondary">
+                                                        <div>
+                                                            <p className="font-semibold">{name}</p>
+                                                            <p className="text-sm text-muted-foreground">{itemStat.count} sold</p>
+                                                        </div>
+                                                        <Badge variant="destructive">{formatCurrency(itemStat.totalValue)}</Badge>
+                                                    </div>
+                                                ))
+                                                ) : (
+                                                <div className="h-full flex items-center justify-center text-muted-foreground">
+                                                    <p>No items sold today.</p>
+                                                </div>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
                             </div>
                         </div>
                     ) : (
@@ -959,6 +1008,7 @@ export default AccountingView;
     
 
     
+
 
 
 
