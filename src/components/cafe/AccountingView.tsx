@@ -741,6 +741,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     if (expense.source === 'cash') miscCashExpenses += expense.amount; else miscMomoExpenses += expense.amount;
                 });
                 
+                const totalMiscExpenses = miscCashExpenses + miscMomoExpenses;
                 const expectedCash = cashSales - miscCashExpenses;
                 const expectedMomo = momoSales - miscMomoExpenses;
                 
@@ -961,6 +962,7 @@ export default AccountingView;
     
 
     
+
 
 
 
