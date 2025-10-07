@@ -159,29 +159,25 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     const newPaymentAmount = parseFloat(amountPaidInput) || 0;
     const newChangeGivenNum = parseFloat(changeGivenInput) || 0;
 
-    let alreadyPaid = 0;
-    let alreadyGivenChange = 0;
-
-    if (editingOrder) {
-        alreadyPaid = editingOrder.amountPaid;
-        alreadyGivenChange = editingOrder.changeGiven || 0;
-    }
+    const alreadyPaid = editingOrder?.amountPaid || 0;
+    const alreadyGivenChange = editingOrder?.changeGiven || 0;
 
     const finalAmountPaid = alreadyPaid + newPaymentAmount;
     const finalChangeGiven = alreadyGivenChange + newChangeGivenNum;
+
     const effectivePayment = finalAmountPaid - finalChangeGiven;
     const newBalance = finalTotal - effectivePayment;
 
     const deficit = newBalance > 0 ? newBalance : 0;
     const change = newBalance < 0 ? Math.abs(newBalance) : 0;
-    
+
     return {
-      finalAmountPaid,
-      finalChangeGiven,
-      newPaymentAmount,
-      newBalance,
-      deficit,
-      change,
+        finalAmountPaid,
+        finalChangeGiven,
+        newPaymentAmount,
+        newBalance,
+        deficit,
+        change,
     };
 };
 
@@ -255,18 +251,19 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         rewardCustomerTag: reward?.customer.customerTag || editingOrder?.rewardCustomerTag || '',
       };
       
-      let effectiveNewPayment = newPaymentAmount;
-
-      if (isOverpaid) { 
-        effectiveNewPayment = 0;
-      } else if (isPaid && paymentMethod === 'momo') {
-          effectiveNewPayment = amountOwedNow;
-          if (effectiveNewPayment < 0) effectiveNewPayment = 0;
+      let revenueFromThisPayment = 0;
+      if (isPaid && !isOverpaid) {
+        if (paymentMethod === 'momo') {
+            revenueFromThisPayment = amountOwedNow;
+        } else {
+            revenueFromThisPayment = Math.min(newPaymentAmount, amountOwedNow);
+        }
       }
+      if (revenueFromThisPayment < 0) revenueFromThisPayment = 0;
 
       if (isPaid) {
           orderData.lastPaymentTimestamp = serverTimestamp();
-          orderData.lastPaymentAmount = effectiveNewPayment;
+          orderData.lastPaymentAmount = revenueFromThisPayment;
       }
       
       if (pardonedAmount > 0) {
@@ -316,6 +313,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               } else {
                 orderData.paymentStatus = 'Unpaid';
               }
+              
+              orderData.lastPaymentAmount = Math.min(orderData.amountPaid, finalTotal);
 
               const counterRef = doc(db, "counters", "orderIdCounter");
               const newOrderRef = doc(collection(db, "orders"));
