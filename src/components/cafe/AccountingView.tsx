@@ -202,13 +202,14 @@ const ReconciliationView: React.FC<{
                 cashierName: session?.fullName || session?.username || 'Unknown',
             };
             await addDoc(collection(db, "reconciliationReports"), reportData);
+            
+            onBack();
+            
             toast({ 
                 title: "Day Closed Successfully", 
                 description: "The financial report has been saved."
             });
-            resetForm();
-            setShowConfirm(false);
-            onBack();
+            
         } catch (e) {
             console.error("Error saving report:", e);
             toast({ 
@@ -218,6 +219,7 @@ const ReconciliationView: React.FC<{
             });
         } finally {
             setIsSubmitting(false);
+            setShowConfirm(false);
         }
     };
 
@@ -1008,6 +1010,7 @@ export default AccountingView;
     
 
     
+
 
 
 
