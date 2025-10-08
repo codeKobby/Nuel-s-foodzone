@@ -790,7 +790,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const totalMiscExpenses = miscCashExpenses + miscMomoExpenses;
                 const expectedCash = cashSales - miscCashExpenses + settledUnpaidOrdersValue - previousDaysChangeGiven;
                 const expectedMomo = momoSales - miscMomoExpenses;
-                const netRevenue = totalSales - todayUnpaidOrdersValue - totalMiscExpenses - totalRewardDiscount - totalPardonedAmount + settledUnpaidOrdersValue;
+                const netRevenue = totalSales - todayUnpaidOrdersValue - totalMiscExpenses - totalRewardDiscount - totalPardonedAmount;
     
                 setStats({ 
                     totalSales, 
@@ -1010,6 +1010,7 @@ export default AccountingView;
     
 
     
+
 
 
 
