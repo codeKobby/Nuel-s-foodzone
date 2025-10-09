@@ -1,5 +1,6 @@
 
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -167,12 +168,10 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         try {
             const batch = writeBatch(db);
             const now = serverTimestamp();
-            const changeGiven = parseFloat(changeGivenInput) || 0;
+            const changeGiven = parseFloat(changeGivenInput) || (change > 0 ? change : 0);
     
-            // This is the amount of NEW money being applied in this specific transaction.
             let paymentBeingApplied = paymentMethod === 'momo' ? finalTotal : amountPaidNum;
     
-            // Distribute this payment across the selected unpaid orders
             for (const order of orders) {
                 if (paymentBeingApplied <= 0 && !pardonDeficit) break;
     
@@ -180,7 +179,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 const orderData = (await getDoc(orderRef)).data() as Order;
                 const orderBalance = orderData.balanceDue;
                 
-                if (orderBalance <= 0) continue; // Skip already paid orders
+                if (orderBalance <= 0) continue;
     
                 const amountToPayForOrder = Math.min(paymentBeingApplied, orderBalance);
                 
@@ -191,7 +190,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     amountPaid: newAmountPaid,
                     lastPaymentTimestamp: now,
                     lastPaymentAmount: amountToPayForOrder,
-                    paymentMethod: paymentMethod, // Set the method for THIS specific payment action
+                    paymentMethod: paymentMethod,
                 };
     
                 if (newBalanceDue <= 0) {
@@ -206,36 +205,26 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 paymentBeingApplied -= amountToPayForOrder;
             }
     
-            // After distributing payments, handle any overall change or deficit on the LAST order.
             const lastOrder = orders[orders.length - 1];
             if (lastOrder) {
                 const lastOrderRef = doc(db, "orders", lastOrder.id);
-                const lastOrderData = (await getDoc(lastOrderRef)).data() as Order;
                 let finalUpdate: any = {};
     
-                // 1. Handle CHANGE owed to customer
-                if (finalAmountPaid > finalTotal) {
-                    const totalChangeDue = finalAmountPaid - finalTotal;
-                    const finalChangeGiven = parseFloat(changeGivenInput) || totalChangeDue;
-                    // The final balance is the amount of change *not* given back
-                    finalUpdate.balanceDue = -(totalChangeDue - finalChangeGiven); 
-                    finalUpdate.changeGiven = (lastOrderData.changeGiven || 0) + finalChangeGiven;
+                if (change > 0) {
+                    finalUpdate.balanceDue = -(change - changeGiven); 
+                    finalUpdate.changeGiven = (lastOrder.changeGiven || 0) + changeGiven;
                     finalUpdate.paymentStatus = 'Paid';
+                    finalUpdate.settledOn = (change - changeGiven) === 0 ? now : null;
                 }
-                // 2. Handle DEFICIT left by customer
-                else if (finalAmountPaid < finalTotal) {
-                    const remainingDeficit = finalTotal - finalAmountPaid;
+                else if (deficit > 0) {
                     if (pardonDeficit) {
-                        finalUpdate.pardonedAmount = (lastOrderData.pardonedAmount || 0) + remainingDeficit;
-                        finalUpdate.notes = `${(lastOrderData.notes || '')} Combined payment deficit of ${formatCurrency(remainingDeficit)} pardoned.`.trim();
+                        finalUpdate.pardonedAmount = (lastOrder.pardonedAmount || 0) + deficit;
+                        finalUpdate.notes = `${(lastOrder.notes || '')} Combined payment deficit of ${formatCurrency(deficit)} pardoned.`.trim();
                         finalUpdate.balanceDue = 0;
                         finalUpdate.paymentStatus = 'Paid';
-                    } else {
-                        // The deficit is already reflected in the balanceDue from the loop above
                     }
                 }
     
-                // 3. Handle REWARD if applied
                 if (reward) {
                     const rewardRef = doc(db, 'rewards', reward.customer.id);
                     batch.update(rewardRef, {
@@ -244,7 +233,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                         updatedAt: serverTimestamp()
                     });
     
-                    finalUpdate.rewardDiscount = (lastOrderData.rewardDiscount || 0) + reward.discount;
+                    finalUpdate.rewardDiscount = (lastOrder.rewardDiscount || 0) + reward.discount;
                     finalUpdate.rewardCustomerTag = reward.customer.customerTag;
                 }
                 
@@ -353,5 +342,8 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 };
 
 export default CombinedPaymentModal;
+
+    
+
 
     

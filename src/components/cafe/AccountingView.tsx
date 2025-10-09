@@ -769,8 +769,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     // Change given today for old orders
                     if (order.settledOn) {
                         const settledDate = order.settledOn.toDate();
-                        if (settledDate >= todayStart && settledDate <= todayEnd && !isTodayOrder) {
-                            previousDaysChangeGiven += order.changeGiven || 0;
+                        if (settledDate >= todayStart && settledDate <= todayEnd && !isTodayOrder && order.balanceDue >= 0) {
+                             previousDaysChangeGiven += (order.changeGiven || 0) - (order.pardonedAmount || 0); // More robust change given calc
                         }
                     }
                 });
@@ -1021,3 +1021,6 @@ export default AccountingView;
 
 
 
+
+
+    

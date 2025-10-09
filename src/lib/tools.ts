@@ -1,4 +1,5 @@
 
+
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
@@ -26,7 +27,6 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         const reconciliationReportsRef = collection(db, "reconciliationReports");
         const reportsQuery = query(reconciliationReportsRef, where("timestamp", ">=", startDateTimestamp), where("timestamp", "<=", endDateTimestamp));
 
-        // Get all orders first to correctly calculate payments vs sales
         const allOrdersSnapshot = await getDocs(query(ordersRef));
 
         const [miscSnapshot, reportsSnapshot] = await Promise.all([
@@ -40,14 +40,13 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         let totalOrders = 0;
         let totalSales = 0;
         let totalPardonedAmount = 0;
+        let collections = 0;
         const itemCounts: Record<string, number> = {};
 
         allOrdersSnapshot.forEach(doc => {
             const order = doc.data() as Order;
             const orderDate = order.timestamp.toDate();
-            const settledDate = order.settledOn?.toDate();
-
-            // 1. Total Sales (from completed orders created in range)
+            
             if (orderDate >= startDate && orderDate <= endDate) {
                 if (order.status === 'Completed') {
                     totalOrders++;
@@ -61,26 +60,27 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
                 if (order.pardonedAmount && order.pardonedAmount > 0) {
                     totalPardonedAmount += order.pardonedAmount;
                 }
-            }
-
-            // 2. Paid Revenue (from any payment made in range)
-            const paymentDate = order.lastPaymentTimestamp?.toDate() ?? order.timestamp.toDate();
-            if (paymentDate >= startDate && paymentDate <= endDate) {
-                 if (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid') {
-                    const paidAmount = order.lastPaymentAmount ?? order.amountPaid;
-                    if (order.paymentMethod === 'cash') cashSales += paidAmount;
-                    if (order.paymentMethod === 'momo') momoSales += paidAmount;
+                
+                if (order.balanceDue < 0) {
+                 changeOwed += Math.abs(order.balanceDue);
                 }
             }
 
-            // 3. Change owed TO the customer created in this period and not yet settled
-            if (orderDate >= startDate && orderDate <= endDate && order.balanceDue < 0) {
-                 changeOwed += Math.abs(order.balanceDue);
+            const paymentDate = order.lastPaymentTimestamp?.toDate();
+            if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                 const paymentAmount = order.lastPaymentAmount || 0;
+                 if (order.paymentMethod === 'cash') cashSales += paymentAmount;
+                 if (order.paymentMethod === 'momo') momoSales += paymentAmount;
+                 
+                 const isOrderFromPeriod = order.timestamp.toDate() >= startDate && order.timestamp.toDate() <= endDate;
+                 if(!isOrderFromPeriod) {
+                    collections += paymentAmount;
+                 }
             }
-            
-            // 4. Subtract change settled in this period that was created earlier
+
+            const settledDate = order.settledOn?.toDate();
             if (settledDate && settledDate >= startDate && settledDate <= endDate && orderDate < startDate) {
-                cashSales -= order.changeGiven;
+                if (order.paymentMethod === 'cash') cashSales -= order.changeGiven;
             }
         });
         
@@ -96,7 +96,7 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
             totalDiscrepancy += report.totalDiscrepancy;
         });
 
-        const netSales = (cashSales + momoSales) - totalMiscExpenses - totalPardonedAmount;
+        const netSales = (cashSales + momoSales + collections) - totalMiscExpenses - totalPardonedAmount;
         const itemPerformance = Object.entries(itemCounts)
             .sort(([, a], [, b]) => b - a)
             .map(([name, count]) => ({ name, count }));
@@ -115,7 +115,6 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
 
     } catch (error) {
         console.error("Error fetching business data for tool:", error);
-        // In case of error, return a zeroed-out response
         return {
             totalSales: 0,
             netSales: 0,
@@ -129,3 +128,5 @@ export async function getBusinessDataForRange(startDateStr: string, endDateStr: 
         };
     }
 }
+
+    

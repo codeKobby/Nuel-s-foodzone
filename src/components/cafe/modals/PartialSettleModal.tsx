@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -44,7 +45,7 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
             return;
         }
         setError(null);
-        const isFullSettlement = amount === changeDue;
+        const isFullSettlement = Math.abs(amount - changeDue) < 0.01;
         onSettle(order.id, amount, isFullSettlement);
         onClose();
     };
@@ -119,3 +120,5 @@ const PartialSettleModal: React.FC<PartialSettleModalProps> = ({ order, onClose,
 };
 
 export default PartialSettleModal;
+
+    
