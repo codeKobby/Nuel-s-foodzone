@@ -34,7 +34,8 @@ export interface Order {
   items: Omit<OrderItem, 'id' | 'category'>[];
   fulfilledItems: FulfilledItem[];
   total: number;
-  paymentMethod: 'cash' | 'momo' | 'Unpaid';
+  paymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid';
+  paymentBreakdown?: { cash: number; momo: number };
   paymentStatus: 'Paid' | 'Unpaid' | 'Partially Paid';
   amountPaid: number;
   changeGiven: number; 

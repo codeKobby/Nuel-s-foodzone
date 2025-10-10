@@ -137,9 +137,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   const [step, setStep] = useState(1);
   const [orderType, setOrderType] = useState<'Dine-In' | 'Takeout' | 'Delivery'>('Dine-In');
   const [orderTag, setOrderTag] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'momo'>('cash');
-  const [amountPaidInput, setAmountPaidInput] = useState('');
+  
+  const [cashPaidInput, setCashPaidInput] = useState('');
+  const [momoPaidInput, setMomoPaidInput] = useState('');
   const [changeGivenInput, setChangeGivenInput] = useState('');
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { session } = useContext(AuthContext);
@@ -155,40 +157,37 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
   const finalTotal = Math.max(0, total - (reward?.discount ?? 0));
 
-  const calculateBalances = () => {
-    const newPaymentAmount = parseFloat(amountPaidInput) || 0;
-    const newChangeGivenNum = parseFloat(changeGivenInput) || 0;
+  const balances = React.useMemo(() => {
+    const cashPaid = parseFloat(cashPaidInput) || 0;
+    const momoPaid = parseFloat(momoPaidInput) || 0;
+    const totalPaid = cashPaid + momoPaid;
 
     const alreadyPaid = editingOrder?.amountPaid || 0;
     const alreadyGivenChange = editingOrder?.changeGiven || 0;
 
-    const finalAmountPaid = alreadyPaid + newPaymentAmount;
-    const finalChangeGiven = alreadyGivenChange + newChangeGivenNum;
-
-    const effectivePayment = finalAmountPaid - finalChangeGiven;
+    const finalAmountPaid = alreadyPaid + totalPaid;
+    
+    let effectivePayment = finalAmountPaid - alreadyGivenChange;
     const newBalance = finalTotal - effectivePayment;
 
     const deficit = newBalance > 0 ? newBalance : 0;
     const change = newBalance < 0 ? Math.abs(newBalance) : 0;
-
+    
     return {
-        finalAmountPaid,
-        finalChangeGiven,
-        newPaymentAmount,
-        newBalance,
-        deficit,
-        change,
+      totalPaid,
+      finalAmountPaid,
+      newBalance,
+      deficit,
+      change,
     };
-};
+  }, [cashPaidInput, momoPaidInput, finalTotal, editingOrder]);
 
-  const balances = calculateBalances();
-  const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(parseFloat(amountPaidInput));
-  
+  const isAmountPaidEntered = cashPaidInput.trim() !== '' || momoPaidInput.trim() !== '';
   const amountOwedNow = editingOrder ? finalTotal - (editingOrder.amountPaid - (editingOrder.changeGiven || 0)) : finalTotal;
   const isOverpaid = editingOrder && (editingOrder.amountPaid - (editingOrder.changeGiven || 0)) >= finalTotal;
 
-  const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && balances.deficit > 0;
-  const canConfirmPayment = !isOverpaid && (paymentMethod === 'momo' || (paymentMethod === 'cash' && isAmountPaidEntered));
+  const showDeficitOptions = isAmountPaidEntered && balances.deficit > 0;
+  const canConfirmPayment = !isOverpaid && isAmountPaidEntered;
 
   const handleProceedToPayment = () => {
     if (!orderTag.trim()) {
@@ -213,7 +212,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     setIsApplyingReward(false);
   };
 
-
   const processOrder = async (options: { isPaid: boolean, pardonDeficit?: boolean }) => {
     setIsProcessing(true);
     setError(null);
@@ -221,15 +219,28 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     const { isPaid, pardonDeficit = false } = options;
     
     try {
-        const {
-            finalAmountPaid,
-            finalChangeGiven,
-            newPaymentAmount,
-            newBalance,
-        } = calculateBalances();
+      const cashPaid = parseFloat(cashPaidInput) || 0;
+      const momoPaid = parseFloat(momoPaidInput) || 0;
+      const totalPaid = cashPaid + momoPaid;
       
-      const pardonedAmount = isPaid && pardonDeficit && newBalance > 0 ? newBalance : 0;
+      const pardonedAmount = isPaid && pardonDeficit && balances.newBalance > 0 ? balances.newBalance : 0;
       
+      const paymentBreakdown = {
+        cash: (editingOrder?.paymentBreakdown?.cash || 0) + cashPaid,
+        momo: (editingOrder?.paymentBreakdown?.momo || 0) + momoPaid,
+      };
+
+      let paymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid' = 'Unpaid';
+      if(isPaid) {
+        if (paymentBreakdown.cash > 0 && paymentBreakdown.momo > 0) {
+            paymentMethod = 'split';
+        } else if (paymentBreakdown.cash > 0) {
+            paymentMethod = 'cash';
+        } else if (paymentBreakdown.momo > 0) {
+            paymentMethod = 'momo';
+        }
+      }
+
       const orderData: any = {
         tag: orderTag,
         orderType,
@@ -238,8 +249,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           price: i.price, 
           quantity: i.quantity 
         })),
-        total: finalTotal, // Use the potentially discounted total
-        paymentMethod: isPaid ? paymentMethod : 'Unpaid',
+        total: finalTotal,
+        paymentMethod,
+        paymentBreakdown,
         pardonedAmount: (editingOrder?.pardonedAmount || 0) + pardonedAmount,
         notes: editingOrder?.notes || '',
         status: editingOrder?.status || 'Pending',
@@ -253,11 +265,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
       
       let revenueFromThisPayment = 0;
       if (isPaid && !isOverpaid) {
-        if (paymentMethod === 'momo') {
-            revenueFromThisPayment = amountOwedNow;
-        } else {
-            revenueFromThisPayment = Math.min(newPaymentAmount, amountOwedNow);
-        }
+        revenueFromThisPayment = Math.min(totalPaid, amountOwedNow);
       }
       if (revenueFromThisPayment < 0) revenueFromThisPayment = 0;
 
@@ -273,9 +281,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
       if (editingOrder) {
           const orderRef = doc(db, "orders", editingOrder.id);
           
-          orderData.amountPaid = finalAmountPaid;
-          orderData.changeGiven = finalChangeGiven;
-          orderData.balanceDue = newBalance;
+          orderData.amountPaid = balances.finalAmountPaid;
+          orderData.changeGiven = (editingOrder.changeGiven || 0) + (parseFloat(changeGivenInput) || 0);
+          orderData.balanceDue = balances.newBalance;
 
            if (pardonDeficit) {
               orderData.balanceDue = 0;
@@ -283,7 +291,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           
           if (orderData.balanceDue <= 0) {
               orderData.paymentStatus = 'Paid';
-          } else if (finalAmountPaid > 0) {
+          } else if (orderData.amountPaid > 0) {
               orderData.paymentStatus = 'Partially Paid';
           } else {
               orderData.paymentStatus = 'Unpaid';
@@ -297,7 +305,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
       } else {
           await runTransaction(db, async (transaction) => {
               
-              orderData.amountPaid = isPaid ? newPaymentAmount : 0;
+              orderData.amountPaid = isPaid ? totalPaid : 0;
               orderData.changeGiven = isPaid ? (parseFloat(changeGivenInput) || 0) : 0;
               
               orderData.balanceDue = finalTotal - (orderData.amountPaid - orderData.changeGiven);
@@ -512,71 +520,59 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               {renderBalanceBreakdown()}
               
               {!isOverpaid ? (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                      onClick={() => setPaymentMethod('cash')} 
-                      variant={paymentMethod === 'cash' ? 'default' : 'outline'}
-                      size="sm"
-                    >
-                      Cash
-                    </Button>
-                    <Button 
-                      onClick={() => setPaymentMethod('momo')} 
-                      variant={paymentMethod === 'momo' ? 'default' : 'outline'}
-                      size="sm"
-                    >
-                      Digital
-                    </Button>
-                  </div>
-                  
-                  {paymentMethod === 'cash' && (
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="cashPaid">Amount Received from Customer</Label>
+                <div className="space-y-4 p-4 border rounded-lg">
+                    <div>
+                        <Label htmlFor="cashPaid">Amount Paid (Cash)</Label>
                         <Input 
                           id="cashPaid" 
                           type="number" 
-                          value={amountPaidInput} 
-                          onChange={(e) => setAmountPaidInput(e.target.value)} 
-                          placeholder="Enter amount..." 
+                          value={cashPaidInput} 
+                          onChange={(e) => setCashPaidInput(e.target.value)} 
+                          placeholder="0.00" 
                           autoFocus 
-                          className="text-lg h-12 mt-2" 
+                          className="mt-1" 
                         />
-                      </div>
-                      
-                      {balances.change > 0 && (
+                    </div>
+                     <div>
+                        <Label htmlFor="momoPaid">Amount Paid (Momo/Card)</Label>
+                        <Input 
+                          id="momoPaid" 
+                          type="number" 
+                          value={momoPaidInput} 
+                          onChange={(e) => setMomoPaidInput(e.target.value)} 
+                          placeholder="0.00" 
+                          className="mt-1" 
+                        />
+                    </div>
+                    {balances.change > 0 && (
                         <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                          <p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
+                            <p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
                             Change Due: {formatCurrency(balances.change)}
-                          </p>
-                          <Label htmlFor="changeGiven">Amount Given as Change</Label>
-                          <Input 
+                            </p>
+                            <Label htmlFor="changeGiven">Amount Given as Change</Label>
+                            <Input 
                             id="changeGiven" 
                             type="number" 
                             value={changeGivenInput} 
                             onChange={(e) => setChangeGivenInput(e.target.value)} 
                             placeholder={formatCurrency(balances.change)} 
                             className="text-center mt-2" 
-                          />
-                          <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
+                            />
+                            <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
                             Leave empty or enter less if not giving full change
-                          </p>
+                            </p>
                         </div>
-                      )}
-                      
-                      {showDeficitOptions && (
+                    )}
+                    {showDeficitOptions && (
                         <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
-                          <AlertTriangle className="h-4 w-4 text-orange-600" />
-                          <AlertTitle className="text-orange-800 dark:text-orange-200">Payment Insufficient</AlertTitle>
-                          <AlertDescription className="text-orange-700 dark:text-orange-300">
+                            <AlertTriangle className="h-4 w-4 text-orange-600" />
+                            <AlertTitle className="text-orange-800 dark:text-orange-200">Payment Insufficient</AlertTitle>
+                            <AlertDescription className="text-orange-700 dark:text-orange-300">
                             Customer still owes: <span className="font-bold">{formatCurrency(balances.deficit)}</span>
-                          </AlertDescription>
+                            </AlertDescription>
                         </Alert>
-                      )}
-                    </div>
-                  )}
-                </>
+                    )}
+                </div>
               ) : (
                  <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
                   <Info className="h-4 w-4 text-green-600" />
@@ -656,3 +652,4 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 };
 
 export default OrderOptionsModal;
+

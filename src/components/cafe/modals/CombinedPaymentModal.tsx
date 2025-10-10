@@ -1,6 +1,7 @@
 
 
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -122,8 +123,8 @@ interface CombinedPaymentModalProps {
 }
 
 const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onClose, onOrderPlaced }) => {
-    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'momo'>('cash');
-    const [amountPaidInput, setAmountPaidInput] = useState('');
+    const [cashPaidInput, setCashPaidInput] = useState('');
+    const [momoPaidInput, setMomoPaidInput] = useState('');
     const [changeGivenInput, setChangeGivenInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -142,14 +143,15 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     
     const finalTotal = Math.max(0, totalToPay - (reward?.discount ?? 0));
 
-    const amountPaidNum = parseFloat(amountPaidInput);
-    const isAmountPaidEntered = amountPaidInput.trim() !== '' && !isNaN(amountPaidNum);
-    const finalAmountPaid = paymentMethod === 'momo' ? finalTotal : (isAmountPaidEntered ? amountPaidNum : 0);
+    const cashPaidNum = parseFloat(cashPaidInput) || 0;
+    const momoPaidNum = parseFloat(momoPaidInput) || 0;
+    const totalAmountPaid = cashPaidNum + momoPaidNum;
+
+    const deficit = totalAmountPaid < finalTotal ? finalTotal - totalAmountPaid : 0;
+    const change = totalAmountPaid > finalTotal ? totalAmountPaid - finalTotal : 0;
     
-    const deficit = finalAmountPaid < finalTotal ? finalTotal - finalAmountPaid : 0;
-    const change = finalAmountPaid > finalTotal ? finalAmountPaid - finalTotal : 0;
-    
-    const showDeficitOptions = paymentMethod === 'cash' && isAmountPaidEntered && deficit > 0;
+    const isAmountPaidEntered = cashPaidInput.trim() !== '' || momoPaidInput.trim() !== '';
+    const showDeficitOptions = isAmountPaidEntered && deficit > 0;
     
     const handleApplyReward = (appliedReward: RewardApplication) => {
         setReward(appliedReward);
@@ -157,8 +159,8 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     };
 
     const processCombinedPayment = async ({ pardonDeficit = false }) => {
-        if (paymentMethod === 'cash' && !isAmountPaidEntered) {
-             setError("Please enter an amount paid.");
+        if (!isAmountPaidEntered) {
+             setError("Please enter an amount paid in at least one field.");
              return;
         }
 
@@ -170,42 +172,77 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             const now = serverTimestamp();
             const changeGiven = parseFloat(changeGivenInput) || (change > 0 ? change : 0);
     
-            let paymentBeingApplied = paymentMethod === 'momo' ? finalTotal : amountPaidNum;
-    
-            for (const order of orders) {
-                if (paymentBeingApplied <= 0 && !pardonDeficit) break;
-    
+            let cashPaymentToApply = cashPaidNum;
+            let momoPaymentToApply = momoPaidNum;
+            
+            // This will hold the total payments applied to each order from all sources
+            const paymentDistribution: Record<string, {cash: number, momo: number}> = {};
+
+            // Sort orders to pay off smaller balances first
+            const sortedOrders = [...orders].sort((a,b) => a.balanceDue - b.balanceDue);
+
+            for (const order of sortedOrders) {
+                if (order.balanceDue <= 0) continue;
+                if(cashPaymentToApply <= 0 && momoPaymentToApply <= 0) break;
+
+                let remainingBalance = order.balanceDue;
+                
+                // Apply cash first
+                const cashForThisOrder = Math.min(cashPaymentToApply, remainingBalance);
+                if (cashForThisOrder > 0) {
+                    paymentDistribution[order.id] = {...(paymentDistribution[order.id] || {cash: 0, momo: 0}), cash: cashForThisOrder};
+                    remainingBalance -= cashForThisOrder;
+                    cashPaymentToApply -= cashForThisOrder;
+                }
+                
+                // Apply momo second
+                const momoForThisOrder = Math.min(momoPaymentToApply, remainingBalance);
+                 if (momoForThisOrder > 0) {
+                    paymentDistribution[order.id] = {...(paymentDistribution[order.id] || {cash: 0, momo: 0}), momo: momoForThisOrder};
+                    remainingBalance -= momoForThisOrder;
+                    momoPaymentToApply -= momoForThisOrder;
+                }
+            }
+
+            for(const order of sortedOrders) {
+                if(!paymentDistribution[order.id] && !(pardonDeficit && deficit > 0)) continue;
+
                 const orderRef = doc(db, "orders", order.id);
                 const orderData = (await getDoc(orderRef)).data() as Order;
-                const orderBalance = orderData.balanceDue;
+
+                const cashApplied = paymentDistribution[order.id]?.cash || 0;
+                const momoApplied = paymentDistribution[order.id]?.momo || 0;
+                const totalApplied = cashApplied + momoApplied;
                 
-                if (orderBalance <= 0) continue;
-    
-                const amountToPayForOrder = Math.min(paymentBeingApplied, orderBalance);
-                
-                const newAmountPaid = orderData.amountPaid + amountToPayForOrder;
-                let newBalanceDue = orderBalance - amountToPayForOrder;
-    
+                const newAmountPaid = orderData.amountPaid + totalApplied;
+                let newBalanceDue = orderData.balanceDue - totalApplied;
+
                 const updateData: any = {
                     amountPaid: newAmountPaid,
                     lastPaymentTimestamp: now,
-                    lastPaymentAmount: amountToPayForOrder,
-                    paymentMethod: paymentMethod,
+                    lastPaymentAmount: totalApplied,
+                    paymentBreakdown: {
+                        cash: (orderData.paymentBreakdown?.cash || 0) + cashApplied,
+                        momo: (orderData.paymentBreakdown?.momo || 0) + momoApplied,
+                    },
                 };
-    
-                if (newBalanceDue <= 0) {
+                
+                if (cashApplied > 0 && momoApplied > 0) updateData.paymentMethod = 'split';
+                else if (cashApplied > 0) updateData.paymentMethod = 'cash';
+                else if (momoApplied > 0) updateData.paymentMethod = 'momo';
+
+
+                if (newBalanceDue <= 0.01) {
                     updateData.paymentStatus = 'Paid';
                 } else {
                     updateData.paymentStatus = 'Partially Paid';
                 }
     
                 updateData.balanceDue = newBalanceDue;
-    
                 batch.update(orderRef, updateData);
-                paymentBeingApplied -= amountToPayForOrder;
             }
-    
-            const lastOrder = orders[orders.length - 1];
+            
+            const lastOrder = sortedOrders[sortedOrders.length - 1];
             if (lastOrder) {
                 const lastOrderRef = doc(db, "orders", lastOrder.id);
                 let finalUpdate: any = {};
@@ -214,15 +251,13 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     finalUpdate.balanceDue = -(change - changeGiven); 
                     finalUpdate.changeGiven = (lastOrder.changeGiven || 0) + changeGiven;
                     finalUpdate.paymentStatus = 'Paid';
-                    finalUpdate.settledOn = (change - changeGiven) === 0 ? now : null;
+                    finalUpdate.settledOn = (change - changeGiven) < 0.01 ? now : null;
                 }
-                else if (deficit > 0) {
-                    if (pardonDeficit) {
-                        finalUpdate.pardonedAmount = (lastOrder.pardonedAmount || 0) + deficit;
-                        finalUpdate.notes = `${(lastOrder.notes || '')} Combined payment deficit of ${formatCurrency(deficit)} pardoned.`.trim();
-                        finalUpdate.balanceDue = 0;
-                        finalUpdate.paymentStatus = 'Paid';
-                    }
+                else if (deficit > 0 && pardonDeficit) {
+                    finalUpdate.pardonedAmount = (lastOrder.pardonedAmount || 0) + deficit;
+                    finalUpdate.notes = `${(lastOrder.notes || '')} Combined payment deficit of ${formatCurrency(deficit)} pardoned.`.trim();
+                    finalUpdate.balanceDue = 0;
+                    finalUpdate.paymentStatus = 'Paid';
                 }
     
                 if (reward) {
@@ -281,31 +316,27 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 {reward && <Badge variant="secondary"><Gift className="h-3 w-3 mr-1.5" />{formatCurrency(reward.discount)} discount applied</Badge>}
             </div>
             
-            <div className="space-y-4 pt-2">
-                <div className="flex justify-center space-x-4">
-                    <Button onClick={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'secondary'}>Cash</Button>
-                    <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'secondary'}>Momo/Card</Button>
+            <div className="space-y-4 pt-2 p-4 border rounded-lg">
+                <div>
+                    <Label htmlFor="cashPaid">Amount Paid (Cash)</Label>
+                    <Input id="cashPaid" type="number" value={cashPaidInput} onChange={(e) => setCashPaidInput(e.target.value)} placeholder="0.00" autoFocus className="mt-1" />
                 </div>
-                {paymentMethod === 'cash' && (
-                    <div className="space-y-4">
-                         <div>
-                            <Label htmlFor="cashPaid">Amount Paid by Customer</Label>
-                            <Input id="cashPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="0.00" autoFocus className="text-lg h-12" />
-                        </div>
+                 <div>
+                    <Label htmlFor="momoPaid">Amount Paid (Momo/Card)</Label>
+                    <Input id="momoPaid" type="number" value={momoPaidInput} onChange={(e) => setMomoPaidInput(e.target.value)} placeholder="0.00" className="mt-1" />
+                </div>
                         
-                        {change > 0 && (
-                             <div className="text-center">
-                                <p className="font-semibold text-red-500">Change Due: {formatCurrency(change)}</p>
-                                <div className="mt-2">
-                                    <Label htmlFor="changeGiven">Amount Given as Change</Label>
-                                    <Input id="changeGiven" type="number" value={changeGivenInput} onChange={(e) => setChangeGivenInput(e.target.value)} placeholder={formatCurrency(change)} className="text-center" />
-                                </div>
-                            </div>
-                        )}
-                        {showDeficitOptions && (
-                            <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>
-                        )}
+                {change > 0 && (
+                        <div className="text-center">
+                        <p className="font-semibold text-red-500">Change Due: {formatCurrency(change)}</p>
+                        <div className="mt-2">
+                            <Label htmlFor="changeGiven">Amount Given as Change</Label>
+                            <Input id="changeGiven" type="number" value={changeGivenInput} onChange={(e) => setChangeGivenInput(e.target.value)} placeholder={formatCurrency(change)} className="text-center" />
+                        </div>
                     </div>
+                )}
+                {showDeficitOptions && (
+                    <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>
                 )}
                  {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
             </div>
@@ -324,7 +355,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                         </Button>
                     </div>
                 ) : (
-                    <Button onClick={() => processCombinedPayment({})} disabled={isProcessing || (paymentMethod === 'cash' && !isAmountPaidEntered)} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                    <Button onClick={() => processCombinedPayment({})} disabled={isProcessing || !isAmountPaidEntered} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
                         {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
                     </Button>
                 )}

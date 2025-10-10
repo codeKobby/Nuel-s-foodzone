@@ -418,7 +418,7 @@ const ReconciliationView: React.FC<{
 
     return (
         <>
-        <Dialog open={true} onOpenChange={onBack}>
+        <Dialog open={true} onOpenChange={(open) => !open && onBack()}>
             <DialogContent className="max-w-7xl max-h-[90vh]">
                 <DialogHeader className="pb-4 border-b">
                     <DialogTitle className="text-2xl font-bold">End-of-Day Reconciliation</DialogTitle>
@@ -737,12 +737,10 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             });
                         }
                         
-                        // Unpaid value from today's orders
                         if (order.balanceDue > 0) {
                             todayUnpaidOrdersValue += order.balanceDue;
                         }
                         
-                        // Other stats for today's orders
                         totalPardonedAmount += order.pardonedAmount || 0;
                         totalRewardDiscount += order.rewardDiscount || 0;
                         if (order.balanceDue < 0) {
@@ -751,26 +749,30 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     }
     
                     // Revenue Calculation (payments made today)
-                    if (order.lastPaymentTimestamp) {
-                        const paymentDate = order.lastPaymentTimestamp.toDate();
-                        if (paymentDate >= todayStart && paymentDate <= todayEnd) {
-                            const paymentAmount = order.lastPaymentAmount || 0;
-                            const revenuePortion = Math.min(paymentAmount, order.total);
-    
-                            if (isTodayOrder) { // Payment for today's order
-                                if (order.paymentMethod === 'cash') cashSales += revenuePortion;
-                                else if (order.paymentMethod === 'momo') momoSales += revenuePortion;
-                            } else { // Collection on an old order
-                                settledUnpaidOrdersValue += paymentAmount; 
+                    const paymentDate = order.lastPaymentTimestamp?.toDate();
+                    if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
+                        const paymentAmount = order.lastPaymentAmount || 0;
+                        
+                        if (isTodayOrder) { // Payment for today's order
+                             // Use paymentBreakdown if it exists
+                            if (order.paymentBreakdown) {
+                                if(order.paymentBreakdown.cash) cashSales += Math.min(order.paymentBreakdown.cash, order.total);
+                                if(order.paymentBreakdown.momo) momoSales += Math.min(order.paymentBreakdown.momo, order.total - (order.paymentBreakdown.cash || 0) );
+                            } else if (order.paymentMethod === 'cash') {
+                                cashSales += Math.min(paymentAmount, order.total);
+                            } else if (order.paymentMethod === 'momo') {
+                                momoSales += Math.min(paymentAmount, order.total);
                             }
+                        } else { // Collection on an old order
+                            settledUnpaidOrdersValue += paymentAmount; 
                         }
                     }
     
                     // Change given today for old orders
-                    if (order.settledOn) {
-                        const settledDate = order.settledOn.toDate();
-                        if (settledDate >= todayStart && settledDate <= todayEnd && !isTodayOrder && order.balanceDue >= 0) {
-                             previousDaysChangeGiven += (order.changeGiven || 0) - (order.pardonedAmount || 0); // More robust change given calc
+                    const settledDate = order.settledOn?.toDate();
+                    if (settledDate && settledDate >= todayStart && settledDate <= todayEnd && !isTodayOrder) {
+                        if (order.changeGiven > (order.pardonedAmount || 0)) {
+                             previousDaysChangeGiven += (order.changeGiven - (order.pardonedAmount || 0));
                         }
                     }
                 });
@@ -856,16 +858,11 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         return Object.entries(stats.itemStats).sort(([, a], [, b]) => b.count - a.count);
     }, [stats]);
     
-    // Corrected Expected Cash calculation for Reconciliation View
     const adjustedExpectedCash = useMemo(() => {
         if (!stats) return 0;
-        // Start with cash payments from today's orders
         let expected = stats.cashSales;
-        // Add cash collected for old debts
-        expected += stats.settledUnpaidOrdersValue; // Assuming collections are cash, might need refinement
-        // Subtract cash expenses for today
+        expected += stats.settledUnpaidOrdersValue; 
         expected -= stats.miscCashExpenses;
-        // Subtract change given today for orders from previous days
         expected -= stats.previousDaysChangeGiven;
         return expected;
     }, [stats]);
