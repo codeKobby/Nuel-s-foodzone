@@ -66,9 +66,8 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
 
 const ReconciliationView: React.FC<{ 
     stats: PeriodStats | null,
-    adjustedExpectedCash: number,
     onBack: () => void 
-}> = ({ stats, adjustedExpectedCash, onBack }) => {
+}> = ({ stats, onBack }) => {
     const [notes, setNotes] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
@@ -96,14 +95,27 @@ const ReconciliationView: React.FC<{
         return momoTransactions.reduce((total, amount) => total + amount, 0);
     }, [momoTransactions]);
     
-    const availableCash = useMemo(() => {
-        if (!deductCustomerChange || !stats) return totalCountedCash;
-        return totalCountedCash - stats.changeOwedForPeriod;
-    }, [totalCountedCash, stats, deductCustomerChange]);
+    const expectedCashBase = useMemo(() => {
+        if (!stats) return 0;
+        let expected = stats.cashSales;
+        expected += stats.settledUnpaidOrdersValue;
+        expected -= stats.miscCashExpenses;
+        expected -= stats.previousDaysChangeGiven;
+        return expected;
+    }, [stats]);
+    
+    const adjustedExpectedCash = useMemo(() => {
+        if (!stats) return 0;
+        if (deductCustomerChange) {
+            return expectedCashBase;
+        } else {
+            return expectedCashBase + stats.changeOwedForPeriod;
+        }
+    }, [stats, expectedCashBase, deductCustomerChange]);
 
     const cashDiscrepancy = useMemo(() => {
-        return availableCash - adjustedExpectedCash;
-    }, [availableCash, adjustedExpectedCash]);
+        return totalCountedCash - adjustedExpectedCash;
+    }, [totalCountedCash, adjustedExpectedCash]);
 
     const momoDiscrepancy = useMemo(() => {
         if (!stats) return 0;
@@ -138,15 +150,15 @@ const ReconciliationView: React.FC<{
                 timestamp: serverTimestamp(),
                 period: format(today, 'yyyy-MM-dd'),
                 totalSales: stats.totalSales,
-                expectedCash: adjustedExpectedCash,
+                expectedCash: expectedCashBase,
                 expectedMomo: stats.expectedMomo,
-                totalExpectedRevenue: adjustedExpectedCash + stats.expectedMomo,
+                totalExpectedRevenue: expectedCashBase + stats.expectedMomo,
                 countedCash: totalCountedCash,
                 countedMomo: totalCountedMomo,
                 totalCountedRevenue: totalCountedCash + totalCountedMomo,
-                cashDiscrepancy: cashDiscrepancy,
-                momoDiscrepancy: momoDiscrepancy,
-                totalDiscrepancy: totalDiscrepancy,
+                cashDiscrepancy,
+                momoDiscrepancy,
+                totalDiscrepancy,
                 notes: notes,
                 changeOwedForPeriod: stats.changeOwedForPeriod,
                 changeOwedSetAside: deductCustomerChange,
@@ -211,7 +223,7 @@ const ReconciliationView: React.FC<{
             return baseText;
         }
 
-        const changeText = `You have indicated that customer change of ${formatCurrency(stats.changeOwedForPeriod)} will be ${deductCustomerChange ? 'DEDUCTED from the available cash' : 'LEFT IN the cash drawer'}.`;
+        const changeText = `You have indicated that customer change of ${formatCurrency(stats.changeOwedForPeriod)} will be ${deductCustomerChange ? 'DEDUCTED from the counted cash' : 'LEFT IN the cash drawer'}.`;
 
         return `${changeText} ${baseText}`;
     }, [stats, deductCustomerChange]);
@@ -490,14 +502,14 @@ const ReconciliationView: React.FC<{
                                                 onCheckedChange={setDeductCustomerChange} 
                                             />
                                             <Label htmlFor="deduct-change" className="font-medium">
-                                                Deduct customer change from available cash?
+                                                Deduct change from today's cash?
                                             </Label>
                                         </div>
                                     </div>
                                     <p className="text-sm text-muted-foreground mt-3">
                                         {deductCustomerChange 
-                                            ? "Change will be set aside and deducted from your available cash." 
-                                            : "Change will be counted as part of available cash (pay customers immediately)."
+                                            ? "Change will be considered 'set aside' and will NOT be included in the expected cash." 
+                                            : "Change will be counted as part of expected cash (assuming it's still in the drawer)."
                                         }
                                     </p>
                                 </CardContent>
@@ -551,8 +563,11 @@ const ReconciliationView: React.FC<{
                                             <div className="flex justify-between text-red-600"><span>(-) Cash Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscCashExpenses)}</span></div>
                                             {stats.settledUnpaidOrdersValue > 0 && <div className="flex justify-between text-green-600"><span>(+) Settled Old Orders:</span><span className="font-medium">+{formatCurrency(stats.settledUnpaidOrdersValue)}</span></div>}
                                             {stats.previousDaysChangeGiven > 0 && <div className="flex justify-between text-orange-600"><span>(-) Previous Days Change:</span><span className="font-medium">-{formatCurrency(stats.previousDaysChangeGiven)}</span></div>}
+                                            {!deductCustomerChange && stats.changeOwedForPeriod > 0 && (
+                                                <div className="flex justify-between text-blue-600"><span>(+) Undeducted Change:</span><span className="font-medium">+{formatCurrency(stats.changeOwedForPeriod)}</span></div>
+                                            )}
                                             <UiSeparator />
-                                            <div className="flex justify-between font-bold text-blue-700 text-base"><span>Expected Cash:</span><span>{formatCurrency(adjustedExpectedCash)}</span></div>
+                                            <div className="flex justify-between font-bold text-blue-700 text-base"><span>Expected Cash in Drawer:</span><span>{formatCurrency(adjustedExpectedCash)}</span></div>
                                         </div>
                                     </div>
                                     <div className="space-y-3">
@@ -567,7 +582,7 @@ const ReconciliationView: React.FC<{
                                 </div>
                             </CardContent>
                             <CardFooter className="bg-primary/10 p-4">
-                                <div className="w-full flex justify-between items-center"><span className="font-bold text-primary text-lg">Total Expected:</span><span className="font-extrabold text-primary text-xl">{formatCurrency(adjustedExpectedCash + stats.expectedMomo)}</span></div>
+                                <div className="w-full flex justify-between items-center"><span className="font-bold text-primary text-lg">Total Expected Net:</span><span className="font-extrabold text-primary text-xl">{formatCurrency(expectedCashBase + stats.expectedMomo)}</span></div>
                             </CardFooter>
                         </Card>
 
@@ -576,21 +591,18 @@ const ReconciliationView: React.FC<{
                             <CardContent className="p-6 space-y-4">
                                 <div className="space-y-2 text-sm">
                                     <h4 className="font-semibold text-base text-green-600">Cash</h4>
-                                    <div className="flex justify-between"><span>Cash Counted:</span><span className="font-medium">{formatCurrency(totalCountedCash)}</span></div>
-                                    {stats.changeOwedForPeriod > 0 && deductCustomerChange && <div className="flex justify-between text-orange-600"><span>(-) Today's Change:</span><span className="font-medium">-{formatCurrency(stats.changeOwedForPeriod)}</span></div>}
-                                    <UiSeparator />
-                                    <div className="flex justify-between font-bold text-green-700"><span>Available Cash:</span><span>{formatCurrency(availableCash)}</span></div>
+                                    <div className="flex justify-between font-bold text-green-700"><span>Cash Counted:</span><span>{formatCurrency(totalCountedCash)}</span></div>
                                 </div>
                                 <div className="space-y-2 text-sm">
                                     <h4 className="font-semibold text-base text-green-600">MoMo/Card</h4>
-                                    <div className="flex justify-between font-bold text-green-700"><span>Available MoMo:</span><span>{formatCurrency(totalCountedMomo)}</span></div>
+                                    <div className="flex justify-between font-bold text-green-700"><span>MoMo Counted:</span><span>{formatCurrency(totalCountedMomo)}</span></div>
                                 </div>
                             </CardContent>
-                            <CardFooter className="bg-green-500/10 p-4"><div className="w-full flex justify-between items-center"><span className="font-bold text-green-700 dark:text-green-300 text-lg">Total Available:</span><span className="font-extrabold text-green-600 dark:text-green-400 text-xl">{formatCurrency(availableCash + totalCountedMomo)}</span></div></CardFooter>
+                            <CardFooter className="bg-green-500/10 p-4"><div className="w-full flex justify-between items-center"><span className="font-bold text-green-700 dark:text-green-300 text-lg">Total Counted:</span><span className="font-extrabold text-green-600 dark:text-green-400 text-xl">{formatCurrency(totalCountedCash + totalCountedMomo)}</span></div></CardFooter>
                         </Card>
 
                         <Card className={`border-2 ${getBalanceStatus(totalDiscrepancy).bg}`}>
-                            <CardContent className="p-6"><div className="flex items-center justify-center space-x-3">{React.createElement(getBalanceStatus(totalDiscrepancy).icon, { className: `h-8 w-8 ${getBalanceStatus(totalDiscrepancy).color}` })}<div className="text-center"><p className="text-lg font-semibold">Overall Status</p><p className={`text-2xl font-bold ${getBalanceStatus(totalDiscrepancy).color}`}>{getBalanceStatus(totalDiscrepancy).text}</p></div></div></CardContent>
+                            <CardContent className="p-6"><div className="flex items-center justify-center space-x-3">{React.createElement(getBalanceStatus(cashDiscrepancy).icon, { className: `h-8 w-8 ${getBalanceStatus(cashDiscrepancy).color}` })}<div className="text-center"><p className="text-lg font-semibold">Cash Status</p><p className={`text-2xl font-bold ${getBalanceStatus(cashDiscrepancy).color}`}>{getBalanceStatus(cashDiscrepancy).text}</p></div></div></CardContent>
                         </Card>
                     </div>
                 </div>
@@ -704,19 +716,19 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     const paymentDate = order.lastPaymentTimestamp?.toDate();
                     if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
                         const paymentAmount = order.lastPaymentAmount || 0;
+                        const isOrderFromPeriod = order.timestamp.toDate() >= todayStart && order.timestamp.toDate() <= todayEnd;
+
+                        if (order.paymentBreakdown) {
+                            if(order.paymentBreakdown.cash) cashSales += order.paymentBreakdown.cash;
+                            if(order.paymentBreakdown.momo) momoSales += order.paymentBreakdown.momo;
+                        } else if (order.paymentMethod === 'cash') {
+                            cashSales += paymentAmount;
+                        } else if (order.paymentMethod === 'momo') {
+                            momoSales += paymentAmount;
+                        }
                         
-                        if (isTodayOrder) { // Payment for today's order
-                             // Use paymentBreakdown if it exists
-                            if (order.paymentBreakdown) {
-                                if(order.paymentBreakdown.cash) cashSales += Math.min(order.paymentBreakdown.cash, order.total);
-                                if(order.paymentBreakdown.momo) momoSales += Math.min(order.paymentBreakdown.momo, order.total - (order.paymentBreakdown.cash || 0) );
-                            } else if (order.paymentMethod === 'cash') {
-                                cashSales += Math.min(paymentAmount, order.total);
-                            } else if (order.paymentMethod === 'momo') {
-                                momoSales += Math.min(paymentAmount, order.total);
-                            }
-                        } else { // Collection on an old order
-                            settledUnpaidOrdersValue += paymentAmount; 
+                        if (!isOrderFromPeriod) { 
+                           settledUnpaidOrdersValue += paymentAmount;
                         }
                     }
     
@@ -744,7 +756,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const totalMiscExpenses = miscCashExpenses + miscMomoExpenses;
                 const expectedCash = cashSales - miscCashExpenses + settledUnpaidOrdersValue - previousDaysChangeGiven;
                 const expectedMomo = momoSales - miscMomoExpenses;
-                const netRevenue = totalSales - todayUnpaidOrdersValue - totalMiscExpenses - totalRewardDiscount - totalPardonedAmount;
+                const netRevenue = (cashSales + momoSales) - totalMiscExpenses - totalRewardDiscount - totalPardonedAmount;
     
                 setStats({ 
                     totalSales, 
@@ -810,17 +822,8 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         return Object.entries(stats.itemStats).sort(([, a], [, b]) => b.count - a.count);
     }, [stats]);
     
-    const adjustedExpectedCash = useMemo(() => {
-        if (!stats) return 0;
-        let expected = stats.cashSales;
-        expected += stats.settledUnpaidOrdersValue; 
-        expected -= stats.miscCashExpenses;
-        expected -= stats.previousDaysChangeGiven;
-        return expected;
-    }, [stats]);
-
     if (showReconciliation && stats) {
-        return <ReconciliationView stats={stats} adjustedExpectedCash={adjustedExpectedCash} onBack={() => setShowReconciliation(false)} />;
+        return <ReconciliationView stats={stats} onBack={() => setShowReconciliation(false)} />;
     }
 
     return (
@@ -952,3 +955,5 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+    
