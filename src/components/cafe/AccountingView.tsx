@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
@@ -29,8 +28,6 @@ import { Search } from 'lucide-react';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { AuthContext } from '@/context/AuthContext';
 import { formatCurrency } from '@/lib/utils';
-import { fixIncorrectPaymentData } from '@/lib/data-fix';
-
 
 interface PeriodStats {
     totalSales: number;
@@ -53,51 +50,6 @@ interface PeriodStats {
     orders: Order[];
     itemStats: Record<string, { count: number; totalValue: number }>;
 }
-
-const DataCorrectionTools = () => {
-    const { toast } = useToast();
-    const [isFixing, setIsFixing] = useState(false);
-    const [fixCompleted, setFixCompleted] = useState(false);
-
-    const handleRunFix = async () => {
-        setIsFixing(true);
-        const result = await fixIncorrectPaymentData();
-        toast({
-            title: result.success ? "Success" : "Error",
-            description: result.message,
-            type: result.success ? 'success' : 'error',
-        });
-        if (result.success) {
-            setFixCompleted(true);
-        }
-        setIsFixing(false);
-    }
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-xl flex items-center"><Wrench className="mr-2"/>Data Correction Tool</CardTitle>
-                <CardDescription>A one-time tool to fix specific data errors in the database.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">This tool will correct the payment distribution for orders <span className="font-mono">#0707</span> and <span className="font-mono">#0708</span>, attributing GH₵550 to cash and GH₵290 to momo.</p>
-                     <Button
-                        onClick={handleRunFix}
-                        disabled={isFixing || fixCompleted}
-                        className="w-full"
-                        variant="destructive"
-                    >
-                        {isFixing && <Loader className="mr-2 animate-spin" />}
-                        {fixCompleted ? "Fix Completed" : "Run Payment Fix"}
-                    </Button>
-                     {fixCompleted && <p className="text-xs text-green-600 text-center mt-2">This data has been corrected. You can now dismiss this card.</p>}
-                </div>
-            </CardContent>
-        </Card>
-    );
-};
-
 
 const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, color?: string, description?: string | React.ReactNode }> = ({ icon, title, value, color, description }) => (
     <Card>
@@ -896,7 +848,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                          </Alert>
                     ) : stats ? (
                         <div className="space-y-6">
-                            <DataCorrectionTools />
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 <div className="lg:col-span-2 space-y-6">
                                     <Card>
@@ -1001,23 +952,3 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-    
-
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
