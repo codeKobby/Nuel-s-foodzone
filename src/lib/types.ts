@@ -35,7 +35,7 @@ export interface Order {
   fulfilledItems: FulfilledItem[];
   total: number;
   paymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid';
-  paymentBreakdown?: { cash: number; momo: number };
+  paymentBreakdown: { cash: number; momo: number };
   paymentStatus: 'Paid' | 'Unpaid' | 'Partially Paid';
   amountPaid: number;
   changeGiven: number; 
@@ -235,7 +235,3 @@ export interface DashboardStats {
     incompleteAccountingDays: string[];
     pardonedOrders: Order[];
 }
-
-    
-
-    

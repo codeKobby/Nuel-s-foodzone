@@ -165,9 +165,10 @@ const ReconciliationView: React.FC<{
                 cashierId: session?.uid || 'unknown',
                 cashierName: session?.fullName || session?.username || 'Unknown',
             };
-            await addDoc(collection(db, "reconciliationReports"), reportData);
             
             onBack();
+
+            await addDoc(collection(db, "reconciliationReports"), reportData);
             
             toast({ 
                 title: "Day Closed Successfully", 
@@ -955,5 +956,3 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-    
