@@ -319,7 +319,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             <div className="space-y-4 pt-2 p-4 border rounded-lg">
                 <div>
                     <Label htmlFor="cashPaid">Amount Paid (Cash)</Label>
-                    <Input id="cashPaid" type="number" value={cashPaidInput} onChange={(e) => setCashPaidInput(e.target.value)} placeholder="0.00" autoFocus className="mt-1" />
+                    <Input id="cashPaid" type="number" value={cashPaidInput} onChange={(e) => setCashPaidInput(e.target.value)} placeholder="0.00" className="mt-1" />
                 </div>
                  <div>
                     <Label htmlFor="momoPaid">Amount Paid (Momo/Card)</Label>
