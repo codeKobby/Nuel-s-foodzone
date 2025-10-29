@@ -529,7 +529,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                           value={cashPaidInput} 
                           onChange={(e) => setCashPaidInput(e.target.value)} 
                           placeholder="0.00" 
-                          autoFocus 
                           className="mt-1" 
                         />
                     </div>
