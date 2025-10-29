@@ -742,7 +742,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const allTimeUnpaidOrdersValue = previousUnpaidOrdersValue + todayUnpaidOrdersValue;
     
                 const totalMiscExpenses = miscCashExpenses + miscMomoExpenses;
-                const expectedCash = cashSales - miscCashExpenses + settledUnpaidOrdersValue - previousDaysChangeGiven;
+                const expectedCash = cashSales - miscCashExpenses + settledUnpaidOrdersValue - previousDaysChangeGiven - totalPardonedAmount;
                 const expectedMomo = momoSales - miscMomoExpenses;
                 const netRevenue = totalSales - todayUnpaidOrdersValue - totalMiscExpenses - totalRewardDiscount - totalPardonedAmount;
     
@@ -816,6 +816,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         expected += stats.settledUnpaidOrdersValue; 
         expected -= stats.miscCashExpenses;
         expected -= stats.previousDaysChangeGiven;
+        expected -= stats.totalPardonedAmount;
         return expected;
     }, [stats]);
 
