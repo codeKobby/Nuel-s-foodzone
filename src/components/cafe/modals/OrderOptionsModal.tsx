@@ -128,14 +128,14 @@ interface OrderOptionsModalProps {
 }
 
 const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
-	total,
-	orderItems,
-	editingOrder,
-	onClose,
-	onOrderPlaced,
+  total,
+  orderItems,
+  editingOrder,
+  onClose,
+  onOrderPlaced
 }) => {
-	const [step, setStep] = useState(1);
-	const [orderType, setOrderType] = useState<"Dine-In" | "Takeout" | "Delivery">("Dine-In");
+  const [step, setStep] = useState(1);
+  const [orderType, setOrderType] = useState<'Dine-In' | 'Takeout' | 'Delivery'>('Dine-In');
   const [orderTag, setOrderTag] = useState('');
   
   const [cashPaidInput, setCashPaidInput] = useState('');
@@ -477,275 +477,178 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               )}
             </div>
             
-						<div className="space-y-1 text-center pt-2">
-							{reward && (
-								<p className="text-sm text-muted-foreground line-through">
-									{formatCurrency(total)}
-								</p>
-							)}
-							<p className="text-3xl font-bold text-primary">{formatCurrency(finalTotal)}</p>
-							{reward && (
-								<Badge variant="secondary">
-									<Gift className="h-3 w-3 mr-1.5" />
-									{formatCurrency(reward.discount)} discount applied
-								</Badge>
-							)}
-						</div>
+            <DialogFooter className="grid grid-cols-2 gap-2">
+              <Button
+                onClick={handlePayLater}
+                disabled={isProcessing}
+                variant="secondary"
+                className="bg-yellow-500 hover:bg-yellow-600 text-white"
+              >
+                {isProcessing ? <LoadingSpinner /> : 'Save Unpaid'}
+              </Button>
+              <Button onClick={handleProceedToPayment}>
+                Add Payment
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>
+                {editingOrder ? `Add Payment - ${editingOrder.simplifiedId}` : 'Process Payment'}
+              </DialogTitle>
+              <DialogDescription>
+                {editingOrder
+                  ? 'Add a payment to this existing order.'
+                  : 'Complete the payment for this new order.'
+                }
+              </DialogDescription>
+                <div className="space-y-1 text-center pt-2">
+                    {reward && (
+                        <p className="text-sm text-muted-foreground line-through">{formatCurrency(total)}</p>
+                    )}
+                    <p className="text-3xl font-bold text-primary">{formatCurrency(finalTotal)}</p>
+                    {reward && (
+                        <Badge variant="secondary">
+                            <Gift className="h-3 w-3 mr-1.5" />
+                            {formatCurrency(reward.discount)} discount applied
+                        </Badge>
+                    )}
+                </div>
+            </DialogHeader>
 
+            <div className="space-y-4">
+              {renderBalanceBreakdown()}
 
-					<div className="space-y-4">
-						{renderBalanceBreakdown()}
+              {!isOverpaid ? (
+                <div className="space-y-4 p-4 border rounded-lg">
+                    <div>
+                        <Label htmlFor="cashPaid">Amount Paid (Cash)</Label>
+                        <Input
+                          id="cashPaid"
+                          type="number"
+                          value={cashPaidInput}
+                          onChange={(e) => setCashPaidInput(e.target.value)}
+                          placeholder="0.00"
+                          className="mt-1"
+                        />
+                    </div>
+                     <div>
+                        <Label htmlFor="momoPaid">Amount Paid (Momo/Card)</Label>
+                        <Input
+                          id="momoPaid"
+                          type="number"
+                          value={momoPaidInput}
+                          onChange={(e) => setMomoPaidInput(e.target.value)}
+                          placeholder="0.00"
+                          className="mt-1"
+                        />
+                    </div>
+                    {balances.change > 0 && (
+                        <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                            <p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
+                            Change Due: {formatCurrency(balances.change)}
+                            </p>
+                            <Label htmlFor="changeGiven">Amount Given as Change</Label>
+                            <Input
+                            id="changeGiven"
+                            type="number"
+                            value={changeGivenInput}
+                            onChange={(e) => setChangeGivenInput(e.target.value)}
+                            placeholder={formatCurrency(balances.change)}
+                            className="text-center mt-2"
+                            />
+                            <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
+                            Leave empty or enter less if not giving full change
+                            </p>
+                        </div>
+                    )}
+                    {showDeficitOptions && (
+                        <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
+                            <AlertTriangle className="h-4 w-4 text-orange-600" />
+                            <AlertTitle className="text-orange-800 dark:text-orange-200">Payment Insufficient</AlertTitle>
+                            <AlertDescription className="text-orange-700 dark:text-orange-300">
+                            Customer still owes: <span className="font-bold">{formatCurrency(balances.deficit)}</span>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </div>
+              ) : (
+                 <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
+                  <Info className="h-4 w-4 text-green-600" />
+                  <AlertTitle className="text-green-800 dark:text-green-200">Customer Overpaid</AlertTitle>
+                  <AlertDescription className="text-green-700 dark:text-green-300">
+                    The customer's previous payment covers the new total.
+                    A change of <span className="font-bold">{formatCurrency(Math.abs(amountOwedNow))}</span> is now due.
+                  </AlertDescription>
+                </Alert>
+              )}
 
-						{!isOverpaid ? (
-							<div className="space-y-4 p-4 border rounded-lg">
-								<div>
-									<Label htmlFor="cashPaid">Amount Paid (Cash)</Label>
-									<Input
-										id="cashPaid"
-										type="number"
-										value={cashPaidInput}
-										onChange={(e) => setCashPaidInput(e.target.value)}
-										placeholder="0.00"
-										className="mt-1"
-									/>
-								</div>
-								<div>
-									<Label htmlFor="momoPaid">Amount Paid (Momo/Card)</Label>
-									<Input
-										id="momoPaid"
-										type="number"
-										value={momoPaidInput}
-										onChange={(e) => setMomoPaidInput(e.target.value)}
-										placeholder="0.00"
-										className="mt-1"
-									/>
-								</div>
-								{balances.change > 0 && (
-									<div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-										<p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
-											Change Due: {formatCurrency(balances.change)}
-										</p>
-										<Label htmlFor="changeGiven">Amount Given as Change</Label>
-										<Input
-											id="changeGiven"
-											type="number"
-											value={changeGivenInput}
-											onChange={(e) => setChangeGivenInput(e.target.value)}
-											placeholder={formatCurrency(balances.change)}
-											className="text-center mt-2"
-										/>
-										<p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
-											Leave empty or enter less if not giving full change
-										</p>
-									</div>
-								)}
-								{showDeficitOptions && (
-									<Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
-										<AlertTriangle className="h-4 w-4 text-orange-600" />
-										<AlertTitle className="text-orange-800 dark:text-orange-200">
-											Payment Insufficient
-										</AlertTitle>
-										<AlertDescription className="text-orange-700 dark:text-orange-300">
-											Customer still owes:{" "}
-											<span className="font-bold">{formatCurrency(balances.deficit)}</span>
-										</AlertDescription>
-									</Alert>
-								)}
-							</div>
-						) : (
-							<Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
-								<Info className="h-4 w-4 text-green-600" />
-								<AlertTitle className="text-green-800 dark:text-green-200">
-									Customer Overpaid
-								</AlertTitle>
-								<AlertDescription className="text-green-700 dark:text-green-300">
-									The customer's previous payment covers the new total. A change of{" "}
-									<span className="font-bold">{formatCurrency(Math.abs(amountOwedNow))}</span> is
-									now due.
-								</AlertDescription>
-							</Alert>
-						)}
+              {error && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </div>
 
-						{error && (
-							<Alert variant="destructive">
-								<AlertTriangle className="h-4 w-4" />
-								<AlertTitle>Error</AlertTitle>
-								<AlertDescription>{error}</AlertDescription>
-							</Alert>
-						)}
-					</div>
-					<DialogFooter className="grid grid-cols-2 gap-2">
-						<Button
-							onClick={handlePayLater}
-							disabled={isProcessing}
-							variant="secondary"
-							className="bg-yellow-500 hover:bg-yellow-600 text-white"
-						>
-							{isProcessing ? <LoadingSpinner /> : "Save Unpaid"}
-						</Button>
-						<Button onClick={handleProceedToPayment}>Add Payment</Button>
-					</DialogFooter>
-				</>
-			) : (
-				<>
-					<DialogHeader>
-						<DialogTitle>
-							{editingOrder ? `Add Payment - ${editingOrder.simplifiedId}` : "Process Payment"}
-						</DialogTitle>
-						<DialogDescription>
-							{editingOrder
-								? "Add a payment to this existing order."
-								: "Complete the payment for this new order."}
-						</DialogDescription>
-						<div className="space-y-1 text-center pt-2">
-							{reward && (
-								<p className="text-sm text-muted-foreground line-through">
-									{formatCurrency(total)}
-								</p>
-							)}
-							<p className="text-3xl font-bold text-primary">{formatCurrency(finalTotal)}</p>
-							{reward && (
-								<Badge variant="secondary">
-									<Gift className="h-3 w-3 mr-1.5" />
-									{formatCurrency(reward.discount)} discount applied
-								</Badge>
-							)}
-						</div>
-					</DialogHeader>
-
-					<div className="space-y-4">
-						{renderBalanceBreakdown()}
-
-						{!isOverpaid ? (
-							<div className="space-y-4 p-4 border rounded-lg">
-								<div>
-									<Label htmlFor="cashPaid">Amount Paid (Cash)</Label>
-									<Input
-										id="cashPaid"
-										type="number"
-										value={cashPaidInput}
-										onChange={(e) => setCashPaidInput(e.target.value)}
-										placeholder="0.00"
-										className="mt-1"
-									/>
-								</div>
-								<div>
-									<Label htmlFor="momoPaid">Amount Paid (Momo/Card)</Label>
-									<Input
-										id="momoPaid"
-										type="number"
-										value={momoPaidInput}
-										onChange={(e) => setMomoPaidInput(e.target.value)}
-										placeholder="0.00"
-										className="mt-1"
-									/>
-								</div>
-								{balances.change > 0 && (
-									<div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-										<p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
-											Change Due: {formatCurrency(balances.change)}
-										</p>
-										<Label htmlFor="changeGiven">Amount Given as Change</Label>
-										<Input
-											id="changeGiven"
-											type="number"
-											value={changeGivenInput}
-											onChange={(e) => setChangeGivenInput(e.target.value)}
-											placeholder={formatCurrency(balances.change)}
-											className="text-center mt-2"
-										/>
-										<p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
-											Leave empty or enter less if not giving full change
-										</p>
-									</div>
-								)}
-								{showDeficitOptions && (
-									<Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
-										<AlertTriangle className="h-4 w-4 text-orange-600" />
-										<AlertTitle className="text-orange-800 dark:text-orange-200">
-											Payment Insufficient
-										</AlertTitle>
-										<AlertDescription className="text-orange-700 dark:text-orange-300">
-											Customer still owes:{" "}
-											<span className="font-bold">{formatCurrency(balances.deficit)}</span>
-										</AlertDescription>
-									</Alert>
-								)}
-							</div>
-						) : (
-							<Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
-								<Info className="h-4 w-4 text-green-600" />
-								<AlertTitle className="text-green-800 dark:text-green-200">
-									Customer Overpaid
-								</AlertTitle>
-								<AlertDescription className="text-green-700 dark:text-green-300">
-									The customer's previous payment covers the new total. A change of{" "}
-									<span className="font-bold">{formatCurrency(Math.abs(amountOwedNow))}</span> is
-									now due.
-								</AlertDescription>
-							</Alert>
-						)}
-
-						{error && (
-							<Alert variant="destructive">
-								<AlertTriangle className="h-4 w-4" />
-								<AlertTitle>Error</AlertTitle>
-								<AlertDescription>{error}</AlertDescription>
-							</Alert>
-						)}
-					</div>
-
-					<DialogFooter className="grid grid-cols-1 gap-3 pt-4">
-						{!isOverpaid && (
-							<Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
-								<Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
-							</Button>
-						)}
-						{isOverpaid ? (
-							<Button
-								onClick={() => processOrder({ isPaid: true })}
-								disabled={isProcessing}
-								className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg"
-							>
-								{isProcessing ? <LoadingSpinner /> : "Confirm & Settle Change"}
-							</Button>
-						) : showDeficitOptions ? (
-							<div className="grid grid-cols-2 gap-2">
-								<Button
-									onClick={() => processOrder({ isPaid: true, pardonDeficit: true })}
-									disabled={isProcessing}
-									className="bg-green-500 hover:bg-green-600 text-white"
-									size="sm"
-								>
-									{isProcessing ? <LoadingSpinner /> : "Pardon Deficit"}
-								</Button>
-								<Button
-									onClick={() => processOrder({ isPaid: true, pardonDeficit: false })}
-									disabled={isProcessing}
-									className="bg-yellow-500 hover:bg-yellow-600 text-white"
-									size="sm"
-								>
-									{isProcessing ? <LoadingSpinner /> : "Keep Balance"}
-								</Button>
-							</div>
-						) : (
-							<Button
-								onClick={() => processOrder({ isPaid: true })}
-								disabled={isProcessing || !canConfirmPayment}
-								className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg"
-							>
-								{isProcessing ? <LoadingSpinner /> : "Process Payment"}
-							</Button>
-						)}
-						<Button onClick={() => setStep(1)} variant="outline" size="sm" className="mt-2">
-							← Back to Details
-						</Button>
-					</DialogFooter>
-				</>
-			)}
-		</DialogContent>
-	</Dialog>
-);
+            <DialogFooter className="grid grid-cols-1 gap-3 pt-4">
+              {!isOverpaid && (
+                  <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
+                      <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
+                  </Button>
+              )}
+              {isOverpaid ? (
+                <Button
+                  onClick={() => processOrder({ isPaid: true })}
+                  disabled={isProcessing}
+                  className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg"
+                >
+                  {isProcessing ? <LoadingSpinner /> : "Confirm & Settle Change"}
+                </Button>
+              ) : showDeficitOptions ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={() => processOrder({ isPaid: true, pardonDeficit: true })}
+                    disabled={isProcessing}
+                    className="bg-green-500 hover:bg-green-600 text-white"
+                    size="sm"
+                  >
+                    {isProcessing ? <LoadingSpinner /> : 'Pardon Deficit'}
+                  </Button>
+                  <Button
+                    onClick={() => processOrder({ isPaid: true, pardonDeficit: false })}
+                    disabled={isProcessing}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                    size="sm"
+                  >
+                    {isProcessing ? <LoadingSpinner /> : 'Keep Balance'}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  onClick={() => processOrder({ isPaid: true })}
+                  disabled={isProcessing || !canConfirmPayment}
+                  className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg"
+                >
+                  {isProcessing ? <LoadingSpinner /> : 'Process Payment'}
+                </Button>
+              )}
+              <Button
+                onClick={() => setStep(1)}
+                variant="outline"
+                size="sm"
+                className="mt-2"
+              >
+                ← Back to Details
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 export default OrderOptionsModal;

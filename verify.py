@@ -8,24 +8,24 @@ def run(playwright):
     for i in range(3):
         try:
             page.goto("http://localhost:9002/backoffice/orders", timeout=60000)
+            page.wait_for_load_state("networkidle")
             break
         except Exception:
             time.sleep(5)
 
-    # Click on the first "Settle Change" button
-    page.locator("text=Settle Change").first.click()
+    # Click on the "Change Due" button
+    page.locator("button:has-text('Change Due')").first.hover()
+    page.locator("button:has-text('Change Due')").first.click()
 
-    # Wait for the modal to appear
-    page.wait_for_selector('div[role="dialog"]')
+    # Verify the date range is set to "All Time"
+    page.screenshot(path="verification-change-due.png")
 
-    # Enter a partial amount
-    page.locator("#settle-amount").fill("5")
+    # Click on the "Unpaid Orders" button
+    page.locator("button:has-text('Unpaid Orders')").first.hover()
+    page.locator("button:has-text('Unpaid Orders')").first.click()
 
-    # Click the "Settle Cash" button
-    page.click("text=Settle Cash")
-
-    # Take a screenshot of the updated order
-    page.screenshot(path="verification.png")
+    # Verify the date range is set to "All Time"
+    page.screenshot(path="verification-unpaid-orders.png")
 
     browser.close()
 
