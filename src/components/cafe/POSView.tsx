@@ -185,6 +185,7 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
             setShowBreakfastModal(true);
             return;
         }
+        
         setCurrentOrder(prev => {
             const existingItem = Object.values(prev).find(i => i.name === item.name);
             if (existingItem) {
@@ -203,14 +204,21 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
         const combinedName = `English Breakfast with ${drinkName}`;
         
         setCurrentOrder(prev => {
-            const existingEntry = Object.entries(prev).find(([, item]) => item.name === combinedName);
+            const existingEntry = Object.values(prev).find(item => item.name === combinedName);
 
             if (existingEntry) {
-                const [existingId, existingItem] = existingEntry;
-                return { ...prev, [existingId]: { ...existingItem, quantity: existingItem.quantity + 1 } };
+                return { ...prev, [existingEntry.id]: { ...existingEntry, quantity: existingEntry.quantity + 1 } };
             } else {
                 const newItemId = crypto.randomUUID();
-                return { ...prev, [newItemId]: { ...breakfastItem, id: newItemId, name: combinedName, quantity: 1 } };
+                const newPrice = breakfastItem.price; // Keep original price, drink is included
+                const newItem = {
+                    ...breakfastItem,
+                    id: newItemId,
+                    name: combinedName,
+                    price: newPrice,
+                    quantity: 1,
+                };
+                return { ...prev, [newItemId]: newItem };
             }
         });
         setShowBreakfastModal(false);
@@ -482,5 +490,3 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
 };
 
 export default POSView;
-
-    
