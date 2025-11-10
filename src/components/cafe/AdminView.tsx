@@ -31,6 +31,7 @@ import { updatePassword } from '@/lib/auth-tools';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { initialMenuData } from '@/data/initial-data';
+import { Checkbox } from '../ui/checkbox';
 
 
 const AdminForm = ({
@@ -41,8 +42,8 @@ const AdminForm = ({
     onCancel,
 }: {
     editingItem: MenuItem | null;
-    formState: { name: string; price: string; category: string; stock: string };
-    handleFormChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    formState: { name: string; price: string; category: string; stock: string, requiresChoice: boolean };
+    handleFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLButtonElement>) => void;
     handleSubmit: (e: React.FormEvent) => void;
     onCancel: () => void;
 }) => (
@@ -62,6 +63,17 @@ const AdminForm = ({
         <div>
             <Label htmlFor="stock">Stock Quantity</Label>
             <Input type="number" name="stock" id="stock" value={formState.stock} onChange={handleFormChange} />
+        </div>
+         <div className="flex items-center space-x-2">
+            <Checkbox 
+                id="requiresChoice" 
+                name="requiresChoice"
+                checked={formState.requiresChoice} 
+                onCheckedChange={(checked) => handleFormChange({ target: { name: 'requiresChoice', value: checked } } as any)}
+            />
+            <Label htmlFor="requiresChoice" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Requires a choice? (e.g., for breakfast drinks)
+            </Label>
         </div>
         <div className="flex space-x-2 pt-4">
             <Button type="submit" className="flex-1 font-bold">{editingItem ? 'Update Item' : 'Add Item'}</Button>
@@ -134,7 +146,7 @@ const AdminView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-    const [formState, setFormState] = useState({ name: '', price: '', category: '', stock: '' });
+    const [formState, setFormState] = useState({ name: '', price: '', category: '', stock: '', requiresChoice: false });
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<MenuItem | null>(null);
     const [isMenuSheetOpen, setIsMenuSheetOpen] = useState(false);
     const [isSecuritySheetOpen, setIsSecuritySheetOpen] = useState(false);
@@ -159,10 +171,18 @@ const AdminView: React.FC = () => {
         }
     }, [editingItem]);
     
-    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormState(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, type } = e.target;
+        if (type === 'checkbox') {
+             const checked = (e.target as HTMLInputElement).checked;
+             setFormState(prev => ({ ...prev, [name]: checked }));
+        } else {
+             setFormState(prev => ({ ...prev, [name]: value }));
+        }
+    };
 
     const clearForm = () => {
-        setFormState({ name: '', price: '', category: '', stock: '' });
+        setFormState({ name: '', price: '', category: '', stock: '', requiresChoice: false });
         setEditingItem(null);
         setIsMenuSheetOpen(false);
     };
@@ -175,7 +195,7 @@ const AdminView: React.FC = () => {
             price: parseFloat(formState.price), 
             category: formState.category, 
             stock: parseInt(formState.stock, 10) || 0,
-            requiresChoice: false,
+            requiresChoice: formState.requiresChoice,
         };
         try {
             if (editingItem) {
@@ -189,7 +209,13 @@ const AdminView: React.FC = () => {
 
     const handleEdit = (item: MenuItem) => {
         setEditingItem(item);
-        setFormState({ name: String(item.name), price: String(item.price), category: String(item.category), stock: String(item.stock || '') });
+        setFormState({ 
+            name: String(item.name), 
+            price: String(item.price), 
+            category: String(item.category), 
+            stock: String(item.stock || ''),
+            requiresChoice: item.requiresChoice || false
+        });
     };
 
     const handleDelete = async (itemId: string) => {

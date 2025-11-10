@@ -106,6 +106,7 @@ You have access to several tools to help you.
   - Use 'updateMenuItem' to change existing items (price, name, category, stock)
   - Use 'deleteMenuItem' to remove items
 - When adding a new item, the 'category' is REQUIRED. If the user doesn't specify a category, ask them first before calling the tool.
+- When adding a new item, 'requiresChoice' should be set to true if the item needs a special selection (like English Breakfast needing a drink choice).
 
 **Date Calculations:**
 Today's date is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}. 
@@ -125,7 +126,7 @@ Use this to calculate date ranges for terms like:
 **Error Handling:**
 - If a tool fails, explain what went wrong
 - If data is missing, don't invent information
-- Ask for clarification if requests are unclear`
+- If requests are unclear, ask for clarification`
             });
 
             return text || "I apologize, but I couldn't generate a response. Please try rephrasing your question.";

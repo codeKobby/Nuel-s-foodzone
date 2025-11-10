@@ -66,7 +66,7 @@ export async function addMenuItem(input: AddMenuItemInput): Promise<string> {
             price: input.price,
             category: input.category,
             stock: input.stock,
-            requiresChoice: false,
+            requiresChoice: input.requiresChoice,
         });
         
         return `Successfully added "${input.name}" to the ${input.category} category with ID: ${docRef.id}`;
@@ -88,6 +88,7 @@ export async function updateMenuItem(input: UpdateMenuItemInput): Promise<string
         if (input.price !== undefined) updateData.price = input.price;
         if (input.category !== undefined) updateData.category = input.category;
         if (input.stock !== undefined) updateData.stock = input.stock;
+        if (input.requiresChoice !== undefined) updateData.requiresChoice = input.requiresChoice;
         
         await updateDoc(menuRef, updateData);
         

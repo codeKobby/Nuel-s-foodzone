@@ -90,6 +90,7 @@ export const AddMenuItemInputSchema = z.object({
   price: z.number().describe("The price of the item."),
   category: z.string().describe("The category for the item (e.g., 'Beverages', 'Snacks', 'Main Course')."),
   stock: z.number().default(0).describe("Initial stock quantity."),
+  requiresChoice: z.boolean().default(false).describe("Whether the item requires the user to make a choice (e.g., a drink for a breakfast combo)."),
 });
 export type AddMenuItemInput = z.infer<typeof AddMenuItemInputSchema>;
 
@@ -99,6 +100,7 @@ export const UpdateMenuItemInputSchema = z.object({
   price: z.number().optional().describe("New price for the item."),
   category: z.string().optional().describe("New category for the item."),
   stock: z.number().optional().describe("New stock quantity."),
+  requiresChoice: z.boolean().optional().describe("New value for whether the item requires a choice."),
 });
 export type UpdateMenuItemInput = z.infer<typeof UpdateMenuItemInputSchema>;
 
