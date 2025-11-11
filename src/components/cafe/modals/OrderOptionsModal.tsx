@@ -127,12 +127,12 @@ interface OrderOptionsModalProps {
     onOrderPlaced: (order: Order) => void;
 }
 
-const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ 
-  total, 
-  orderItems, 
-  editingOrder, 
-  onClose, 
-  onOrderPlaced 
+const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
+  total,
+  orderItems,
+  editingOrder,
+  onClose,
+  onOrderPlaced
 }) => {
   const [step, setStep] = useState(1);
   const [orderType, setOrderType] = useState<'Dine-In' | 'Takeout' | 'Delivery'>('Dine-In');
@@ -152,6 +152,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     if (editingOrder) {
       setOrderType(editingOrder.orderType);
       setOrderTag(editingOrder.tag || '');
+      setStep(2);
     }
   }, [editingOrder]);
 
@@ -477,10 +478,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
             </div>
             
             <DialogFooter className="grid grid-cols-2 gap-2">
-              <Button 
-                onClick={handlePayLater} 
-                disabled={isProcessing} 
-                variant="secondary" 
+              <Button
+                onClick={handlePayLater}
+                disabled={isProcessing}
+                variant="secondary"
                 className="bg-yellow-500 hover:bg-yellow-600 text-white"
               >
                 {isProcessing ? <LoadingSpinner /> : 'Save Unpaid'}
@@ -497,8 +498,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 {editingOrder ? `Add Payment - ${editingOrder.simplifiedId}` : 'Process Payment'}
               </DialogTitle>
               <DialogDescription>
-                {editingOrder 
-                  ? 'Add a payment to this existing order.' 
+                {editingOrder
+                  ? 'Add a payment to this existing order.'
                   : 'Complete the payment for this new order.'
                 }
               </DialogDescription>
@@ -515,32 +516,32 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                     )}
                 </div>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               {renderBalanceBreakdown()}
-              
+
               {!isOverpaid ? (
                 <div className="space-y-4 p-4 border rounded-lg">
                     <div>
                         <Label htmlFor="cashPaid">Amount Paid (Cash)</Label>
-                        <Input 
-                          id="cashPaid" 
-                          type="number" 
-                          value={cashPaidInput} 
-                          onChange={(e) => setCashPaidInput(e.target.value)} 
-                          placeholder="0.00" 
-                          className="mt-1" 
+                        <Input
+                          id="cashPaid"
+                          type="number"
+                          value={cashPaidInput}
+                          onChange={(e) => setCashPaidInput(e.target.value)}
+                          placeholder="0.00"
+                          className="mt-1"
                         />
                     </div>
                      <div>
                         <Label htmlFor="momoPaid">Amount Paid (Momo/Card)</Label>
-                        <Input 
-                          id="momoPaid" 
-                          type="number" 
-                          value={momoPaidInput} 
-                          onChange={(e) => setMomoPaidInput(e.target.value)} 
-                          placeholder="0.00" 
-                          className="mt-1" 
+                        <Input
+                          id="momoPaid"
+                          type="number"
+                          value={momoPaidInput}
+                          onChange={(e) => setMomoPaidInput(e.target.value)}
+                          placeholder="0.00"
+                          className="mt-1"
                         />
                     </div>
                     {balances.change > 0 && (
@@ -549,13 +550,13 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                             Change Due: {formatCurrency(balances.change)}
                             </p>
                             <Label htmlFor="changeGiven">Amount Given as Change</Label>
-                            <Input 
-                            id="changeGiven" 
-                            type="number" 
-                            value={changeGivenInput} 
-                            onChange={(e) => setChangeGivenInput(e.target.value)} 
-                            placeholder={formatCurrency(balances.change)} 
-                            className="text-center mt-2" 
+                            <Input
+                            id="changeGiven"
+                            type="number"
+                            value={changeGivenInput}
+                            onChange={(e) => setChangeGivenInput(e.target.value)}
+                            placeholder={formatCurrency(balances.change)}
+                            className="text-center mt-2"
                             />
                             <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
                             Leave empty or enter less if not giving full change
@@ -577,12 +578,12 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                   <Info className="h-4 w-4 text-green-600" />
                   <AlertTitle className="text-green-800 dark:text-green-200">Customer Overpaid</AlertTitle>
                   <AlertDescription className="text-green-700 dark:text-green-300">
-                    The customer's previous payment covers the new total. 
+                    The customer's previous payment covers the new total.
                     A change of <span className="font-bold">{formatCurrency(Math.abs(amountOwedNow))}</span> is now due.
                   </AlertDescription>
                 </Alert>
               )}
-              
+
               {error && (
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
@@ -591,7 +592,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 </Alert>
               )}
             </div>
-            
+
             <DialogFooter className="grid grid-cols-1 gap-3 pt-4">
               {!isOverpaid && (
                   <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
@@ -599,7 +600,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                   </Button>
               )}
               {isOverpaid ? (
-                <Button 
+                <Button
                   onClick={() => processOrder({ isPaid: true })}
                   disabled={isProcessing}
                   className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg"
@@ -608,17 +609,17 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 </Button>
               ) : showDeficitOptions ? (
                 <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    onClick={() => processOrder({ isPaid: true, pardonDeficit: true })} 
-                    disabled={isProcessing} 
+                  <Button
+                    onClick={() => processOrder({ isPaid: true, pardonDeficit: true })}
+                    disabled={isProcessing}
                     className="bg-green-500 hover:bg-green-600 text-white"
                     size="sm"
                   >
                     {isProcessing ? <LoadingSpinner /> : 'Pardon Deficit'}
                   </Button>
-                  <Button 
-                    onClick={() => processOrder({ isPaid: true, pardonDeficit: false })} 
-                    disabled={isProcessing} 
+                  <Button
+                    onClick={() => processOrder({ isPaid: true, pardonDeficit: false })}
+                    disabled={isProcessing}
                     className="bg-yellow-500 hover:bg-yellow-600 text-white"
                     size="sm"
                   >
@@ -626,18 +627,18 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                   </Button>
                 </div>
               ) : (
-                <Button 
-                  onClick={() => processOrder({ isPaid: true })} 
-                  disabled={isProcessing || !canConfirmPayment} 
+                <Button
+                  onClick={() => processOrder({ isPaid: true })}
+                  disabled={isProcessing || !canConfirmPayment}
                   className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg"
                 >
                   {isProcessing ? <LoadingSpinner /> : 'Process Payment'}
                 </Button>
               )}
-              <Button 
-                onClick={() => setStep(1)} 
-                variant="outline" 
-                size="sm" 
+              <Button
+                onClick={() => setStep(1)}
+                variant="outline"
+                size="sm"
                 className="mt-2"
               >
                 ← Back to Details
