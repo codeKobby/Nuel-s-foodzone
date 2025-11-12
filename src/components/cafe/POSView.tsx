@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
@@ -181,11 +180,11 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
     }, [currentOrder]);
 
     const addToOrder = useCallback((item: MenuItem) => {
-        if (item.requiresChoice) {
+        // Check if item is English Breakfast by name (case-insensitive)
+        if (item.name.toLowerCase() === 'english breakfast' || item.requiresChoice) {
             setShowBreakfastModal(true);
             return;
         }
-        
         setCurrentOrder(prev => {
             const existingItem = Object.values(prev).find(i => i.name === item.name);
             if (existingItem) {
@@ -204,21 +203,14 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
         const combinedName = `English Breakfast with ${drinkName}`;
         
         setCurrentOrder(prev => {
-            const existingEntry = Object.values(prev).find(item => item.name === combinedName);
+            const existingEntry = Object.entries(prev).find(([, item]) => item.name === combinedName);
 
             if (existingEntry) {
-                return { ...prev, [existingEntry.id]: { ...existingEntry, quantity: existingEntry.quantity + 1 } };
+                const [existingId, existingItem] = existingEntry;
+                return { ...prev, [existingId]: { ...existingItem, quantity: existingItem.quantity + 1 } };
             } else {
                 const newItemId = crypto.randomUUID();
-                const newPrice = breakfastItem.price; // Keep original price, drink is included
-                const newItem = {
-                    ...breakfastItem,
-                    id: newItemId,
-                    name: combinedName,
-                    price: newPrice,
-                    quantity: 1,
-                };
-                return { ...prev, [newItemId]: newItem };
+                return { ...prev, [newItemId]: { ...breakfastItem, id: newItemId, name: combinedName, quantity: 1 } };
             }
         });
         setShowBreakfastModal(false);
