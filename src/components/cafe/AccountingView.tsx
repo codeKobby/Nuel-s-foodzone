@@ -717,19 +717,21 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
                         const paymentAmount = order.lastPaymentAmount || 0;
                         const orderIsFromToday = order.timestamp.toDate() >= todayStart && order.timestamp.toDate() <= todayEnd;
-                        
-                        // Use paymentBreakdown if it exists and payment is for today's order
-                        if (orderIsFromToday && order.paymentBreakdown) {
-                            if(order.paymentBreakdown.cash) cashSales += order.paymentBreakdown.cash;
-                            if(order.paymentBreakdown.momo) momoSales += order.paymentBreakdown.momo;
-                        } else {
-                             // Fallback for older orders or collections
-                             if(order.paymentMethod === 'cash') cashSales += paymentAmount;
-                             else if(order.paymentMethod === 'momo') momoSales += paymentAmount;
-                        }
 
-                        if (!orderIsFromToday) {
-                            settledUnpaidOrdersValue += paymentAmount; 
+                        const truePaymentAmount = order.amountPaid > order.total ? order.total - (order.amountPaid - paymentAmount) : paymentAmount;
+
+                        if(orderIsFromToday) {
+                            if (order.paymentBreakdown) {
+                                if(order.paymentBreakdown.cash) cashSales += Math.min(order.paymentBreakdown.cash, order.total);
+                                if(order.paymentBreakdown.momo) momoSales += Math.min(order.paymentBreakdown.momo, order.total - (order.paymentBreakdown.cash || 0));
+                            } else if (order.paymentMethod === 'cash') {
+                                cashSales += truePaymentAmount;
+                            } else if (order.paymentMethod === 'momo') {
+                                momoSales += truePaymentAmount;
+                            }
+                        } else {
+                            // This is a collection on an old order
+                            settledUnpaidOrdersValue += paymentAmount;
                         }
                     }
     
