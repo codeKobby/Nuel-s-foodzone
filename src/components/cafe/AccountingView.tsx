@@ -97,8 +97,12 @@ const ReconciliationView: React.FC<{
     }, [momoTransactions]);
     
     const availableCash = useMemo(() => {
-        if (!deductCustomerChange || !stats) return totalCountedCash;
-        return totalCountedCash - stats.changeOwedForPeriod;
+        if (!stats) return totalCountedCash;
+        let counted = totalCountedCash;
+        if(deductCustomerChange) {
+            counted -= stats.changeOwedForPeriod;
+        }
+        return counted;
     }, [totalCountedCash, stats, deductCustomerChange]);
 
     const cashDiscrepancy = useMemo(() => {
@@ -155,23 +159,29 @@ const ReconciliationView: React.FC<{
             };
             await addDoc(collection(db, "reconciliationReports"), reportData);
             
-            onBack();
-            
             toast({ 
                 title: "Day Closed Successfully", 
-                description: "The financial report has been saved."
+                description: "The financial report has been saved.",
+                type: 'success'
             });
+
+            resetForm();
+            setShowConfirm(false);
+            
+            // Add a small delay before navigation
+            setTimeout(() => {
+                onBack();
+            }, 100);
             
         } catch (e) {
             console.error("Error saving report:", e);
             toast({ 
                 title: "Save Failed", 
-                description: "Could not save the report. Please try again.",
+                description: e instanceof Error ? e.message : "Could not save the report. Please try again.",
                 type: "error"
             });
         } finally {
             setIsSubmitting(false);
-            setShowConfirm(false);
         }
     };
 
@@ -577,20 +587,22 @@ const ReconciliationView: React.FC<{
                                 <div className="space-y-2 text-sm">
                                     <h4 className="font-semibold text-base text-green-600">Cash</h4>
                                     <div className="flex justify-between"><span>Cash Counted:</span><span className="font-medium">{formatCurrency(totalCountedCash)}</span></div>
-                                    {stats.changeOwedForPeriod > 0 && deductCustomerChange && <div className="flex justify-between text-orange-600"><span>(-) Today's Change:</span><span className="font-medium">-{formatCurrency(stats.changeOwedForPeriod)}</span></div>}
+                                    {stats.changeOwedForPeriod > 0 && (
+                                    <div className="flex justify-between text-orange-600"><span>(-) Today's Change:</span>
+                                    <span>{deductCustomerChange ? `-${formatCurrency(stats.changeOwedForPeriod)}` : '-GH₵0.00'}</span></div>)}
                                     <UiSeparator />
                                     <div className="flex justify-between font-bold text-green-700"><span>Available Cash:</span><span>{formatCurrency(availableCash)}</span></div>
                                 </div>
                                 <div className="space-y-2 text-sm">
-                                    <h4 className="font-semibold text-base text-green-600">MoMo/Card</h4>
-                                    <div className="flex justify-between font-bold text-green-700"><span>Available MoMo:</span><span>{formatCurrency(totalCountedMomo)}</span></div>
+                                    <h4 className="font-semibold text-base text-purple-600">MoMo/Card</h4>
+                                    <div className="flex justify-between font-bold text-purple-700"><span>Available MoMo:</span><span>{formatCurrency(totalCountedMomo)}</span></div>
                                 </div>
                             </CardContent>
                             <CardFooter className="bg-green-500/10 p-4"><div className="w-full flex justify-between items-center"><span className="font-bold text-green-700 dark:text-green-300 text-lg">Total Available:</span><span className="font-extrabold text-green-600 dark:text-green-400 text-xl">{formatCurrency(availableCash + totalCountedMomo)}</span></div></CardFooter>
                         </Card>
 
                         <Card className={`border-2 ${getBalanceStatus(totalDiscrepancy).bg}`}>
-                            <CardContent className="p-6"><div className="flex items-center justify-center space-x-3">{React.createElement(getBalanceStatus(totalDiscrepancy).icon, { className: `h-8 w-8 ${getBalanceStatus(totalDiscrepancy).color}` })}<div className="text-center"><p className="text-lg font-semibold">Overall Status</p><p className={`text-2xl font-bold ${getBalanceStatus(totalDiscrepancy).color}`}>{getBalanceStatus(totalDiscrepancy).text}</p></div></div></CardContent>
+                            <CardContent className="p-6"><div className="flex items-center justify-center space-x-3">{React.createElement(getBalanceStatus(totalDiscrepancy).icon, { className: `h-8 w-8 ${getBalanceStatus(totalDiscrepancy).color}` })}<div className="text-center"><p className="text-lg font-semibold">Overall Balance</p><p className={`text-2xl font-bold ${getBalanceStatus(totalDiscrepancy).color}`}>{getBalanceStatus(totalDiscrepancy).text}</p></div></div></CardContent>
                         </Card>
                     </div>
                 </div>
@@ -704,18 +716,19 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     const paymentDate = order.lastPaymentTimestamp?.toDate();
                     if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
                         const paymentAmount = order.lastPaymentAmount || 0;
+                        const orderIsFromToday = order.timestamp.toDate() >= todayStart && order.timestamp.toDate() <= todayEnd;
                         
-                        if (isTodayOrder) { // Payment for today's order
-                             // Use paymentBreakdown if it exists
-                            if (order.paymentBreakdown) {
-                                if(order.paymentBreakdown.cash) cashSales += Math.min(order.paymentBreakdown.cash, order.total);
-                                if(order.paymentBreakdown.momo) momoSales += Math.min(order.paymentBreakdown.momo, order.total - (order.paymentBreakdown.cash || 0) );
-                            } else if (order.paymentMethod === 'cash') {
-                                cashSales += Math.min(paymentAmount, order.total);
-                            } else if (order.paymentMethod === 'momo') {
-                                momoSales += Math.min(paymentAmount, order.total);
-                            }
-                        } else { // Collection on an old order
+                        // Use paymentBreakdown if it exists and payment is for today's order
+                        if (orderIsFromToday && order.paymentBreakdown) {
+                            if(order.paymentBreakdown.cash) cashSales += order.paymentBreakdown.cash;
+                            if(order.paymentBreakdown.momo) momoSales += order.paymentBreakdown.momo;
+                        } else {
+                             // Fallback for older orders or collections
+                             if(order.paymentMethod === 'cash') cashSales += paymentAmount;
+                             else if(order.paymentMethod === 'momo') momoSales += paymentAmount;
+                        }
+
+                        if (!orderIsFromToday) {
                             settledUnpaidOrdersValue += paymentAmount; 
                         }
                     }
