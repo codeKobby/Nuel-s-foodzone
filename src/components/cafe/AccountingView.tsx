@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
@@ -67,8 +66,9 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
 
 const ReconciliationView: React.FC<{ 
     stats: PeriodStats | null,
+    adjustedExpectedCash: number,
     onBack: () => void 
-}> = ({ stats, onBack }) => {
+}> = ({ stats, adjustedExpectedCash, onBack }) => {
     const [notes, setNotes] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
@@ -96,27 +96,14 @@ const ReconciliationView: React.FC<{
         return momoTransactions.reduce((total, amount) => total + amount, 0);
     }, [momoTransactions]);
     
-    const expectedCashBase = useMemo(() => {
-        if (!stats) return 0;
-        let expected = stats.cashSales;
-        expected += stats.settledUnpaidOrdersValue;
-        expected -= stats.miscCashExpenses;
-        expected -= stats.previousDaysChangeGiven;
-        return expected;
-    }, [stats]);
-    
-    const adjustedExpectedCash = useMemo(() => {
-        if (!stats) return 0;
-        let expected = expectedCashBase;
-        if (!deductCustomerChange) {
-            expected += stats.changeOwedForPeriod;
-        }
-        return expected;
-    }, [stats, expectedCashBase, deductCustomerChange]);
+    const availableCash = useMemo(() => {
+        if (!deductCustomerChange || !stats) return totalCountedCash;
+        return totalCountedCash - stats.changeOwedForPeriod;
+    }, [totalCountedCash, stats, deductCustomerChange]);
 
     const cashDiscrepancy = useMemo(() => {
-        return totalCountedCash - adjustedExpectedCash;
-    }, [totalCountedCash, adjustedExpectedCash]);
+        return availableCash - adjustedExpectedCash;
+    }, [availableCash, adjustedExpectedCash]);
 
     const momoDiscrepancy = useMemo(() => {
         if (!stats) return 0;
@@ -151,26 +138,25 @@ const ReconciliationView: React.FC<{
                 timestamp: serverTimestamp(),
                 period: format(today, 'yyyy-MM-dd'),
                 totalSales: stats.totalSales,
-                expectedCash: expectedCashBase,
+                expectedCash: adjustedExpectedCash,
                 expectedMomo: stats.expectedMomo,
-                totalExpectedRevenue: expectedCashBase + stats.expectedMomo,
+                totalExpectedRevenue: adjustedExpectedCash + stats.expectedMomo,
                 countedCash: totalCountedCash,
                 countedMomo: totalCountedMomo,
                 totalCountedRevenue: totalCountedCash + totalCountedMomo,
-                cashDiscrepancy,
-                momoDiscrepancy,
-                totalDiscrepancy,
+                cashDiscrepancy: cashDiscrepancy,
+                momoDiscrepancy: momoDiscrepancy,
+                totalDiscrepancy: totalDiscrepancy,
                 notes: notes,
                 changeOwedForPeriod: stats.changeOwedForPeriod,
                 changeOwedSetAside: deductCustomerChange,
                 cashierId: session?.uid || 'unknown',
                 cashierName: session?.fullName || session?.username || 'Unknown',
             };
-            
             await addDoc(collection(db, "reconciliationReports"), reportData);
             
             onBack();
-
+            
             toast({ 
                 title: "Day Closed Successfully", 
                 description: "The financial report has been saved."
@@ -225,7 +211,7 @@ const ReconciliationView: React.FC<{
             return baseText;
         }
 
-        const changeText = `You have indicated that customer change of ${formatCurrency(stats.changeOwedForPeriod)} will be ${deductCustomerChange ? 'DEDUCTED from the counted cash' : 'LEFT IN the cash drawer'}.`;
+        const changeText = `You have indicated that customer change of ${formatCurrency(stats.changeOwedForPeriod)} will be ${deductCustomerChange ? 'DEDUCTED from the available cash' : 'LEFT IN the cash drawer'}.`;
 
         return `${changeText} ${baseText}`;
     }, [stats, deductCustomerChange]);
@@ -394,223 +380,221 @@ const ReconciliationView: React.FC<{
                 </DialogHeader>
                 
                 {!stats ? <LoadingSpinner /> : (
-                <>
-                    <ScrollArea className="max-h-[70vh]">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-6 pr-4">
-                        <div className="lg:col-span-1 space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-lg">
-                                        <Banknote className="h-5 w-5 text-green-600" />
-                                        Physical Cash Count
-                                    </CardTitle>
-                                    <CardDescription>Count each denomination in your cash drawer</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                                        {cashDenominations.map(den => (
-                                            <div key={den} className="space-y-2">
-                                                <Label className="text-sm font-medium">GH₵{den}</Label>
-                                                <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg border">
-                                                    <span className="text-sm text-muted-foreground min-w-[20px]">×</span>
-                                                    <Input 
-                                                        type="text" 
-                                                        inputMode="numeric" 
-                                                        value={denominationQuantities[String(den)]} 
-                                                        onChange={(e) => handleDenominationChange(e.target.value, String(den))} 
-                                                        placeholder="0" 
-                                                        className="text-center font-medium border-0 bg-transparent p-0 h-auto focus-visible:ring-1" 
-                                                    />
-                                                </div>
-                                                <div className="text-xs text-center text-muted-foreground">
-                                                    {denominationQuantities[String(den)] 
-                                                        ? formatCurrency(den * (parseInt(String(denominationQuantities[String(den)])) || 0)) 
-                                                        : ''}
-                                                </div>
+                <ScrollArea className="max-h-[70vh]">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-6 pr-4">
+                    <div className="lg:col-span-1 space-y-6">
+                         <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-lg">
+                                    <Banknote className="h-5 w-5 text-green-600" />
+                                    Physical Cash Count
+                                </CardTitle>
+                                <CardDescription>Count each denomination in your cash drawer</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                    {cashDenominations.map(den => (
+                                        <div key={den} className="space-y-2">
+                                            <Label className="text-sm font-medium">GH₵{den}</Label>
+                                            <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg border">
+                                                <span className="text-sm text-muted-foreground min-w-[20px]">×</span>
+                                                <Input 
+                                                    type="text" 
+                                                    inputMode="numeric" 
+                                                    value={denominationQuantities[String(den)]} 
+                                                    onChange={(e) => handleDenominationChange(e.target.value, String(den))} 
+                                                    placeholder="0" 
+                                                    className="text-center font-medium border-0 bg-transparent p-0 h-auto focus-visible:ring-1" 
+                                                />
                                             </div>
+                                            <div className="text-xs text-center text-muted-foreground">
+                                                {denominationQuantities[String(den)] 
+                                                    ? formatCurrency(den * (parseInt(String(denominationQuantities[String(den)])) || 0)) 
+                                                    : ''}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-green-800 dark:text-green-200">Total Cash Counted:</span>
+                                        <span className="text-xl font-bold text-green-600 dark:text-green-400">
+                                            {formatCurrency(totalCountedCash)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-lg">
+                                    <Smartphone className="h-5 w-5 text-purple-600" />
+                                    MoMo/Card Transactions
+                                </CardTitle>
+                                <CardDescription>Enter individual transaction amounts (press Space or Enter to add)</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    value={momoInput} 
+                                    onChange={(e) => setMomoInput(e.target.value)} 
+                                    onKeyDown={handleMomoInputKeyDown} 
+                                    placeholder="Enter amount and press Space/Enter" 
+                                    className="mb-4 h-12 text-lg" 
+                                />
+                                {momoTransactions.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mb-4">
+                                        {momoTransactions.map((amount, index) => (
+                                            <Badge key={index} variant="secondary" className="text-sm px-3 py-2">
+                                                {formatCurrency(amount)}
+                                                <button 
+                                                    onClick={() => removeMomoTransaction(index)} 
+                                                    className="ml-2 hover:bg-destructive/20 rounded-full p-0.5"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </Badge>
                                         ))}
                                     </div>
-                                    <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-semibold text-green-800 dark:text-green-200">Total Cash Counted:</span>
-                                            <span className="text-xl font-bold text-green-600 dark:text-green-400">
-                                                {formatCurrency(totalCountedCash)}
-                                            </span>
-                                        </div>
+                                )}
+                                <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-purple-800 dark:text-purple-200">Total MoMo Counted:</span>
+                                        <span className="text-xl font-bold text-purple-600 dark:text-purple-400">
+                                            {formatCurrency(totalCountedMomo)}
+                                        </span>
                                     </div>
-                                </CardContent>
-                            </Card>
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                            <Card>
+                        {stats.changeOwedForPeriod > 0 && (
+                            <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/50">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-lg">
-                                        <Smartphone className="h-5 w-5 text-purple-600" />
-                                        MoMo/Card Transactions
+                                    <CardTitle className="flex items-center gap-2 text-lg text-orange-800 dark:text-orange-200">
+                                        <ArrowRightLeft className="h-5 w-5" />
+                                        Customer Change Management
                                     </CardTitle>
-                                    <CardDescription>Enter individual transaction amounts (press Space or Enter to add)</CardDescription>
+                                    <CardDescription>
+                                        You owe {formatCurrency(stats.changeOwedForPeriod)} in customer change from today
+                                    </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <Input 
-                                        type="number" 
-                                        step="0.01" 
-                                        value={momoInput} 
-                                        onChange={(e) => setMomoInput(e.target.value)} 
-                                        onKeyDown={handleMomoInputKeyDown} 
-                                        placeholder="Enter amount and press Space/Enter" 
-                                        className="mb-4 h-12 text-lg" 
-                                    />
-                                    {momoTransactions.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 mb-4">
-                                            {momoTransactions.map((amount, index) => (
-                                                <Badge key={index} variant="secondary" className="text-sm px-3 py-2">
-                                                    {formatCurrency(amount)}
-                                                    <button 
-                                                        onClick={() => removeMomoTransaction(index)}
-                                                        className="ml-2 hover:bg-destructive/20 rounded-full p-0.5"
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    )}
-                                    <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-semibold text-purple-800 dark:text-purple-200">Total MoMo Counted:</span>
-                                            <span className="text-xl font-bold text-purple-600 dark:text-purple-400">
-                                                {formatCurrency(totalCountedMomo)}
-                                            </span>
+                                    <div className="flex items-center justify-between p-4 bg-background rounded-lg">
+                                        <div className="flex items-center space-x-3">
+                                            <Switch 
+                                                id="deduct-change" 
+                                                checked={deductCustomerChange} 
+                                                onCheckedChange={setDeductCustomerChange} 
+                                            />
+                                            <Label htmlFor="deduct-change" className="font-medium">
+                                                Deduct customer change from available cash?
+                                            </Label>
                                         </div>
                                     </div>
+                                    <p className="text-sm text-muted-foreground mt-3">
+                                        {deductCustomerChange 
+                                            ? "Change will be set aside and deducted from your available cash." 
+                                            : "Change will be counted as part of available cash (pay customers immediately)."
+                                        }
+                                    </p>
                                 </CardContent>
                             </Card>
-
-                            {stats.changeOwedForPeriod > 0 && (
-                                <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/50">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 text-lg text-orange-800 dark:text-orange-200">
-                                            <ArrowRightLeft className="h-5 w-5" />
-                                            Customer Change Management
-                                        </CardTitle>
-                                        <CardDescription>
-                                            You owe {formatCurrency(stats.changeOwedForPeriod)} in customer change from today
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="flex items-center justify-between p-4 bg-background rounded-lg">
-                                            <div className="flex items-center space-x-3">
-                                                <Switch 
-                                                    id="deduct-change" 
-                                                    checked={deductCustomerChange} 
-                                                    onCheckedChange={setDeductCustomerChange} 
-                                                />
-                                                <Label htmlFor="deduct-change" className="font-medium">
-                                                    Deduct change from today's cash?
-                                                </Label>
-                                            </div>
-                                        </div>
-                                        <p className="text-sm text-muted-foreground mt-3">
-                                            {deductCustomerChange 
-                                                ? "Change will be considered 'set aside' and will NOT be included in the expected cash." 
-                                                : "Change will be counted as part of expected cash (assuming it's still in the drawer)."
-                                            }
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                            )}
-                            
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Notes &amp; Comments</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <Textarea 
-                                        value={notes} 
-                                        onChange={(e) => setNotes(e.target.value)} 
-                                        placeholder="Explain any discrepancies, issues, or special circumstances..."
-                                        className="min-h-[100px]"
-                                    />
-                                </CardContent>
-                            </Card>
-                            
-                            <Button 
-                                variant="outline" 
-                                size="lg" 
-                                className="w-full" 
-                                onClick={() => setIsAdvancedModalOpen(true)}
-                            >
-                                <FileText className="mr-2 h-4 w-4" />
-                                Cross-Check Orders
-                            </Button>
-                        </div>
-
-                        <div className="lg:col-span-2 space-y-6">
-                            <div className="text-center">
-                                <h3 className="text-2xl font-bold mb-2">Reconciliation Analysis</h3>
-                                <p className="text-muted-foreground">Comparing expected vs counted</p>
-                            </div>
-                            
-                            <Card className="border-2">
-                                <CardHeader className="bg-blue-50 dark:bg-blue-900/20">
-                                    <CardTitle className="flex items-center gap-2">
-                                        <TrendingUp className="h-5 w-5 text-blue-600" />
-                                        Expected Money Breakdown
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-3">
-                                            <h4 className="font-semibold text-lg text-blue-600">Cash Expected</h4>
-                                            <div className="space-y-2 text-sm">
-                                                <div className="flex justify-between"><span>Today's Cash Sales:</span><span className="font-medium">{formatCurrency(stats.cashSales)}</span></div>
-                                                <div className="flex justify-between text-red-600"><span>(-) Cash Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscCashExpenses)}</span></div>
-                                                {stats.settledUnpaidOrdersValue > 0 && <div className="flex justify-between text-green-600"><span>(+) Settled Old Orders:</span><span className="font-medium">+{formatCurrency(stats.settledUnpaidOrdersValue)}</span></div>}
-                                                {stats.previousDaysChangeGiven > 0 && <div className="flex justify-between text-orange-600"><span>(-) Previous Days Change:</span><span className="font-medium">-{formatCurrency(stats.previousDaysChangeGiven)}</span></div>}
-                                                {!deductCustomerChange && stats.changeOwedForPeriod > 0 && (
-                                                    <div className="flex justify-between text-blue-600"><span>(+) Undeducted Change:</span><span className="font-medium">+{formatCurrency(stats.changeOwedForPeriod)}</span></div>
-                                                )}
-                                                <UiSeparator />
-                                                <div className="flex justify-between font-bold text-blue-700 text-base"><span>Expected Cash in Drawer:</span><span>{formatCurrency(adjustedExpectedCash)}</span></div>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-3">
-                                            <h4 className="font-semibold text-lg text-purple-600">MoMo/Card Expected</h4>
-                                            <div className="space-y-2 text-sm">
-                                                <div className="flex justify-between"><span>Today's MoMo Sales:</span><span className="font-medium">{formatCurrency(stats.momoSales)}</span></div>
-                                                <div className="flex justify-between text-red-600"><span>(-) MoMo Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscMomoExpenses)}</span></div>
-                                                <UiSeparator />
-                                                <div className="flex justify-between font-bold text-purple-700 text-base"><span>Expected MoMo:</span><span>{formatCurrency(stats.expectedMomo)}</span></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                                <CardFooter className="bg-primary/10 p-4">
-                                    <div className="w-full flex justify-between items-center"><span className="font-bold text-primary text-lg">Total Expected Net:</span><span className="font-extrabold text-primary text-xl">{formatCurrency(expectedCashBase + stats.expectedMomo)}</span></div>
-                                </CardFooter>
-                            </Card>
-
-                            <Card>
-                                <CardHeader className="bg-green-50 dark:bg-green-900/20"><CardTitle className="flex items-center gap-2"><TrendingDown className="h-5 w-5 text-green-600" />Counted Money</CardTitle></CardHeader>
-                                <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2 text-sm">
-                                        <h4 className="font-semibold text-base text-green-600">Cash Counted</h4>
-                                        <div className="flex justify-between font-bold text-green-700 text-2xl"><span>{formatCurrency(totalCountedCash)}</span></div>
-                                    </div>
-                                    <div className="space-y-2 text-sm">
-                                        <h4 className="font-semibold text-base text-purple-600">MoMo/Card Counted</h4>
-                                        <div className="flex justify-between font-bold text-purple-700 text-2xl"><span>{formatCurrency(totalCountedMomo)}</span></div>
-                                    </div>
-                                </CardContent>
-                                <CardFooter className="bg-green-500/10 p-4"><div className="w-full flex justify-between items-center"><span className="font-bold text-green-700 dark:text-green-300 text-lg">Total Counted:</span><span className="font-extrabold text-green-600 dark:text-green-400 text-xl">{formatCurrency(totalCountedCash + totalCountedMomo)}</span></div></CardFooter>
-                            </Card>
-                            
-                            <Card className={`border-2 ${getBalanceStatus(totalDiscrepancy).bg}`}>
-                                <CardContent className="p-6"><div className="flex items-center justify-center space-x-3">{React.createElement(getBalanceStatus(totalDiscrepancy).icon, { className: `h-8 w-8 ${getBalanceStatus(totalDiscrepancy).color}` })}<div className="text-center"><p className="text-lg font-semibold">Overall Balance</p><p className={`text-2xl font-bold ${getBalanceStatus(totalDiscrepancy).color}`}>{getBalanceStatus(totalDiscrepancy).text}</p></div></div></CardContent>
-                            </Card>
-                        </div>
+                        )}
+                        
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Notes &amp; Comments</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <Textarea 
+                                    value={notes} 
+                                    onChange={(e) => setNotes(e.target.value)} 
+                                    placeholder="Explain any discrepancies, issues, or special circumstances..."
+                                    className="min-h-[100px]"
+                                />
+                            </CardContent>
+                        </Card>
+                        
+                        <Button 
+                            variant="outline" 
+                            size="lg" 
+                            className="w-full" 
+                            onClick={() => setIsAdvancedModalOpen(true)}
+                        >
+                            <FileText className="mr-2 h-4 w-4" />
+                            Cross-Check Orders
+                        </Button>
                     </div>
-                    </ScrollArea>
-                </>
+
+                    <div className="lg:col-span-2 space-y-6">
+                         <div className="text-center">
+                            <h3 className="text-2xl font-bold mb-2">Reconciliation Analysis</h3>
+                            <p className="text-muted-foreground">Comparing expected vs counted</p>
+                        </div>
+                        
+                        <Card className="border-2">
+                            <CardHeader className="bg-blue-50 dark:bg-blue-900/20">
+                                <CardTitle className="flex items-center gap-2">
+                                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                                    Expected Money Breakdown
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-3">
+                                        <h4 className="font-semibold text-lg text-blue-600">Cash Expected</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between"><span>Today's Cash Sales:</span><span className="font-medium">{formatCurrency(stats.cashSales)}</span></div>
+                                            <div className="flex justify-between text-red-600"><span>(-) Cash Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscCashExpenses)}</span></div>
+                                            {stats.settledUnpaidOrdersValue > 0 && <div className="flex justify-between text-green-600"><span>(+) Settled Old Orders:</span><span className="font-medium">+{formatCurrency(stats.settledUnpaidOrdersValue)}</span></div>}
+                                            {stats.previousDaysChangeGiven > 0 && <div className="flex justify-between text-orange-600"><span>(-) Previous Days Change:</span><span className="font-medium">-{formatCurrency(stats.previousDaysChangeGiven)}</span></div>}
+                                            <UiSeparator />
+                                            <div className="flex justify-between font-bold text-blue-700 text-base"><span>Expected Cash:</span><span>{formatCurrency(adjustedExpectedCash)}</span></div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <h4 className="font-semibold text-lg text-purple-600">MoMo/Card Expected</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between"><span>Today's MoMo Sales:</span><span className="font-medium">{formatCurrency(stats.momoSales)}</span></div>
+                                            <div className="flex justify-between text-red-600"><span>(-) MoMo Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscMomoExpenses)}</span></div>
+                                            <UiSeparator />
+                                            <div className="flex justify-between font-bold text-purple-700 text-base"><span>Expected MoMo:</span><span>{formatCurrency(stats.expectedMomo)}</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                            <CardFooter className="bg-primary/10 p-4">
+                                <div className="w-full flex justify-between items-center"><span className="font-bold text-primary text-lg">Total Expected:</span><span className="font-extrabold text-primary text-xl">{formatCurrency(adjustedExpectedCash + stats.expectedMomo)}</span></div>
+                            </CardFooter>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="bg-green-50 dark:bg-green-900/20"><CardTitle className="flex items-center gap-2"><TrendingDown className="h-5 w-5 text-green-600" />Counted Money</CardTitle></CardHeader>
+                            <CardContent className="p-6 space-y-4">
+                                <div className="space-y-2 text-sm">
+                                    <h4 className="font-semibold text-base text-green-600">Cash</h4>
+                                    <div className="flex justify-between"><span>Cash Counted:</span><span className="font-medium">{formatCurrency(totalCountedCash)}</span></div>
+                                    {stats.changeOwedForPeriod > 0 && deductCustomerChange && <div className="flex justify-between text-orange-600"><span>(-) Today's Change:</span><span className="font-medium">-{formatCurrency(stats.changeOwedForPeriod)}</span></div>}
+                                    <UiSeparator />
+                                    <div className="flex justify-between font-bold text-green-700"><span>Available Cash:</span><span>{formatCurrency(availableCash)}</span></div>
+                                </div>
+                                <div className="space-y-2 text-sm">
+                                    <h4 className="font-semibold text-base text-green-600">MoMo/Card</h4>
+                                    <div className="flex justify-between font-bold text-green-700"><span>Available MoMo:</span><span>{formatCurrency(totalCountedMomo)}</span></div>
+                                </div>
+                            </CardContent>
+                            <CardFooter className="bg-green-500/10 p-4"><div className="w-full flex justify-between items-center"><span className="font-bold text-green-700 dark:text-green-300 text-lg">Total Available:</span><span className="font-extrabold text-green-600 dark:text-green-400 text-xl">{formatCurrency(availableCash + totalCountedMomo)}</span></div></CardFooter>
+                        </Card>
+
+                        <Card className={`border-2 ${getBalanceStatus(totalDiscrepancy).bg}`}>
+                            <CardContent className="p-6"><div className="flex items-center justify-center space-x-3">{React.createElement(getBalanceStatus(totalDiscrepancy).icon, { className: `h-8 w-8 ${getBalanceStatus(totalDiscrepancy).color}` })}<div className="text-center"><p className="text-lg font-semibold">Overall Status</p><p className={`text-2xl font-bold ${getBalanceStatus(totalDiscrepancy).color}`}>{getBalanceStatus(totalDiscrepancy).text}</p></div></div></CardContent>
+                        </Card>
+                    </div>
+                </div>
+                </ScrollArea>
                 )}
                 
                 <DialogFooter className="pt-6 border-t">
@@ -719,15 +703,20 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     // Revenue Calculation (payments made today)
                     const paymentDate = order.lastPaymentTimestamp?.toDate();
                     if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
-                        const isOrderFromPeriod = order.timestamp.toDate() >= todayStart && order.timestamp.toDate() <= todayEnd;
-
-                        if (order.paymentBreakdown) {
-                            if(order.paymentBreakdown.cash) cashSales += order.paymentBreakdown.cash;
-                            if(order.paymentBreakdown.momo) momoSales += order.paymentBreakdown.momo;
-                        }
+                        const paymentAmount = order.lastPaymentAmount || 0;
                         
-                        if (!isOrderFromPeriod) { 
-                           settledUnpaidOrdersValue += order.lastPaymentAmount || 0;
+                        if (isTodayOrder) { // Payment for today's order
+                             // Use paymentBreakdown if it exists
+                            if (order.paymentBreakdown) {
+                                if(order.paymentBreakdown.cash) cashSales += Math.min(order.paymentBreakdown.cash, order.total);
+                                if(order.paymentBreakdown.momo) momoSales += Math.min(order.paymentBreakdown.momo, order.total - (order.paymentBreakdown.cash || 0) );
+                            } else if (order.paymentMethod === 'cash') {
+                                cashSales += Math.min(paymentAmount, order.total);
+                            } else if (order.paymentMethod === 'momo') {
+                                momoSales += Math.min(paymentAmount, order.total);
+                            }
+                        } else { // Collection on an old order
+                            settledUnpaidOrdersValue += paymentAmount; 
                         }
                     }
     
@@ -753,9 +742,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const allTimeUnpaidOrdersValue = previousUnpaidOrdersValue + todayUnpaidOrdersValue;
     
                 const totalMiscExpenses = miscCashExpenses + miscMomoExpenses;
-                const expectedCash = cashSales - miscCashExpenses + settledUnpaidOrdersValue - previousDaysChangeGiven;
+                const expectedCash = cashSales - miscCashExpenses + settledUnpaidOrdersValue - previousDaysChangeGiven - totalPardonedAmount;
                 const expectedMomo = momoSales - miscMomoExpenses;
-                const netRevenue = (cashSales + momoSales) - totalMiscExpenses - totalRewardDiscount - totalPardonedAmount;
+                const netRevenue = totalSales - todayUnpaidOrdersValue - totalMiscExpenses - totalRewardDiscount - totalPardonedAmount;
     
                 setStats({ 
                     totalSales, 
@@ -821,8 +810,18 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         return Object.entries(stats.itemStats).sort(([, a], [, b]) => b.count - a.count);
     }, [stats]);
     
+    const adjustedExpectedCash = useMemo(() => {
+        if (!stats) return 0;
+        let expected = stats.cashSales;
+        expected += stats.settledUnpaidOrdersValue; 
+        expected -= stats.miscCashExpenses;
+        expected -= stats.previousDaysChangeGiven;
+        expected -= stats.totalPardonedAmount;
+        return expected;
+    }, [stats]);
+
     if (showReconciliation && stats) {
-        return <ReconciliationView stats={stats} onBack={() => setShowReconciliation(false)} />;
+        return <ReconciliationView stats={stats} adjustedExpectedCash={adjustedExpectedCash} onBack={() => setShowReconciliation(false)} />;
     }
 
     return (
@@ -954,6 +953,3 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
-    
-
