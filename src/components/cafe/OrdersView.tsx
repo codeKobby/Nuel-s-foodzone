@@ -552,7 +552,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                     <Button 
                       variant={filters.showChangeOnly ? "default" : "outline"} 
                       size="sm"
-                      onClick={() => setFilters(prev => ({...prev, showChangeOnly: !prev.showChangeOnly, showUnpaidOnly: false}))}
+                      onClick={() => setFilters(prev => ({...prev, dateRange: 'All Time', showChangeOnly: !prev.showChangeOnly, showUnpaidOnly: false}))}
                       className="relative"
                     >
                       <Coins className="h-4 w-4" />
@@ -574,7 +574,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                     <Button 
                       variant={filters.showUnpaidOnly ? "default" : "outline"} 
                       size="sm"
-                      onClick={() => setFilters(prev => ({...prev, showUnpaidOnly: !prev.showUnpaidOnly, showChangeOnly: false}))}
+                      onClick={() => setFilters(prev => ({...prev, dateRange: 'All Time', showUnpaidOnly: !prev.showUnpaidOnly, showChangeOnly: false}))}
                       className="relative"
                     >
                       <Clock className="h-4 w-4" />
@@ -782,4 +782,5 @@ export default OrdersView;
     
 
     
+
 
