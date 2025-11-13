@@ -409,7 +409,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md w-[95vw] flex flex-col max-h-[90vh]">
         {isApplyingReward ? <RewardContent total={total} onApplyReward={handleApplyReward} onBack={() => setIsApplyingReward(false)} /> : step === 1 ? (
           <>
             <DialogHeader>
@@ -512,80 +512,82 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 </div>
             </DialogHeader>
             
-            <div className="space-y-4">
-              {renderBalanceBreakdown()}
-              
-              {!isOverpaid ? (
-                <div className="space-y-4 p-4 border rounded-lg">
-                    <div>
-                        <Label>Payment Method</Label>
-                        <div className="grid grid-cols-2 gap-2 mt-1">
-                            <Button onClick={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'outline'} className="h-12"><Coins className="mr-2"/>Cash</Button>
-                            <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'outline'} className="h-12"><CreditCard className="mr-2"/>Momo</Button>
-                        </div>
-                    </div>
-                    <div>
-                        <Label htmlFor="amountPaid">Amount Paid ({paymentMethod})</Label>
-                        <Input 
-                          id="amountPaid" 
-                          type="number" 
-                          value={amountPaidInput} 
-                          onChange={(e) => setAmountPaidInput(e.target.value)} 
-                          placeholder="0.00" 
-                          autoFocus 
-                          className="mt-1 text-lg h-12" 
-                        />
-                    </div>
-                    {balances.change > 0 && (
-                        <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                            <p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
-                            Change Due: {formatCurrency(balances.change)}
-                            </p>
-                            <Label htmlFor="changeGiven">Amount Given as Change</Label>
-                            <Input 
-                            id="changeGiven" 
+            <ScrollArea className="flex-1">
+              <div className="space-y-4 pr-6">
+                {renderBalanceBreakdown()}
+                
+                {!isOverpaid ? (
+                  <div className="space-y-4 p-4 border rounded-lg">
+                      <div>
+                          <Label>Payment Method</Label>
+                          <div className="grid grid-cols-2 gap-2 mt-1">
+                              <Button onClick={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'outline'} className="h-12"><Coins className="mr-2"/>Cash</Button>
+                              <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'outline'} className="h-12"><CreditCard className="mr-2"/>Momo</Button>
+                          </div>
+                      </div>
+                      <div>
+                          <Label htmlFor="amountPaid">Amount Paid ({paymentMethod})</Label>
+                          <Input 
+                            id="amountPaid" 
                             type="number" 
-                            value={changeGivenInput} 
-                            onChange={(e) => setChangeGivenInput(e.target.value)} 
-                            placeholder={formatCurrency(balances.change)} 
-                            className="text-center mt-2" 
-                            />
-                            <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
-                            Leave empty or enter less if not giving full change
-                            </p>
-                        </div>
-                    )}
-                    {showDeficitOptions && (
-                        <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
-                            <AlertTriangle className="h-4 w-4 text-orange-600" />
-                            <AlertTitle className="text-orange-800 dark:text-orange-200">Payment Insufficient</AlertTitle>
-                            <AlertDescription className="text-orange-700 dark:text-orange-300">
-                            Customer still owes: <span className="font-bold">{formatCurrency(balances.deficit)}</span>
-                            </AlertDescription>
-                        </Alert>
-                    )}
-                </div>
-              ) : (
-                 <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
-                  <Info className="h-4 w-4 text-green-600" />
-                  <AlertTitle className="text-green-800 dark:text-green-200">Customer Overpaid</AlertTitle>
-                  <AlertDescription className="text-green-700 dark:text-green-300">
-                    The customer's previous payment covers the new total. 
-                    A change of <span className="font-bold">{formatCurrency(Math.abs(amountOwedNow))}</span> is now due.
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              {error && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-            </div>
+                            value={amountPaidInput} 
+                            onChange={(e) => setAmountPaidInput(e.target.value)} 
+                            placeholder="0.00" 
+                            autoFocus 
+                            className="mt-1 text-lg h-12" 
+                          />
+                      </div>
+                      {balances.change > 0 && (
+                          <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                              <p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
+                              Change Due: {formatCurrency(balances.change)}
+                              </p>
+                              <Label htmlFor="changeGiven">Amount Given as Change</Label>
+                              <Input 
+                              id="changeGiven" 
+                              type="number" 
+                              value={changeGivenInput} 
+                              onChange={(e) => setChangeGivenInput(e.target.value)} 
+                              placeholder={formatCurrency(balances.change)} 
+                              className="text-center mt-2" 
+                              />
+                              <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
+                              Leave empty or enter less if not giving full change
+                              </p>
+                          </div>
+                      )}
+                      {showDeficitOptions && (
+                          <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
+                              <AlertTriangle className="h-4 w-4 text-orange-600" />
+                              <AlertTitle className="text-orange-800 dark:text-orange-200">Payment Insufficient</AlertTitle>
+                              <AlertDescription className="text-orange-700 dark:text-orange-300">
+                              Customer still owes: <span className="font-bold">{formatCurrency(balances.deficit)}</span>
+                              </AlertDescription>
+                          </Alert>
+                      )}
+                  </div>
+                ) : (
+                   <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
+                    <Info className="h-4 w-4 text-green-600" />
+                    <AlertTitle className="text-green-800 dark:text-green-200">Customer Overpaid</AlertTitle>
+                    <AlertDescription className="text-green-700 dark:text-green-300">
+                      The customer's previous payment covers the new total. 
+                      A change of <span className="font-bold">{formatCurrency(Math.abs(amountOwedNow))}</span> is now due.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </ScrollArea>
             
-            <DialogFooter className="grid grid-cols-1 gap-3 pt-4">
+            <DialogFooter className="grid grid-cols-1 gap-3 pt-4 border-t">
               {!isOverpaid && (
                   <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
                       <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
