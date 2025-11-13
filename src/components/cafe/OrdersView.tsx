@@ -166,9 +166,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
         {/* Change Due Button */}
         {isChangeOwedToCustomer && (
           <Button 
-            variant="destructive" 
+            variant="default" 
             size="sm"
-            className="w-full mt-2" 
+            className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white" 
             onClick={() => onChangeDueClick(order)}
           >
             <Coins size={16} className="mr-2"/>
@@ -782,5 +782,6 @@ export default OrdersView;
     
 
     
+
 
 
