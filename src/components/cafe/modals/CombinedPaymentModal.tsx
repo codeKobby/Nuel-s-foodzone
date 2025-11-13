@@ -304,11 +304,8 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             
             <div className="space-y-4 pt-2 p-4 border rounded-lg">
                 <div>
-                    <Label>Payment Method</Label>
-                    <div className="grid grid-cols-2 gap-2 mt-1">
-                        <Button onClick={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'outline'} className="h-12"><Coins className="mr-2"/>Cash</Button>
-                        <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'outline'} className="h-12"><CreditCard className="mr-2"/>Momo</Button>
-                    </div>
+                    <Label htmlFor="cashPaid">Amount Paid (Cash)</Label>
+                    <Input id="cashPaid" type="number" value={cashPaidInput} onChange={(e) => setCashPaidInput(e.target.value)} placeholder="0.00" autoFocus className="mt-1" />
                 </div>
                 <div>
                     <Label htmlFor="amountPaid">Amount Paid ({paymentMethod})</Label>

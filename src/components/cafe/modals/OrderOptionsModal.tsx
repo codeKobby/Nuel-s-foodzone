@@ -127,12 +127,12 @@ interface OrderOptionsModalProps {
     onOrderPlaced: (order: Order) => void;
 }
 
-const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({ 
-  total, 
-  orderItems, 
-  editingOrder, 
-  onClose, 
-  onOrderPlaced 
+const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
+  total,
+  orderItems,
+  editingOrder,
+  onClose,
+  onOrderPlaced
 }) => {
   const [step, setStep] = useState(1);
   const [orderType, setOrderType] = useState<'Dine-In' | 'Takeout' | 'Delivery'>('Dine-In');
@@ -152,6 +152,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     if (editingOrder) {
       setOrderType(editingOrder.orderType);
       setOrderTag(editingOrder.tag || '');
+      setStep(2);
     }
   }, [editingOrder]);
 
@@ -473,10 +474,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
             </div>
             
             <DialogFooter className="grid grid-cols-2 gap-2">
-              <Button 
-                onClick={handlePayLater} 
-                disabled={isProcessing} 
-                variant="secondary" 
+              <Button
+                onClick={handlePayLater}
+                disabled={isProcessing}
+                variant="secondary"
                 className="bg-yellow-500 hover:bg-yellow-600 text-white"
               >
                 {isProcessing ? <LoadingSpinner /> : 'Save Unpaid'}
@@ -493,8 +494,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 {editingOrder ? `Add Payment - ${editingOrder.simplifiedId}` : 'Process Payment'}
               </DialogTitle>
               <DialogDescription>
-                {editingOrder 
-                  ? 'Add a payment to this existing order.' 
+                {editingOrder
+                  ? 'Add a payment to this existing order.'
                   : 'Complete the payment for this new order.'
                 }
               </DialogDescription>
@@ -594,7 +595,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                   </Button>
               )}
               {isOverpaid ? (
-                <Button 
+                <Button
                   onClick={() => processOrder({ isPaid: true })}
                   disabled={isProcessing}
                   className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg"
@@ -603,17 +604,17 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 </Button>
               ) : showDeficitOptions ? (
                 <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    onClick={() => processOrder({ isPaid: true, pardonDeficit: true })} 
-                    disabled={isProcessing} 
+                  <Button
+                    onClick={() => processOrder({ isPaid: true, pardonDeficit: true })}
+                    disabled={isProcessing}
                     className="bg-green-500 hover:bg-green-600 text-white"
                     size="sm"
                   >
                     {isProcessing ? <LoadingSpinner /> : 'Pardon Deficit'}
                   </Button>
-                  <Button 
-                    onClick={() => processOrder({ isPaid: true, pardonDeficit: false })} 
-                    disabled={isProcessing} 
+                  <Button
+                    onClick={() => processOrder({ isPaid: true, pardonDeficit: false })}
+                    disabled={isProcessing}
                     className="bg-yellow-500 hover:bg-yellow-600 text-white"
                     size="sm"
                   >
@@ -621,18 +622,18 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                   </Button>
                 </div>
               ) : (
-                <Button 
-                  onClick={() => processOrder({ isPaid: true })} 
-                  disabled={isProcessing || !canConfirmPayment} 
+                <Button
+                  onClick={() => processOrder({ isPaid: true })}
+                  disabled={isProcessing || !canConfirmPayment}
                   className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg"
                 >
                   {isProcessing ? <LoadingSpinner /> : 'Process Payment'}
                 </Button>
               )}
-              <Button 
-                onClick={() => setStep(1)} 
-                variant="outline" 
-                size="sm" 
+              <Button
+                onClick={() => setStep(1)}
+                variant="outline"
+                size="sm"
                 className="mt-2"
               >
                 ← Back to Details

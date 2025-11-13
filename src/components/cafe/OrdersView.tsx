@@ -364,7 +364,7 @@ const OrdersView: React.FC<{setActiveView: (view: string) => void}> = ({setActiv
                 throw "Document does not exist!";
             }
             const currentBalance = orderDoc.data().balanceDue || 0;
-            const newBalance = currentBalance + settleAmount; // Adding because change is negative
+            const newBalance = currentBalance + settleAmount;
             const currentChangeGiven = orderDoc.data().changeGiven || 0;
             const newChangeGiven = currentChangeGiven + settleAmount;
 
