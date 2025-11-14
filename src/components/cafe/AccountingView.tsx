@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
@@ -731,28 +730,37 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             }
                         });
                     } else {
+                        // FALLBACK: For orders without payment history
                         const paymentDate = order.lastPaymentTimestamp?.toDate();
                         if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
-                            const amountPaidTowardsOrder = order.amountPaid - order.changeGiven;
                             
-                            if (order.paymentBreakdown) {
-                                if(order.paymentBreakdown.cash) {
+                            // CRITICAL FIX: Always prefer paymentBreakdown when it exists
+                            if (order.paymentBreakdown && (order.paymentBreakdown.cash || order.paymentBreakdown.momo)) {
+                                if (order.paymentBreakdown.cash && order.paymentBreakdown.cash > 0) {
                                     cashSales += order.paymentBreakdown.cash;
                                 }
-                                if(order.paymentBreakdown.momo) {
+                                if (order.paymentBreakdown.momo && order.paymentBreakdown.momo > 0) {
                                     momoSales += order.paymentBreakdown.momo;
                                 }
-                            } else {
-                                const revenueAmount = amountPaidTowardsOrder;
-                                if(order.paymentMethod === 'cash') {
-                                    cashSales += revenueAmount;
-                                } else if(order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
-                                    momoSales += revenueAmount;
+                                
+                                if (!isTodayOrder) {
+                                    const totalPayment = (order.paymentBreakdown.cash || 0) + (order.paymentBreakdown.momo || 0);
+                                    settledUnpaidOrdersValue += totalPayment;
                                 }
-                            }
+                            } else {
+                                // Single payment method (no breakdown)
+                                const amountPaidTowardsOrder = order.amountPaid - order.changeGiven;
+                                const revenueToRecord = Math.min(amountPaidTowardsOrder, order.total);
+                                
+                                if (order.paymentMethod === 'cash') {
+                                    cashSales += revenueToRecord;
+                                } else if (order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
+                                    momoSales += revenueToRecord;
+                                }
 
-                            if (!isTodayOrder) {
-                                settledUnpaidOrdersValue += amountPaidTowardsOrder;
+                                if (!isTodayOrder) {
+                                    settledUnpaidOrdersValue += revenueToRecord;
+                                }
                             }
                         }
                     }
