@@ -1,5 +1,4 @@
 
-
 import type { Timestamp } from 'firebase/firestore';
 import type { AnalyzeBusinessOutputSchema } from '@/ai/schemas';
 import { z } from 'zod';
@@ -26,6 +25,12 @@ export interface FulfilledItem {
     quantity: number;
 }
 
+export interface Payment {
+    amount: number;
+    method: 'cash' | 'momo' | 'card' | 'credit';
+    timestamp: Timestamp;
+}
+
 export interface Order {
   id:string;
   simplifiedId: string;
@@ -37,6 +42,7 @@ export interface Order {
   paymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid';
   paymentBreakdown: { cash: number; momo: number };
   paymentStatus: 'Paid' | 'Unpaid' | 'Partially Paid';
+  paymentHistory?: Payment[];
   amountPaid: number;
   changeGiven: number; 
   balanceDue: number; 
@@ -233,5 +239,4 @@ export interface DashboardStats {
     businessMetrics: BusinessMetrics[];
     orderAgeAnalysis: OrderAgeAnalysis[];
     incompleteAccountingDays: string[];
-    pardonedOrders: Order[];
-}
+    pardonedOrders: Order

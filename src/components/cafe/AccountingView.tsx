@@ -680,15 +680,15 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 allOrders.forEach(order => {
                     const orderDate = order.timestamp.toDate();
                     const isTodayOrder = orderDate >= todayStart && orderDate <= todayEnd;
-    
+
                     // Unpaid value from previous days
                     if (orderDate < todayStart && (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid')) {
                         previousUnpaidOrdersValue += order.balanceDue;
                     }
-    
+
                     if (isTodayOrder) {
                         todayOrders.push(order);
-    
+
                         // Total Sales for today (from completed orders created today)
                         if (order.status === "Completed") {
                             totalSales += order.total;
@@ -711,31 +711,52 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             changeOwedForPeriod += Math.abs(order.balanceDue);
                         }
                     }
-    
-                    // Revenue Calculation (payments made today)
-                    const paymentDate = order.lastPaymentTimestamp?.toDate();
-                    if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
-                        const paymentAmount = order.lastPaymentAmount || 0;
-                        const orderIsFromToday = order.timestamp.toDate() >= todayStart && order.timestamp.toDate() <= todayEnd;
 
-                        const truePaymentAmount = order.amountPaid > order.total ? order.total - (order.amountPaid - paymentAmount) : paymentAmount;
-
-                        if(orderIsFromToday) {
-                            if (order.paymentBreakdown) {
-                                if(order.paymentBreakdown.cash) cashSales += Math.min(order.paymentBreakdown.cash, order.total);
-                                if(order.paymentBreakdown.momo) momoSales += Math.min(order.paymentBreakdown.momo, order.total - (order.paymentBreakdown.cash || 0));
-                            } else if (order.paymentMethod === 'cash') {
-                                cashSales += truePaymentAmount;
-                            } else if (order.paymentMethod === 'momo') {
-                                momoSales += truePaymentAmount;
+                    // CORRECTED REVENUE CALCULATION
+                    if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
+                        order.paymentHistory.forEach(payment => {
+                            const paymentDate = payment.timestamp?.toDate();
+                            if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
+                                const paymentAmount = payment.amount || 0;
+                                
+                                if (payment.method === 'cash') {
+                                    cashSales += paymentAmount;
+                                } else if (payment.method === 'momo' || payment.method === 'card') {
+                                    momoSales += paymentAmount;
+                                }
+                                
+                                if (!isTodayOrder) {
+                                    settledUnpaidOrdersValue += paymentAmount;
+                                }
                             }
-                        } else {
-                            // This is a collection on an old order
-                            settledUnpaidOrdersValue += paymentAmount;
+                        });
+                    } else {
+                        const paymentDate = order.lastPaymentTimestamp?.toDate();
+                        if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
+                            const amountPaidTowardsOrder = order.amountPaid - order.changeGiven;
+                            
+                            if (order.paymentBreakdown) {
+                                if(order.paymentBreakdown.cash) {
+                                    cashSales += order.paymentBreakdown.cash;
+                                }
+                                if(order.paymentBreakdown.momo) {
+                                    momoSales += order.paymentBreakdown.momo;
+                                }
+                            } else {
+                                const revenueAmount = amountPaidTowardsOrder;
+                                if(order.paymentMethod === 'cash') {
+                                    cashSales += revenueAmount;
+                                } else if(order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
+                                    momoSales += revenueAmount;
+                                }
+                            }
+
+                            if (!isTodayOrder) {
+                                settledUnpaidOrdersValue += amountPaidTowardsOrder;
+                            }
                         }
                     }
-    
-                    // Change given today for old orders
+
                     const settledDate = order.settledOn?.toDate();
                     if (settledDate && settledDate >= todayStart && settledDate <= todayEnd && !isTodayOrder) {
                         if (order.changeGiven > (order.pardonedAmount || 0)) {
