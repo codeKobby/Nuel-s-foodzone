@@ -678,16 +678,14 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 allOrders.forEach(order => {
                     const orderDate = order.timestamp.toDate();
                     const isTodayOrder = orderDate >= todayStart && orderDate <= todayEnd;
-                
-                    // Unpaid value from previous days
+
                     if (orderDate < todayStart && (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid')) {
                         previousUnpaidOrdersValue += order.balanceDue;
                     }
-                
+
                     if (isTodayOrder) {
                         todayOrders.push(order);
-                
-                        // Total Sales for today (from completed orders created today)
+
                         if (order.status === "Completed") {
                             totalSales += order.total;
                             order.items.forEach(item => {
@@ -709,8 +707,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             changeOwedForPeriod += Math.abs(order.balanceDue);
                         }
                     }
-                
-                    // Check if there's a payment history array (best approach)
+
                     if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
                         order.paymentHistory.forEach(payment => {
                             const paymentDate = payment.timestamp?.toDate();
@@ -723,47 +720,40 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     momoSales += paymentAmount;
                                 }
                                 
-                                // Track settlements of old orders
                                 if (!isTodayOrder) {
                                     settledUnpaidOrdersValue += paymentAmount;
                                 }
                             }
                         });
                     } else {
-                        // FALLBACK: For orders without payment history
                         const paymentDate = order.lastPaymentTimestamp?.toDate();
                         if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
-                            // CRITICAL FIX: Always prefer paymentBreakdown when it exists
-                            if (order.paymentBreakdown && (order.paymentBreakdown.cash || order.paymentBreakdown.momo)) {
-                                if (order.paymentBreakdown.cash && order.paymentBreakdown.cash > 0) {
+                            
+                            const amountPaidTowardsOrder = order.amountPaid - order.changeGiven;
+                            
+                            if (order.paymentBreakdown) {
+                                if(order.paymentBreakdown.cash) {
                                     cashSales += order.paymentBreakdown.cash;
                                 }
-                                if (order.paymentBreakdown.momo && order.paymentBreakdown.momo > 0) {
+                                if(order.paymentBreakdown.momo) {
                                     momoSales += order.paymentBreakdown.momo;
                                 }
-                                
-                                if (!isTodayOrder) {
-                                    const totalPayment = (order.paymentBreakdown.cash || 0) + (order.paymentBreakdown.momo || 0);
-                                    settledUnpaidOrdersValue += totalPayment;
-                                }
                             } else {
-                                // Single payment method (no breakdown)
-                                const revenueToRecord = order.amountPaid - order.changeGiven;
+                                const revenueAmount = amountPaidTowardsOrder;
                                 
-                                if (order.paymentMethod === 'cash') {
-                                    cashSales += revenueToRecord;
-                                } else if (order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
-                                    momoSales += revenueToRecord;
+                                if(order.paymentMethod === 'cash') {
+                                    cashSales += revenueAmount;
+                                } else if(order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
+                                    momoSales += revenueAmount;
                                 }
-                
-                                if (!isTodayOrder) {
-                                    settledUnpaidOrdersValue += revenueToRecord;
-                                }
+                            }
+
+                            if (!isTodayOrder) {
+                                settledUnpaidOrdersValue += amountPaidTowardsOrder;
                             }
                         }
                     }
-                
-                    // Change given today for old orders
+
                     const settledDate = order.settledOn?.toDate();
                     if (settledDate && settledDate >= todayStart && settledDate <= todayEnd && !isTodayOrder) {
                         if (order.changeGiven > (order.pardonedAmount || 0)) {
@@ -787,7 +777,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const totalMiscExpenses = miscCashExpenses + miscMomoExpenses;
                 const expectedCash = cashSales - miscCashExpenses + settledUnpaidOrdersValue - previousDaysChangeGiven;
                 const expectedMomo = momoSales - miscMomoExpenses;
-
                 const netRevenue = (cashSales + momoSales) - totalMiscExpenses - totalRewardDiscount;
     
                 setStats({ 
@@ -996,5 +985,4 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
-
     
