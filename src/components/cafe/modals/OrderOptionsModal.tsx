@@ -217,25 +217,25 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     const { isPaid, pardonDeficit = false } = options;
     
     try {
-      const amountPaid = parseFloat(amountPaidInput) || 0;
-      
+      const newPaymentAmount = parseFloat(amountPaidInput) || 0;
       const pardonedAmount = isPaid && pardonDeficit && balances.newBalance > 0 ? balances.newBalance : 0;
       
       const existingBreakdown = editingOrder?.paymentBreakdown || { cash: 0, momo: 0 };
+      
       const newBreakdown = {
-          cash: existingBreakdown.cash + (paymentMethod === 'cash' ? amountPaid : 0),
-          momo: existingBreakdown.momo + (paymentMethod === 'momo' ? amountPaid : 0),
+        cash: existingBreakdown.cash + (paymentMethod === 'cash' ? newPaymentAmount : 0),
+        momo: existingBreakdown.momo + (paymentMethod === 'momo' ? newPaymentAmount : 0),
       };
 
-      let finalPaymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid' = 'Unpaid';
-      if(isPaid || editingOrder) {
-        if (newBreakdown.cash > 0 && newBreakdown.momo > 0) {
-            finalPaymentMethod = 'split';
-        } else if (newBreakdown.cash > 0) {
-            finalPaymentMethod = 'cash';
-        } else if (newBreakdown.momo > 0) {
-            finalPaymentMethod = 'momo';
-        }
+      let finalPaymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid';
+      if (newBreakdown.cash > 0 && newBreakdown.momo > 0) {
+        finalPaymentMethod = 'split';
+      } else if (newBreakdown.cash > 0) {
+        finalPaymentMethod = 'cash';
+      } else if (newBreakdown.momo > 0) {
+        finalPaymentMethod = 'momo';
+      } else {
+        finalPaymentMethod = 'Unpaid';
       }
 
       const orderData: any = {
@@ -246,7 +246,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           price: i.price, 
           quantity: i.quantity 
         })),
-        total: finalTotal,
+        total: total, // Use original total here, discount is separate
         paymentMethod: finalPaymentMethod,
         paymentBreakdown: newBreakdown,
         pardonedAmount: (editingOrder?.pardonedAmount || 0) + pardonedAmount,
@@ -260,15 +260,9 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         rewardCustomerTag: reward?.customer.customerTag || editingOrder?.rewardCustomerTag || '',
       };
       
-      let revenueFromThisPayment = 0;
-      if (isPaid && !isOverpaid) {
-        revenueFromThisPayment = Math.min(amountPaid, amountOwedNow);
-      }
-      if (revenueFromThisPayment < 0) revenueFromThisPayment = 0;
-
       if (isPaid) {
           orderData.lastPaymentTimestamp = serverTimestamp();
-          orderData.lastPaymentAmount = revenueFromThisPayment;
+          orderData.lastPaymentAmount = newPaymentAmount;
       }
       
       if (pardonedAmount > 0) {
@@ -278,15 +272,16 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
       if (editingOrder) {
           const orderRef = doc(db, "orders", editingOrder.id);
           
-          orderData.amountPaid = balances.finalAmountPaid;
-          orderData.changeGiven = (editingOrder.changeGiven || 0) + (parseFloat(changeGivenInput) || 0);
-          orderData.balanceDue = balances.newBalance;
-
-           if (pardonDeficit) {
-              orderData.balanceDue = 0;
-          }
+          orderData.amountPaid = (editingOrder.amountPaid || 0) + newPaymentAmount;
+          const newChangeGiven = (editingOrder.changeGiven || 0) + (balances.change > 0 ? parseFloat(changeGivenInput) || balances.change : 0);
+          orderData.changeGiven = newChangeGiven;
           
-          if (orderData.balanceDue <= 0) {
+          let balanceDue = total - (orderData.amountPaid - orderData.changeGiven) - (orderData.rewardDiscount || 0);
+          if (pardonDeficit) balanceDue = 0;
+
+          orderData.balanceDue = balanceDue;
+          
+          if (balanceDue <= 0.01) {
               orderData.paymentStatus = 'Paid';
           } else if (orderData.amountPaid > 0) {
               orderData.paymentStatus = 'Partially Paid';
@@ -299,28 +294,24 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           const finalOrderForPopup = { id: docSnap.id, ...docSnap.data() } as Order;
           onOrderPlaced(finalOrderForPopup);
 
-      } else {
+      } else { // New Order
           await runTransaction(db, async (transaction) => {
+              orderData.amountPaid = isPaid ? newPaymentAmount : 0;
+              const changeGiven = isPaid && balances.change > 0 ? (parseFloat(changeGivenInput) || balances.change) : 0;
+              orderData.changeGiven = changeGiven;
               
-              orderData.amountPaid = isPaid ? amountPaid : 0;
-              orderData.changeGiven = isPaid ? (parseFloat(changeGivenInput) || 0) : 0;
-              
-              orderData.balanceDue = finalTotal - (orderData.amountPaid - orderData.changeGiven);
+              let balanceDue = finalTotal - (orderData.amountPaid - orderData.changeGiven);
+              if (pardonDeficit) balanceDue = 0;
+              orderData.balanceDue = balanceDue;
 
-              if (pardonDeficit) {
-                  orderData.balanceDue = 0;
-              }
-              
-              if (isPaid && orderData.balanceDue <= 0) {
+              if (isPaid && balanceDue <= 0.01) {
                 orderData.paymentStatus = 'Paid';
-              } else if (isPaid && orderData.balanceDue > 0) {
+              } else if (isPaid && balanceDue > 0) {
                 orderData.paymentStatus = 'Partially Paid';
               } else {
                 orderData.paymentStatus = 'Unpaid';
               }
               
-              orderData.lastPaymentAmount = Math.min(orderData.amountPaid, finalTotal);
-
               const counterRef = doc(db, "counters", "orderIdCounter");
               const newOrderRef = doc(collection(db, "orders"));
               
@@ -334,6 +325,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                     updatedAt: serverTimestamp() 
                 });
               }
+
               const counterDoc = await transaction.get(counterRef);
               const newCount = (counterDoc.exists() ? counterDoc.data().count : 0) + 1;
               const simplifiedId = generateSimpleOrderId(newCount);
@@ -376,7 +368,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">New Total:</span>
-              <span className="font-semibold">{formatCurrency(finalTotal)}</span>
+              <span className="font-semibold">{formatCurrency(total)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Already Paid:</span>
@@ -493,12 +485,6 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               <DialogTitle>
                 {editingOrder ? `Add Payment - ${editingOrder.simplifiedId}` : 'Process Payment'}
               </DialogTitle>
-              <DialogDescription>
-                {editingOrder
-                  ? 'Add a payment to this existing order.'
-                  : 'Complete the payment for this new order.'
-                }
-              </DialogDescription>
                 <div className="space-y-1 text-center pt-2">
                     {reward && (
                         <p className="text-sm text-muted-foreground line-through">{formatCurrency(total)}</p>
@@ -513,8 +499,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 </div>
             </DialogHeader>
             
-            <ScrollArea className="flex-1">
-              <div className="space-y-4 pr-6">
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              <div className="space-y-4">
                 {renderBalanceBreakdown()}
                 
                 {!isOverpaid ? (

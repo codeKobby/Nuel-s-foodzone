@@ -239,4 +239,5 @@ export interface DashboardStats {
     businessMetrics: BusinessMetrics[];
     orderAgeAnalysis: OrderAgeAnalysis[];
     incompleteAccountingDays: string[];
-    pardonedOrders: Order
+    pardonedOrders: Order[];
+}

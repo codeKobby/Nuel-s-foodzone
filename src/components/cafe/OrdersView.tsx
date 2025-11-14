@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import type { Order, CustomerReward } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, ShoppingCart, CheckCircle2, Pencil, Search, Trash2, Filter, X, Clock, Gift, PlusCircle, UserPlus, RefreshCw, MinusCircle, User } from 'lucide-react';
+import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, ShoppingCart, CheckCircle2, Pencil, Search, Trash2, Filter, X, Clock, Gift, PlusCircle, UserPlus, RefreshCw, MinusCircle, User, CreditCard, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -101,6 +101,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
     }
     return null;
   };
+  
+  const hasSplitPayment = order.paymentBreakdown && order.paymentBreakdown.cash > 0 && order.paymentBreakdown.momo > 0;
 
   return (
     <Card className={cn(
@@ -192,10 +194,14 @@ const OrderCard: React.FC<OrderCardProps> = ({
         
         {/* Payment Details */}
         <div className="space-y-1 mt-2 text-xs text-muted-foreground">
-          <div className="flex justify-between">
-            <span>Paid:</span>
-            <span>{formatCurrency(order.amountPaid)}</span>
-          </div>
+           {hasSplitPayment ? (
+            <>
+              <div className="flex justify-between font-medium text-foreground"><Landmark className="h-3 w-3 mr-1"/>Cash Paid:<span>{formatCurrency(order.paymentBreakdown.cash)}</span></div>
+              <div className="flex justify-between font-medium text-foreground"><CreditCard className="h-3 w-3 mr-1"/>MoMo Paid:<span>{formatCurrency(order.paymentBreakdown.momo)}</span></div>
+            </>
+           ) : (
+             <div className="flex justify-between"><span>Paid ({order.paymentMethod}):</span><span>{formatCurrency(order.amountPaid)}</span></div>
+           )}
           <div className="flex justify-between">
             <span>Change Given:</span>
             <span>{formatCurrency(order.changeGiven)}</span>
@@ -782,6 +788,7 @@ export default OrdersView;
     
 
     
+
 
 
 
