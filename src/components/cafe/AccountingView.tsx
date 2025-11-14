@@ -35,8 +35,6 @@ interface PeriodStats {
     momoSales: number;
     miscCashExpenses: number;
     miscMomoExpenses: number;
-    expectedCash: number;
-    expectedMomo: number;
     netRevenue: number;
     todayUnpaidOrdersValue: number;
     allTimeUnpaidOrdersValue: number;
@@ -66,8 +64,9 @@ const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string |
 const ReconciliationView: React.FC<{ 
     stats: PeriodStats | null,
     adjustedExpectedCash: number,
+    adjustedExpectedMomo: number,
     onBack: () => void 
-}> = ({ stats, adjustedExpectedCash, onBack }) => {
+}> = ({ stats, adjustedExpectedCash, adjustedExpectedMomo, onBack }) => {
     const [notes, setNotes] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
@@ -110,8 +109,8 @@ const ReconciliationView: React.FC<{
 
     const momoDiscrepancy = useMemo(() => {
         if (!stats) return 0;
-        return totalCountedMomo - stats.expectedMomo;
-    }, [totalCountedMomo, stats]);
+        return totalCountedMomo - adjustedExpectedMomo;
+    }, [totalCountedMomo, adjustedExpectedMomo, stats]);
 
     const totalDiscrepancy = useMemo(() => {
         return cashDiscrepancy + momoDiscrepancy;
@@ -142,8 +141,8 @@ const ReconciliationView: React.FC<{
                 period: format(today, 'yyyy-MM-dd'),
                 totalSales: stats.totalSales,
                 expectedCash: adjustedExpectedCash,
-                expectedMomo: stats.expectedMomo,
-                totalExpectedRevenue: adjustedExpectedCash + stats.expectedMomo,
+                expectedMomo: adjustedExpectedMomo,
+                totalExpectedRevenue: adjustedExpectedCash + adjustedExpectedMomo,
                 countedCash: totalCountedCash,
                 countedMomo: totalCountedMomo,
                 totalCountedRevenue: totalCountedCash + totalCountedMomo,
@@ -569,13 +568,13 @@ const ReconciliationView: React.FC<{
                                             <div className="flex justify-between"><span>Today's MoMo Sales:</span><span className="font-medium">{formatCurrency(stats.momoSales)}</span></div>
                                             <div className="flex justify-between text-red-600"><span>(-) MoMo Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscMomoExpenses)}</span></div>
                                             <UiSeparator />
-                                            <div className="flex justify-between font-bold text-purple-700 text-base"><span>Expected MoMo:</span><span>{formatCurrency(stats.expectedMomo)}</span></div>
+                                            <div className="flex justify-between font-bold text-purple-700 text-base"><span>Expected MoMo:</span><span>{formatCurrency(adjustedExpectedMomo)}</span></div>
                                         </div>
                                     </div>
                                 </div>
                             </CardContent>
                             <CardFooter className="bg-primary/10 p-4">
-                                <div className="w-full flex justify-between items-center"><span className="font-bold text-primary text-lg">Total Expected:</span><span className="font-extrabold text-primary text-xl">{formatCurrency(adjustedExpectedCash + stats.expectedMomo)}</span></div>
+                                <div className="w-full flex justify-between items-center"><span className="font-bold text-primary text-lg">Total Expected:</span><span className="font-extrabold text-primary text-xl">{formatCurrency(adjustedExpectedCash + adjustedExpectedMomo)}</span></div>
                             </CardFooter>
                         </Card>
 
@@ -739,7 +738,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     momoSales += order.paymentBreakdown.momo;
                                 }
                             } else {
-                                const revenueAmount = amountPaidTowardsOrder;
+                                const revenueAmount = Math.min(amountPaidTowardsOrder, order.total);
                                 
                                 if(order.paymentMethod === 'cash') {
                                     cashSales += revenueAmount;
@@ -773,11 +772,9 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 });
     
                 const allTimeUnpaidOrdersValue = previousUnpaidOrdersValue + todayUnpaidOrdersValue;
-    
                 const totalMiscExpenses = miscCashExpenses + miscMomoExpenses;
-                const expectedCash = cashSales - miscCashExpenses + settledUnpaidOrdersValue - previousDaysChangeGiven;
-                const expectedMomo = momoSales - miscMomoExpenses;
-                const netRevenue = (cashSales + momoSales) - totalMiscExpenses - totalRewardDiscount;
+                const totalRevenueToday = cashSales + momoSales;
+                const netRevenue = totalRevenueToday - totalMiscExpenses - totalRewardDiscount;
     
                 setStats({ 
                     totalSales, 
@@ -786,8 +783,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                     momoSales, 
                     miscCashExpenses, 
                     miscMomoExpenses, 
-                    expectedCash, 
-                    expectedMomo, 
                     netRevenue, 
                     todayUnpaidOrdersValue,
                     allTimeUnpaidOrdersValue,
@@ -846,14 +841,25 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
     const adjustedExpectedCash = useMemo(() => {
         if (!stats) return 0;
         let expected = stats.cashSales;
-        expected += stats.settledUnpaidOrdersValue; 
         expected -= stats.miscCashExpenses;
         expected -= stats.previousDaysChangeGiven;
+        
+        // This is a subtle point: collections from previous days could be cash or momo.
+        // We need a better way to track this, but for now, we assume collections are cash.
+        // This will be refined.
+        // expected += stats.settledUnpaidOrdersValue; 
+        
         return expected;
     }, [stats]);
 
+    const adjustedExpectedMomo = useMemo(() => {
+        if (!stats) return 0;
+        return stats.momoSales - stats.miscMomoExpenses;
+    }, [stats]);
+
+
     if (showReconciliation && stats) {
-        return <ReconciliationView stats={stats} adjustedExpectedCash={adjustedExpectedCash} onBack={() => setShowReconciliation(false)} />;
+        return <ReconciliationView stats={stats} adjustedExpectedCash={adjustedExpectedCash} adjustedExpectedMomo={adjustedExpectedMomo} onBack={() => setShowReconciliation(false)} />;
     }
 
     return (
@@ -914,13 +920,13 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                             <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
                                                 <div className="flex justify-between items-baseline">
                                                     <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Total Revenue</Label>
-                                                    <p className="text-3xl font-bold">{formatCurrency(stats.totalSales - stats.todayUnpaidOrdersValue)}</p>
+                                                    <p className="text-3xl font-bold">{formatCurrency(stats.cashSales + stats.momoSales)}</p>
                                                 </div>
                                                 
                                                 {stats.settledUnpaidOrdersValue > 0 && (
                                                     <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 text-sm">
                                                         <div className="flex justify-between items-center text-green-700 dark:text-green-300">
-                                                            <span className="font-bold">Today's Net: {formatCurrency(stats.netRevenue - stats.settledUnpaidOrdersValue)}</span>
+                                                            <span className="font-bold">Today's Net: {formatCurrency(stats.netRevenue)}</span>
                                                             <span className="font-semibold">+ Collections: {formatCurrency(stats.settledUnpaidOrdersValue)}</span>
                                                         </div>
                                                     </div>
@@ -985,4 +991,5 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
     
