@@ -748,7 +748,7 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                                     settledUnpaidOrdersValue += totalPayment;
                                 }
                             } else {
-                                // Single payment method (no breakdown)
+                                // Single payment method
                                 const amountPaidTowardsOrder = order.amountPaid - order.changeGiven;
                                 const revenueToRecord = Math.min(amountPaidTowardsOrder, order.total);
                                 
