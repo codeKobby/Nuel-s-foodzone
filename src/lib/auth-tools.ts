@@ -39,15 +39,17 @@ export async function verifyPassword(input: VerifyPasswordInput): Promise<boolea
 
     try {
         const docSnap = await getDoc(credentialRef);
-        const hashedPassword = await hashPassword(password);
 
         if (docSnap.exists()) {
+            // Document exists, compare against stored hash
             const storedHash = docSnap.data().passwordHash;
-            return storedHash === hashedPassword;
+            const hashedInputPassword = await hashPassword(password);
+            return storedHash === hashedInputPassword;
         } else {
+            // Document doesn't exist, check against default password
             const defaultPassword = DEFAULT_PASSWORDS[role as keyof typeof DEFAULT_PASSWORDS];
             if (password === defaultPassword) {
-                // Lazily create the credential document if it doesn't exist
+                // If it matches, create the document with the hashed default password for future use
                 const newHash = await hashPassword(defaultPassword);
                 await setDoc(credentialRef, { passwordHash: newHash });
                 return true;
@@ -101,16 +103,26 @@ export async function verifyCashierPassword(username: string, password: string):
 export async function updatePassword(input: UpdatePasswordInput): Promise<{ success: boolean, message: string }> {
     const { role, currentPassword, newPassword } = input;
 
+    // First, verify the current password is correct.
     const isAuthorized = await verifyPassword({ role, password: currentPassword });
 
     if (!isAuthorized) {
         return { success: false, message: "Incorrect current password." };
     }
 
+    // If authorized, proceed to update the password.
     try {
         const credentialRef = doc(db, "credentials", role);
         const newHash = await hashPassword(newPassword);
-        await updateDoc(credentialRef, { passwordHash: newHash });
+        
+        // Ensure the document exists before updating, or create it.
+        const docSnap = await getDoc(credentialRef);
+        if (docSnap.exists()) {
+            await updateDoc(credentialRef, { passwordHash: newHash });
+        } else {
+            await setDoc(credentialRef, { passwordHash: newHash });
+        }
+
         return { success: true, message: "Password updated successfully." };
     } catch (error) {
         console.error("Error updating password:", error);

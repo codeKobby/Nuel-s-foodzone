@@ -82,11 +82,12 @@ const AdminForm = ({
     </form>
 );
 
-const SecuritySettings = ({ toast }: { toast: any }) => {
+const SecuritySettings = () => {
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const { toast } = useToast();
 
     const handlePasswordUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -322,7 +323,7 @@ const AdminView: React.FC = () => {
                                             <SheetTitle className="text-2xl">Security</SheetTitle>
                                         </SheetHeader>
                                         <div className="p-4 overflow-y-auto">
-                                            <SecuritySettings toast={toast} />
+                                            <SecuritySettings />
                                         </div>
                                     </SheetContent>
                                 </Sheet>
@@ -406,7 +407,7 @@ const AdminView: React.FC = () => {
                                 <CardDescription>Update your account password.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <SecuritySettings toast={toast} />
+                                <SecuritySettings />
                             </CardContent>
                         </TabsContent>
                      </Tabs>
