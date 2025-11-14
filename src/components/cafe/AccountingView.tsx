@@ -1,10 +1,9 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { collection, query, where, getDocs, Timestamp, addDoc, onSnapshot, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
+import type { Order, MiscExpense, ReconciliationReport, Payment } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, FileSignature, AlertCircle, Lock, ShoppingCart, TrendingUp, TrendingDown, CheckCircle, FileText, Banknote, Smartphone, X, Coins, ArrowRightLeft, HelpCircle, Landmark, CreditCard, DollarSign, Hourglass, MinusCircle, Ban, Gift, Wrench, Loader } from 'lucide-react';
@@ -168,7 +167,6 @@ const ReconciliationView: React.FC<{
             resetForm();
             setShowConfirm(false);
             
-            // Add a small delay before navigation
             setTimeout(() => {
                 onBack();
             }, 100);
@@ -680,15 +678,15 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 allOrders.forEach(order => {
                     const orderDate = order.timestamp.toDate();
                     const isTodayOrder = orderDate >= todayStart && orderDate <= todayEnd;
-
+                
                     // Unpaid value from previous days
                     if (orderDate < todayStart && (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid')) {
                         previousUnpaidOrdersValue += order.balanceDue;
                     }
-
+                
                     if (isTodayOrder) {
                         todayOrders.push(order);
-
+                
                         // Total Sales for today (from completed orders created today)
                         if (order.status === "Completed") {
                             totalSales += order.total;
@@ -711,48 +709,63 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                             changeOwedForPeriod += Math.abs(order.balanceDue);
                         }
                     }
-
-                    // CORRECTED REVENUE CALCULATION
-                    // Check for payments made TODAY, regardless of when the order was created
-                    
-                    const paymentDate = order.lastPaymentTimestamp?.toDate();
-                    if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
-                        // This block handles payments made today
-                        const paymentAmount = order.lastPaymentAmount || 0;
-
-                        if (order.paymentBreakdown && order.paymentMethod === 'split') {
-                            // If it's a split payment, the breakdown is the source of truth for the entire order's payment.
-                            // We need to figure out what portion of THIS payment belongs to cash vs momo.
-                            // This logic is complex. A simpler, more robust way is to trust the FINAL breakdown.
-                            // The issue is this runs for every order. Let's rethink.
-
-                            // New Strategy: The `paymentBreakdown` on the order is the CUMULATIVE total.
-                            // `lastPaymentAmount` is just the most recent transaction.
-                            // The Accounting page should sum the breakdowns of all orders paid today.
-                            // Let's adjust the logic here to be simpler and correct it later if needed.
-                            // For now, let's assume `paymentBreakdown` is for the whole order.
-                        
-                        }
-
-                        // If payment was for an order from a previous day, it's a "collection"
-                        if (!isTodayOrder) {
-                            settledUnpaidOrdersValue += paymentAmount;
+                
+                    // Check if there's a payment history array (best approach)
+                    if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
+                        order.paymentHistory.forEach(payment => {
+                            const paymentDate = payment.timestamp?.toDate();
+                            if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
+                                const paymentAmount = payment.amount || 0;
+                                
+                                if (payment.method === 'cash') {
+                                    cashSales += paymentAmount;
+                                } else if (payment.method === 'momo' || payment.method === 'card') {
+                                    momoSales += paymentAmount;
+                                }
+                                
+                                // Track settlements of old orders
+                                if (!isTodayOrder) {
+                                    settledUnpaidOrdersValue += paymentAmount;
+                                }
+                            }
+                        });
+                    } else {
+                        // FALLBACK: For orders without payment history
+                        const paymentDate = order.lastPaymentTimestamp?.toDate();
+                        if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
+                            // CRITICAL FIX: Always prefer paymentBreakdown when it exists
+                            if (order.paymentBreakdown && (order.paymentBreakdown.cash || order.paymentBreakdown.momo)) {
+                                if (order.paymentBreakdown.cash && order.paymentBreakdown.cash > 0) {
+                                    cashSales += order.paymentBreakdown.cash;
+                                }
+                                if (order.paymentBreakdown.momo && order.paymentBreakdown.momo > 0) {
+                                    momoSales += order.paymentBreakdown.momo;
+                                }
+                                
+                                if (!isTodayOrder) {
+                                    const totalPayment = (order.paymentBreakdown.cash || 0) + (order.paymentBreakdown.momo || 0);
+                                    settledUnpaidOrdersValue += totalPayment;
+                                }
+                            } else {
+                                // Single payment method (no breakdown)
+                                const revenueToRecord = order.amountPaid - order.changeGiven;
+                                
+                                if (order.paymentMethod === 'cash') {
+                                    cashSales += revenueToRecord;
+                                } else if (order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
+                                    momoSales += revenueToRecord;
+                                }
+                
+                                if (!isTodayOrder) {
+                                    settledUnpaidOrdersValue += revenueToRecord;
+                                }
+                            }
                         }
                     }
-
-                    if (order.paymentBreakdown) {
-                        const isPaidToday = order.lastPaymentTimestamp?.toDate() >= todayStart && order.lastPaymentTimestamp?.toDate() <= todayEnd;
-                        if (isPaidToday) {
-                            cashSales += order.paymentBreakdown.cash || 0;
-                            momoSales += order.paymentBreakdown.momo || 0;
-                        }
-                    }
-                    
-
-                    // Change given today for old orders (orders from previous days that were settled today)
+                
+                    // Change given today for old orders
                     const settledDate = order.settledOn?.toDate();
                     if (settledDate && settledDate >= todayStart && settledDate <= todayEnd && !isTodayOrder) {
-                        // Only count change given beyond what was pardoned
                         if (order.changeGiven > (order.pardonedAmount || 0)) {
                              previousDaysChangeGiven += (order.changeGiven - (order.pardonedAmount || 0));
                         }
@@ -772,21 +785,16 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
                 const allTimeUnpaidOrdersValue = previousUnpaidOrdersValue + todayUnpaidOrdersValue;
     
                 const totalMiscExpenses = miscCashExpenses + miscMomoExpenses;
-                // Recalculate based on corrected sales figures
-                const finalCashSales = cashSales;
-                const finalMomoSales = momoSales;
+                const expectedCash = cashSales - miscCashExpenses + settledUnpaidOrdersValue - previousDaysChangeGiven;
+                const expectedMomo = momoSales - miscMomoExpenses;
 
-                const expectedCash = finalCashSales - miscCashExpenses + settledUnpaidOrdersValue - previousDaysChangeGiven;
-                const expectedMomo = finalMomoSales - miscMomoExpenses;
-
-                // Net revenue is based on what was SOLD today, not what was collected
-                const netRevenue = totalSales - totalMiscExpenses - totalRewardDiscount - totalPardonedAmount;
+                const netRevenue = (cashSales + momoSales) - totalMiscExpenses - totalRewardDiscount;
     
                 setStats({ 
                     totalSales, 
                     totalItemsSold, 
-                    cashSales: finalCashSales, 
-                    momoSales: finalMomoSales, 
+                    cashSales, 
+                    momoSales, 
                     miscCashExpenses, 
                     miscMomoExpenses, 
                     expectedCash, 
@@ -852,8 +860,6 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
         expected += stats.settledUnpaidOrdersValue; 
         expected -= stats.miscCashExpenses;
         expected -= stats.previousDaysChangeGiven;
-        // Pardoned amount is a reduction in expected revenue, so it should not be subtracted from cash
-        // expected -= stats.totalPardonedAmount; 
         return expected;
     }, [stats]);
 
@@ -990,3 +996,5 @@ const AccountingView: React.FC<{setActiveView: (view: string) => void}> = ({setA
 };
 
 export default AccountingView;
+
+    

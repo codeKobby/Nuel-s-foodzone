@@ -1,4 +1,3 @@
-
 import type { Timestamp } from 'firebase/firestore';
 import type { AnalyzeBusinessOutputSchema } from '@/ai/schemas';
 import { z } from 'zod';
@@ -241,3 +240,5 @@ export interface DashboardStats {
     incompleteAccountingDays: string[];
     pardonedOrders: Order[];
 }
+
+    
