@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { doc, getDoc, updateDoc, writeBatch, serverTimestamp, collection, Timestamp, runTransaction, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
@@ -14,7 +15,6 @@ import { AlertTriangle, Calculator, Info, Gift, Search as SearchIcon, User as Us
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { AuthContext } from '@/context/AuthContext';
-import { useContext } from 'react';
 import { useToast } from '@/hooks/use-toast'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -262,10 +262,12 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           };
           orderData.paymentBreakdown = newBreakdown;
 
-          let finalPaymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid' = 'Unpaid';
+          let finalPaymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid' = editingOrder.paymentMethod;
+
           if (newBreakdown.cash > 0 && newBreakdown.momo > 0) finalPaymentMethod = 'split';
-          else if (newBreakdown.cash > 0) finalPaymentMethod = 'cash';
-          else if (newBreakdown.momo > 0) finalPaymentMethod = 'momo';
+          else if (newBreakdown.cash > 0 && newBreakdown.momo === 0) finalPaymentMethod = 'cash';
+          else if (newBreakdown.momo > 0 && newBreakdown.cash === 0) finalPaymentMethod = 'momo';
+          
           orderData.paymentMethod = finalPaymentMethod;
 
           orderData.amountPaid = (editingOrder.amountPaid || 0) + paymentAmounts.totalPaidNow;
