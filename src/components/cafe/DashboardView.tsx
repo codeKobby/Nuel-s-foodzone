@@ -5,14 +5,13 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { collection, query, where, getDocs, orderBy, Timestamp, doc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import type { 
-    Order, 
-    MiscExpense, 
-    EnhancedReconciliationReport, 
-    ChatSession, 
-    DashboardStats,
-    ChatMessage
+import type {
+  Order,
+  MiscExpense,
+  EnhancedReconciliationReport,
+  ChatSession,
+  DashboardStats,
+  ChatMessage
 } from '@/lib/types';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, Sparkles, User, Bot, Send, Calendar as CalendarIcon, AlertTriangle, Check, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, FileCheck, Clock, Eye, MessageSquare, Plus, ArrowDownUp as SortDesc, ArrowUpWideNarrow as SortAsc } from 'lucide-react';
@@ -56,19 +55,19 @@ import {
 } from "@/components/ui/sheet"
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { analyzeBusiness } from '@/ai/flows/analyze-business-flow';
-import { businessChat } from '@/ai/flows/business-chat-flow';
+import { analyzeBusiness } from '@/ai/actions';
+import { useChat } from '@ai-sdk/react';
 import { useToast } from '@/hooks/use-toast';
 
 type ItemSortKey = 'count' | 'totalValue';
 type ItemSortDirection = 'asc' | 'desc';
 type PresetDateRange = 'today' | 'week' | 'month' | 'custom';
 
-const StatCard: React.FC<{ 
-  icon: React.ReactNode; 
-  title: string; 
-  value: string | number; 
-  description?: string; 
+const StatCard: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  value: string | number;
+  description?: string;
   onClick?: () => void;
   variant?: 'default' | 'warning' | 'success' | 'danger';
   badge?: React.ReactNode;
@@ -123,28 +122,29 @@ const DashboardView: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [date, setDate] = useState<DateRange | undefined>({ 
-    from: startOfWeek(new Date(), { weekStartsOn: 1 }), 
-    to: endOfToday() 
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+    to: endOfToday()
   });
   const [activeDatePreset, setActiveDatePreset] = useState<PresetDateRange>('week');
-  
+
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
   const [analysisContent, setAnalysisContent] = useState('');
   const [isGeneratingAnalysis, setIsGeneratingAnalysis] = useState(false);
-  
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [isAiReplying, setIsAiReplying] = useState(false);
+
+  const { messages, sendMessage, isLoading: isChatLoading, setMessages } = useChat({
+    api: '/api/chat',
+  } as any) as any;
   const [chatInput, setChatInput] = useState('');
   const [isChatSheetOpen, setIsChatSheetOpen] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  
+
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [itemSortKey, setItemSortKey] = useState<ItemSortKey>('count');
   const [itemSortDirection, setItemSortDirection] = useState<ItemSortDirection>('desc');
   const [isUnpaidOrdersModalOpen, setIsUnpaidOrdersModalOpen] = useState(false);
   const [allUnpaidOrders, setAllUnpaidOrders] = useState<Order[]>([]);
-  
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -160,161 +160,161 @@ const DashboardView: React.FC = () => {
     const reportsQuery = query(collection(db, "reconciliationReports"), where("timestamp", ">=", startDate), where("timestamp", "<=", endDate));
 
     const unsubOrders = onSnapshot(ordersQuery, (ordersSnapshot) => {
-        const unsubExpenses = onSnapshot(expensesQuery, (expensesSnapshot) => {
-            const unsubReports = onSnapshot(reportsQuery, (reportsSnapshot) => {
-                try {
-                    const allOrders = ordersSnapshot.docs.map(d => ({...d.data(), id: d.id})) as Order[];
-                    
-                    const ordersCreatedInPeriod = allOrders.filter(o => 
-                        o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate
-                    );
-                    
-                    const unpaidOrders = allOrders.filter(o => o.balanceDue > 0);
-                    setAllUnpaidOrders(unpaidOrders);
-                    const unpaidOrdersValue = unpaidOrders.reduce((sum, o) => sum + o.balanceDue, 0);
-                    const overdueOrdersCount = unpaidOrders.filter(o => differenceInDays(new Date(), o.timestamp.toDate()) > 2).length;
+      const unsubExpenses = onSnapshot(expensesQuery, (expensesSnapshot) => {
+        const unsubReports = onSnapshot(reportsQuery, (reportsSnapshot) => {
+          try {
+            const allOrders = ordersSnapshot.docs.map(d => ({ ...d.data(), id: d.id })) as Order[];
 
-                    const periodExpenses = expensesSnapshot.docs.map(d => d.data()) as MiscExpense[];
-                    const periodReports = reportsSnapshot.docs.map(d => d.data()) as EnhancedReconciliationReport[];
-                    
-                    const totalSales = ordersCreatedInPeriod
-                        .filter(o => o.status === 'Completed')
-                        .reduce((sum, o) => sum + o.total, 0);
-                    
-                    const totalOrders = ordersCreatedInPeriod.length;
-                    const totalItemsSold = ordersCreatedInPeriod
-                        .filter(o => o.status === 'Completed')
-                        .reduce((sum, o) => sum + o.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0);
-                    
-                    let cashSales = 0;
-                    let momoSales = 0;
-                    let newSalesRevenue = 0;
-                    let collections = 0;
-                    let totalPardonedAmount = 0;
+            const ordersCreatedInPeriod = allOrders.filter(o =>
+              o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate
+            );
 
-                    allOrders.forEach(o => {
-                      const paymentDate = o.lastPaymentTimestamp?.toDate();
-                      if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
-                          const paymentAmount = o.lastPaymentAmount || 0;
-                          const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
-                          if (isOrderFromPeriod) {
-                              newSalesRevenue += paymentAmount;
-                          } else {
-                              collections += paymentAmount;
-                          }
+            const unpaidOrders = allOrders.filter(o => o.balanceDue > 0);
+            setAllUnpaidOrders(unpaidOrders);
+            const unpaidOrdersValue = unpaidOrders.reduce((sum, o) => sum + o.balanceDue, 0);
+            const overdueOrdersCount = unpaidOrders.filter(o => differenceInDays(new Date(), o.timestamp.toDate()) > 2).length;
 
-                          if (o.paymentMethod === 'cash') cashSales += paymentAmount;
-                          if (o.paymentMethod === 'momo') momoSales += paymentAmount;
-                      }
+            const periodExpenses = expensesSnapshot.docs.map(d => d.data()) as MiscExpense[];
+            const periodReports = reportsSnapshot.docs.map(d => d.data()) as EnhancedReconciliationReport[];
 
-                      if (o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate) {
-                        totalPardonedAmount += (o.pardonedAmount || 0);
-                      }
-                    });
+            const totalSales = ordersCreatedInPeriod
+              .filter(o => o.status === 'Completed')
+              .reduce((sum, o) => sum + o.total, 0);
 
-                    const totalMiscExpenses = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
-                    const netRevenueFromNewSales = newSalesRevenue - totalMiscExpenses;
-                    const totalNetRevenue = (newSalesRevenue + collections) - totalMiscExpenses;
-                    
-                    const totalVariance = periodReports.reduce((sum, r) => sum + r.totalDiscrepancy, 0);
-                    const totalSurplus = periodReports.reduce((sum, r) => sum + (r.totalDiscrepancy > 0 ? r.totalDiscrepancy : 0), 0);
-                    const totalDeficit = periodReports.reduce((sum, r) => sum + (r.totalDiscrepancy < 0 ? r.totalDiscrepancy : 0), 0);
+            const totalOrders = ordersCreatedInPeriod.length;
+            const totalItemsSold = ordersCreatedInPeriod
+              .filter(o => o.status === 'Completed')
+              .reduce((sum, o) => sum + o.items.reduce((itemSum, i) => itemSum + i.quantity, 0), 0);
 
+            let cashSales = 0;
+            let momoSales = 0;
+            let newSalesRevenue = 0;
+            let collections = 0;
+            let totalPardonedAmount = 0;
 
-                    const salesDataMap: Record<string, { newSales: number; collections: number; expenses: number; netRevenue: number; cashierNames: Set<string> }> = {};
-                    const daysInRange = differenceInDays(endDate, startDate) + 1;
-                    for (let i = 0; i < daysInRange; i++) {
-                        const day = format(addDays(startDate, i), 'MMM d');
-                        salesDataMap[day] = { newSales: 0, collections: 0, netRevenue: 0, expenses: 0, cashierNames: new Set() };
-                    }
-
-                    allOrders.forEach(o => {
-                        const paymentDate = o.lastPaymentTimestamp?.toDate();
-                        if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
-                            const day = format(paymentDate, 'MMM d');
-                            if (salesDataMap[day]) {
-                                const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
-                                const paymentAmount = o.lastPaymentAmount || 0;
-                                if(isOrderFromPeriod) {
-                                    salesDataMap[day].newSales += paymentAmount;
-                                } else {
-                                    salesDataMap[day].collections += paymentAmount;
-                                }
-                                if (o.cashierName) salesDataMap[day].cashierNames.add(o.cashierName);
-                            }
-                        }
-                    });
-
-                    periodExpenses.forEach(e => {
-                        const day = format(e.timestamp.toDate(), 'MMM d');
-                        if (salesDataMap[day]) {
-                            salesDataMap[day].expenses += e.amount;
-                            if(e.cashierName) salesDataMap[day].cashierNames.add(e.cashierName);
-                        }
-                    });
-                    
-                    const salesData = Object.entries(salesDataMap).map(([date, values]) => ({
-                        date,
-                        ...values,
-                        netRevenue: values.newSales + values.collections - values.expenses,
-                        cashierNames: Array.from(values.cashierNames).join(', ')
-                    }));
-                    
-                    const itemPerformance = ordersCreatedInPeriod
-                        .filter(o => o.status === 'Completed')
-                        .flatMap(o => o.items)
-                        .reduce((acc, item) => {
-                            if (!acc[item.name]) {
-                                acc[item.name] = { name: item.name, count: 0, totalValue: 0 };
-                            }
-                            acc[item.name].count += item.quantity;
-                            acc[item.name].totalValue += item.quantity * item.price;
-                            return acc;
-                        }, {} as Record<string, { name: string; count: number; totalValue: number }>);
-                    
-                    const finalStats: DashboardStats = {
-                        totalSales,
-                        previousDayCollections: collections,
-                        totalOrders,
-                        totalItemsSold,
-                        unpaidOrdersValue,
-                        overdueOrdersCount,
-                        totalMiscExpenses,
-                        totalVariance,
-                        enhancedReports: periodReports,
-                        salesData,
-                        itemPerformance: Object.values(itemPerformance),
-                        netRevenueFromNewSales,
-                        totalNetRevenue,
-                        cashSales,
-                        momoSales,
-                        changeFundImpact: 0, 
-                        changeFundHealth: 'healthy', 
-                        totalPardonedAmount,
-                        totalSurplus,
-                        totalDeficit,
-                        dailyStats: [], 
-                        businessMetrics: [],
-                        orderAgeAnalysis: [],
-                        incompleteAccountingDays: [],
-                        pardonedOrders: [],
-                    };
-
-                    setStats(finalStats);
-                } catch(err) {
-                    console.error(err);
-                    if (err instanceof Error) {
-                        setError(`Failed to process dashboard data: ${err.message}.`);
-                    } else {
-                        setError("An unknown error occurred while processing dashboard data.");
-                    }
-                } finally {
-                    setLoading(false);
+            allOrders.forEach(o => {
+              const paymentDate = o.lastPaymentTimestamp?.toDate();
+              if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                const paymentAmount = o.lastPaymentAmount || 0;
+                const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
+                if (isOrderFromPeriod) {
+                  newSalesRevenue += paymentAmount;
+                } else {
+                  collections += paymentAmount;
                 }
+
+                if (o.paymentMethod === 'cash') cashSales += paymentAmount;
+                if (o.paymentMethod === 'momo') momoSales += paymentAmount;
+              }
+
+              if (o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate) {
+                totalPardonedAmount += (o.pardonedAmount || 0);
+              }
             });
-            return () => unsubReports();
+
+            const totalMiscExpenses = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
+            const netRevenueFromNewSales = newSalesRevenue - totalMiscExpenses;
+            const totalNetRevenue = (newSalesRevenue + collections) - totalMiscExpenses;
+
+            const totalVariance = periodReports.reduce((sum, r) => sum + r.totalDiscrepancy, 0);
+            const totalSurplus = periodReports.reduce((sum, r) => sum + (r.totalDiscrepancy > 0 ? r.totalDiscrepancy : 0), 0);
+            const totalDeficit = periodReports.reduce((sum, r) => sum + (r.totalDiscrepancy < 0 ? r.totalDiscrepancy : 0), 0);
+
+
+            const salesDataMap: Record<string, { newSales: number; collections: number; expenses: number; netRevenue: number; cashierNames: Set<string> }> = {};
+            const daysInRange = differenceInDays(endDate, startDate) + 1;
+            for (let i = 0; i < daysInRange; i++) {
+              const day = format(addDays(startDate, i), 'MMM d');
+              salesDataMap[day] = { newSales: 0, collections: 0, netRevenue: 0, expenses: 0, cashierNames: new Set() };
+            }
+
+            allOrders.forEach(o => {
+              const paymentDate = o.lastPaymentTimestamp?.toDate();
+              if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                const day = format(paymentDate, 'MMM d');
+                if (salesDataMap[day]) {
+                  const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
+                  const paymentAmount = o.lastPaymentAmount || 0;
+                  if (isOrderFromPeriod) {
+                    salesDataMap[day].newSales += paymentAmount;
+                  } else {
+                    salesDataMap[day].collections += paymentAmount;
+                  }
+                  if (o.cashierName) salesDataMap[day].cashierNames.add(o.cashierName);
+                }
+              }
+            });
+
+            periodExpenses.forEach(e => {
+              const day = format(e.timestamp.toDate(), 'MMM d');
+              if (salesDataMap[day]) {
+                salesDataMap[day].expenses += e.amount;
+                if (e.cashierName) salesDataMap[day].cashierNames.add(e.cashierName);
+              }
+            });
+
+            const salesData = Object.entries(salesDataMap).map(([date, values]) => ({
+              date,
+              ...values,
+              netRevenue: values.newSales + values.collections - values.expenses,
+              cashierNames: Array.from(values.cashierNames).join(', ')
+            }));
+
+            const itemPerformance = ordersCreatedInPeriod
+              .filter(o => o.status === 'Completed')
+              .flatMap(o => o.items)
+              .reduce((acc, item) => {
+                if (!acc[item.name]) {
+                  acc[item.name] = { name: item.name, count: 0, totalValue: 0 };
+                }
+                acc[item.name].count += item.quantity;
+                acc[item.name].totalValue += item.quantity * item.price;
+                return acc;
+              }, {} as Record<string, { name: string; count: number; totalValue: number }>);
+
+            const finalStats: DashboardStats = {
+              totalSales,
+              previousDayCollections: collections,
+              totalOrders,
+              totalItemsSold,
+              unpaidOrdersValue,
+              overdueOrdersCount,
+              totalMiscExpenses,
+              totalVariance,
+              enhancedReports: periodReports,
+              salesData,
+              itemPerformance: Object.values(itemPerformance),
+              netRevenueFromNewSales,
+              totalNetRevenue,
+              cashSales,
+              momoSales,
+              changeFundImpact: 0,
+              changeFundHealth: 'healthy',
+              totalPardonedAmount,
+              totalSurplus,
+              totalDeficit,
+              dailyStats: [],
+              businessMetrics: [],
+              orderAgeAnalysis: [],
+              incompleteAccountingDays: [],
+              pardonedOrders: [],
+            };
+
+            setStats(finalStats);
+          } catch (err) {
+            console.error(err);
+            if (err instanceof Error) {
+              setError(`Failed to process dashboard data: ${err.message}.`);
+            } else {
+              setError("An unknown error occurred while processing dashboard data.");
+            }
+          } finally {
+            setLoading(false);
+          }
         });
-        return () => unsubExpenses();
+        return () => unsubReports();
+      });
+      return () => unsubExpenses();
     });
     return () => unsubOrders();
   }, [date]);
@@ -322,7 +322,7 @@ const DashboardView: React.FC = () => {
   const setDateRange = (rangeType: PresetDateRange) => {
     const today = new Date();
     let fromDate, toDate;
-    
+
     switch (rangeType) {
       case 'today':
         fromDate = startOfToday();
@@ -342,8 +342,8 @@ const DashboardView: React.FC = () => {
     setDate({ from: fromDate, to: toDate });
     setActiveDatePreset(rangeType);
   };
-  
-    const handleRunAnalysis = async () => {
+
+  const handleRunAnalysis = async () => {
     if (!stats || !date?.from) return;
 
     setIsGeneratingAnalysis(true);
@@ -351,42 +351,42 @@ const DashboardView: React.FC = () => {
     setAnalysisContent('');
 
     try {
-        const itemPerformance = stats.itemPerformance.map(({ name, count }) => ({ name, count }));
-        const avgOrderValue = stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0;
-        
-        const period = date.to 
-            ? `From ${format(date.from, 'MMMM do, yyyy')} to ${format(date.to, 'MMMM do, yyyy')}`
-            : `For ${format(date.from, 'MMMM do, yyyy')}`;
+      const itemPerformance = stats.itemPerformance.map(({ name, count }) => ({ name, count }));
+      const avgOrderValue = stats.totalOrders > 0 ? stats.totalSales / stats.totalOrders : 0;
 
-        const input = {
-            period,
-            totalSales: stats.totalSales,
-            netRevenue: stats.totalNetRevenue,
-            totalOrders: stats.totalOrders,
-            avgOrderValue,
-            itemPerformance,
-            miscExpenses: stats.totalMiscExpenses,
-            cashDiscrepancy: stats.totalVariance ?? 0,
-        };
+      const period = date.to
+        ? `From ${format(date.from, 'MMMM do, yyyy')} to ${format(date.to, 'MMMM do, yyyy')}`
+        : `For ${format(date.from, 'MMMM do, yyyy')}`;
 
-        const result = await analyzeBusiness(input);
-        setAnalysisContent(result.analysis);
+      const input = {
+        period,
+        totalSales: stats.totalSales,
+        netRevenue: stats.totalNetRevenue,
+        totalOrders: stats.totalOrders,
+        avgOrderValue,
+        itemPerformance,
+        miscExpenses: stats.totalMiscExpenses,
+        cashDiscrepancy: stats.totalVariance ?? 0,
+      };
+
+      const result = await analyzeBusiness(input);
+      setAnalysisContent(result.analysis);
     } catch (err) {
-        console.error("AI Analysis failed:", err);
-        setAnalysisContent("## Analysis Failed\n\nAn unexpected error occurred while generating the business analysis. Please check the console for more details.");
-        toast({
-            title: "AI Analysis Error",
-            description: "Could not generate the report. Please try again later.",
-            type: "error",
-        });
+      console.error("AI Analysis failed:", err);
+      setAnalysisContent("## Analysis Failed\n\nAn unexpected error occurred while generating the business analysis. Please check the console for more details.");
+      toast({
+        title: "AI Analysis Error",
+        description: "Could not generate the report. Please try again later.",
+        type: "error",
+      });
     } finally {
-        setIsGeneratingAnalysis(false);
+      setIsGeneratingAnalysis(false);
     }
   };
 
   const sortedItemSales = useMemo(() => {
     if (!stats) return [];
-    const filtered = stats.itemPerformance.filter(item => 
+    const filtered = stats.itemPerformance.filter(item =>
       item.name.toLowerCase().includes(itemSearchQuery.toLowerCase())
     );
     return filtered.sort((a, b) => {
@@ -397,50 +397,17 @@ const DashboardView: React.FC = () => {
       }
     });
   }, [stats, itemSearchQuery, itemSortKey, itemSortDirection]);
-  
-    const handleSendMessage = async () => {
-    if (!chatInput.trim()) return;
 
-    const userMessage: ChatMessage = {
-      role: 'user',
-      content: [{ text: chatInput }],
-    };
 
-    setChatHistory(prev => [...prev, userMessage]);
-    setChatInput('');
-    setIsAiReplying(true);
-
-    try {
-      const responseText = await businessChat({
-        history: chatHistory,
-        prompt: userMessage.content[0].text,
-      });
-
-      const modelMessage: ChatMessage = {
-        role: 'model',
-        content: [{ text: responseText }],
-      };
-      setChatHistory(prev => [...prev, modelMessage]);
-    } catch (err) {
-      console.error("AI Chat failed:", err);
-      const errorMessage: ChatMessage = {
-        role: 'model',
-        content: [{ text: "I'm sorry, I encountered an error. Please try again." }],
-      };
-      setChatHistory(prev => [...prev, errorMessage]);
-    } finally {
-      setIsAiReplying(false);
-    }
-  };
 
   const SortButton = ({ sortKey, label }: { sortKey: ItemSortKey; label: string }) => (
     <Button variant="ghost" size="sm" onClick={() => {
-        if (itemSortKey === sortKey) {
-            setItemSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-        } else {
-            setItemSortKey(sortKey);
-            setItemSortDirection('desc');
-        }
+      if (itemSortKey === sortKey) {
+        setItemSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+      } else {
+        setItemSortKey(sortKey);
+        setItemSortDirection('desc');
+      }
     }}>
       {label}
       {itemSortKey === sortKey && (
@@ -453,23 +420,23 @@ const DashboardView: React.FC = () => {
     <div className="flex-grow flex flex-col overflow-hidden h-full">
       <ScrollArea className="flex-grow p-4" ref={chatContainerRef}>
         <div className="space-y-4">
-          {chatHistory.length === 0 && !isAiReplying && (
+          {messages.length === 0 && !isChatLoading && (
             <div className="text-center text-muted-foreground pt-16">
               <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="text-lg font-medium mb-2">AI Business Assistant</p>
               <p>Ask me anything about your business performance.</p>
             </div>
           )}
-          {chatHistory.map((message, index) => (
-            <div key={index} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}>
-              {message.role === 'model' && <Avatar className="h-8 w-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>}
-              <div className={`rounded-lg px-4 py-2 max-w-sm ${message.role === 'model' ? 'bg-secondary' : 'bg-primary text-primary-foreground'}`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">{message.content[0].text}</ReactMarkdown>
+          {messages.map((message: any) => (
+            <div key={message.id} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}>
+              {message.role === 'assistant' && <Avatar className="h-8 w-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>}
+              <div className={`rounded-lg px-4 py-2 max-w-sm ${message.role === 'assistant' ? 'bg-secondary' : 'bg-primary text-primary-foreground'}`}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">{message.content}</ReactMarkdown>
               </div>
               {message.role === 'user' && <Avatar className="h-8 w-8"><AvatarFallback><User /></AvatarFallback></Avatar>}
             </div>
           ))}
-          {isAiReplying && (
+          {isChatLoading && (
             <div className="flex items-start gap-3">
               <Avatar className="h-8 w-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>
               <div className="rounded-lg px-4 py-2 bg-secondary"><LoadingSpinner /></div>
@@ -477,13 +444,28 @@ const DashboardView: React.FC = () => {
           )}
         </div>
       </ScrollArea>
-      <div className="flex-shrink-0 p-4 border-t bg-background flex gap-2">
-        <Input placeholder="Ask about your business..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isAiReplying && handleSendMessage()} disabled={isAiReplying} className="h-12" />
-        <Button onClick={handleSendMessage} disabled={isAiReplying || !chatInput.trim()} className="h-12"><Send /></Button>
-      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const text = chatInput.trim();
+          if (!text) return;
+          sendMessage(text);
+          setChatInput('');
+        }}
+        className="flex-shrink-0 p-4 border-t bg-background flex gap-2"
+      >
+        <Input
+          placeholder="Ask about your business..."
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          disabled={isChatLoading}
+          className="h-12"
+        />
+        <Button type="submit" disabled={isChatLoading || !chatInput.trim()} className="h-12"><Send /></Button>
+      </form>
     </div>
   );
-  
+
   const UnpaidOrdersModal = () => (
     <Dialog open={isUnpaidOrdersModalOpen} onOpenChange={setIsUnpaidOrdersModalOpen}>
       <DialogContent className="max-w-2xl">
@@ -542,7 +524,7 @@ const DashboardView: React.FC = () => {
           </div>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("w-full sm:w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground", activeDatePreset === 'custom' && 'border-primary' )}>
+              <Button variant="outline" className={cn("w-full sm:w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground", activeDatePreset === 'custom' && 'border-primary')}>
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {date?.from ? (date.to ? <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</> : format(date.from, "LLL dd, y")) : <span>Pick a date</span>}
               </Button>
@@ -551,7 +533,7 @@ const DashboardView: React.FC = () => {
               <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={(newDate) => { setDate(newDate); setActiveDatePreset('custom'); }} numberOfMonths={2} />
             </PopoverContent>
           </Popover>
-           <Button onClick={handleRunAnalysis} className="w-full sm:w-auto"><Sparkles className="mr-2 h-4 w-4" />Analyze</Button>
+          <Button onClick={handleRunAnalysis} className="w-full sm:w-auto"><Sparkles className="mr-2 h-4 w-4" />Analyze</Button>
         </div>
       </div>
 
@@ -563,14 +545,14 @@ const DashboardView: React.FC = () => {
 
         <TabsContent value="overview" className="mt-6 space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard icon={<DollarSign className="text-green-500"/>} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalOrders} orders in period`} />
-            <StatCard icon={<TrendingUp className="text-blue-500"/>} title="Net Revenue" value={formatCurrency(stats.totalNetRevenue)} description={`+${formatCurrency(stats.previousDayCollections)} from collections`} />
-            <StatCard icon={<MinusCircle className="text-orange-500"/>} title="Expenses" value={formatCurrency(stats.totalMiscExpenses)} description="Misc. cash/momo outs" />
-            <StatCard 
-              icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"}/>} 
-              title="Unpaid Orders (All Time)" 
-              value={formatCurrency(stats.unpaidOrdersValue)} 
-              description={`${stats.overdueOrdersCount} overdue`} 
+            <StatCard icon={<DollarSign className="text-green-500" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalOrders} orders in period`} />
+            <StatCard icon={<TrendingUp className="text-blue-500" />} title="Net Revenue" value={formatCurrency(stats.totalNetRevenue)} description={`+${formatCurrency(stats.previousDayCollections)} from collections`} />
+            <StatCard icon={<MinusCircle className="text-orange-500" />} title="Expenses" value={formatCurrency(stats.totalMiscExpenses)} description="Misc. cash/momo outs" />
+            <StatCard
+              icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"} />}
+              title="Unpaid Orders (All Time)"
+              value={formatCurrency(stats.unpaidOrdersValue)}
+              description={`${stats.overdueOrdersCount} overdue`}
               variant={stats.overdueOrdersCount > 0 ? 'danger' : 'default'}
               badge={stats.overdueOrdersCount > 0 ? <Badge variant="destructive">{stats.overdueOrdersCount}</Badge> : undefined}
               onClick={() => setIsUnpaidOrdersModalOpen(true)}
@@ -667,7 +649,7 @@ const DashboardView: React.FC = () => {
           <ScrollArea className="max-h-[60vh] mt-4"><div className="p-4 prose dark:prose-invert max-w-none">{isGeneratingAnalysis ? <div className="flex flex-col items-center justify-center h-48"><LoadingSpinner /><p className="mt-4 text-muted-foreground">Generating your report...</p></div> : <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">{analysisContent}</ReactMarkdown>}</div></ScrollArea>
         </DialogContent>
       </Dialog>
-      
+
       <UnpaidOrdersModal />
 
       <Sheet open={isChatSheetOpen} onOpenChange={setIsChatSheetOpen}>
@@ -675,7 +657,7 @@ const DashboardView: React.FC = () => {
         <SheetContent side="right" className="w-full sm:w-[500px] flex flex-col p-0">
           <SheetHeader className="p-4 border-b flex flex-row items-center justify-between flex-shrink-0">
             <div><SheetTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />AI Business Assistant</SheetTitle><SheetDescription>Get insights about your business performance</SheetDescription></div>
-            <div className="flex gap-2"><Button variant="outline" size="icon" onClick={() => setChatHistory([])}><Plus className="h-4 w-4" /></Button></div>
+            <div className="flex gap-2"><Button variant="outline" size="icon" onClick={() => setMessages([])}><Plus className="h-4 w-4" /></Button></div>
           </SheetHeader>
           <div className="flex-grow overflow-y-auto">{renderChatContent()}</div>
         </SheetContent>
@@ -686,6 +668,5 @@ const DashboardView: React.FC = () => {
 
 export default DashboardView;
 
-    
 
-    
+

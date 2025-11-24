@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { doc, getDoc, updateDoc, writeBatch, serverTimestamp, collection, Timestamp, runTransaction, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
@@ -15,115 +15,115 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { AuthContext } from '@/context/AuthContext';
 import { useContext } from 'react';
-import { useToast } from '@/hooks/use-toast'; 
+import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface RewardApplication {
-    customer: CustomerReward;
-    discount: number;
-    bagsUsed: number;
+  customer: CustomerReward;
+  discount: number;
+  bagsUsed: number;
 }
 
 const RewardContent = ({ total, onApplyReward, onBack }: { total: number; onApplyReward: (reward: RewardApplication) => void; onBack: () => void; }) => {
-    const [rewardSearch, setRewardSearch] = useState('');
-    const [allEligibleCustomers, setAllEligibleCustomers] = useState<CustomerReward[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+  const [rewardSearch, setRewardSearch] = useState('');
+  const [allEligibleCustomers, setAllEligibleCustomers] = useState<CustomerReward[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchEligibleCustomers = async () => {
-            setIsLoading(true);
-            const q = query(
-                collection(db, 'rewards'),
-                where('bagCount', '>=', 5)
-            );
-            const snapshot = await getDocs(q);
-            const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerReward));
-            setAllEligibleCustomers(customers);
-            setIsLoading(false);
-        };
-        fetchEligibleCustomers();
-    }, []);
-
-    const filteredCustomers = React.useMemo(() => {
-        if (!rewardSearch.trim()) {
-            return allEligibleCustomers;
-        }
-        return allEligibleCustomers.filter(customer =>
-            customer.customerTag.toLowerCase().includes(rewardSearch.trim().toLowerCase())
-        );
-    }, [rewardSearch, allEligibleCustomers]);
-
-    const handleSelectRewardCustomer = (customer: CustomerReward) => {
-        const availableDiscount = Math.floor(customer.bagCount / 5) * 10;
-        if (availableDiscount > 0) {
-            const discountToApply = Math.min(availableDiscount, total);
-            const bagsUsed = Math.ceil((discountToApply / 10)) * 5;
-            onApplyReward({
-                customer,
-                discount: discountToApply,
-                bagsUsed,
-            });
-        }
+  useEffect(() => {
+    const fetchEligibleCustomers = async () => {
+      setIsLoading(true);
+      const q = query(
+        collection(db, 'rewards'),
+        where('bagCount', '>=', 5)
+      );
+      const snapshot = await getDocs(q);
+      const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerReward));
+      setAllEligibleCustomers(customers);
+      setIsLoading(false);
     };
+    fetchEligibleCustomers();
+  }, []);
 
-    return (
-     <>
-        <DialogHeader>
-          <DialogTitle>Apply Customer Reward</DialogTitle>
-          <DialogDescription>Search for a customer or select from the eligible list.</DialogDescription>
-        </DialogHeader>
-        <div className="py-4 space-y-4">
-            <div className="relative">
-                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                    placeholder="Search eligible customer..." 
-                    value={rewardSearch} 
-                    onChange={(e) => setRewardSearch(e.target.value)} 
-                    autoFocus
-                    className="pl-10"
-                />
-            </div>
-            <ScrollArea className="h-60 border rounded-md">
-                {isLoading ? (
-                    <div className="flex justify-center items-center h-full"><LoadingSpinner/></div>
-                ) : filteredCustomers.length > 0 ? (
-                    filteredCustomers.map(customer => {
-                        const discount = Math.floor(customer.bagCount / 5) * 10;
-                        return (
-                            <div key={customer.id} className="p-3 border-b flex justify-between items-center hover:bg-secondary">
-                                <div>
-                                    <p className="font-semibold">{customer.customerTag}</p>
-                                    <p className="text-sm text-muted-foreground">Bags: {customer.bagCount} | Discount: {formatCurrency(discount)}</p>
-                                </div>
-                                <Button size="sm" onClick={() => handleSelectRewardCustomer(customer)} disabled={discount <= 0}>
-                                    Apply
-                                </Button>
-                            </div>
-                        )
-                    })
-                ) : (
-                     <p className="p-4 text-center text-muted-foreground">
-                        {rewardSearch.trim() ? 'No customers match your search.' : 'No customers are currently eligible for a reward.'}
-                    </p>
-                )}
-            </ScrollArea>
-        </div>
-        <DialogFooter>
-            <Button variant="secondary" onClick={onBack}>Back to Payment</Button>
-        </DialogFooter>
-     </>
+  const filteredCustomers = React.useMemo(() => {
+    if (!rewardSearch.trim()) {
+      return allEligibleCustomers;
+    }
+    return allEligibleCustomers.filter(customer =>
+      customer.customerTag.toLowerCase().includes(rewardSearch.trim().toLowerCase())
     );
+  }, [rewardSearch, allEligibleCustomers]);
+
+  const handleSelectRewardCustomer = (customer: CustomerReward) => {
+    const availableDiscount = Math.floor(customer.bagCount / 5) * 10;
+    if (availableDiscount > 0) {
+      const discountToApply = Math.min(availableDiscount, total);
+      const bagsUsed = Math.ceil((discountToApply / 10)) * 5;
+      onApplyReward({
+        customer,
+        discount: discountToApply,
+        bagsUsed,
+      });
+    }
+  };
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Apply Customer Reward</DialogTitle>
+        <DialogDescription>Search for a customer or select from the eligible list.</DialogDescription>
+      </DialogHeader>
+      <div className="py-4 space-y-4">
+        <div className="relative">
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search eligible customer..."
+            value={rewardSearch}
+            onChange={(e) => setRewardSearch(e.target.value)}
+            autoFocus
+            className="pl-10"
+          />
+        </div>
+        <ScrollArea className="h-60 border rounded-md">
+          {isLoading ? (
+            <div className="flex justify-center items-center h-full"><LoadingSpinner /></div>
+          ) : filteredCustomers.length > 0 ? (
+            filteredCustomers.map(customer => {
+              const discount = Math.floor(customer.bagCount / 5) * 10;
+              return (
+                <div key={customer.id} className="p-3 border-b flex justify-between items-center hover:bg-secondary">
+                  <div>
+                    <p className="font-semibold">{customer.customerTag}</p>
+                    <p className="text-sm text-muted-foreground">Bags: {customer.bagCount} | Discount: {formatCurrency(discount)}</p>
+                  </div>
+                  <Button size="sm" onClick={() => handleSelectRewardCustomer(customer)} disabled={discount <= 0}>
+                    Apply
+                  </Button>
+                </div>
+              )
+            })
+          ) : (
+            <p className="p-4 text-center text-muted-foreground">
+              {rewardSearch.trim() ? 'No customers match your search.' : 'No customers are currently eligible for a reward.'}
+            </p>
+          )}
+        </ScrollArea>
+      </div>
+      <DialogFooter>
+        <Button variant="secondary" onClick={onBack}>Back to Payment</Button>
+      </DialogFooter>
+    </>
+  );
 };
 
 
 interface OrderOptionsModalProps {
-    total: number;
-    orderItems: Record<string, OrderItem>;
-    editingOrder: Order | null;
-    onClose: () => void;
-    onOrderPlaced: (order: Order) => void;
+  total: number;
+  orderItems: Record<string, OrderItem>;
+  editingOrder: Order | null;
+  onClose: () => void;
+  onOrderPlaced: (order: Order) => void;
 }
 
 const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
@@ -134,13 +134,13 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
   onOrderPlaced
 }) => {
   const [step, setStep] = useState(1);
-  const [orderType, setOrderType] = useState<'Dine-In' | 'Takeout' | 'Delivery'>('Dine-In');
+  const [orderType, setOrderType] = useState<'Dine-In' | 'Takeout' | 'Delivery' | 'Pickup'>('Dine-In');
   const [orderTag, setOrderTag] = useState('');
-  
+
   const [amountPaidCashInput, setAmountPaidCashInput] = useState('');
   const [amountPaidMomoInput, setAmountPaidMomoInput] = useState('');
   const [changeGivenInput, setChangeGivenInput] = useState('');
-  
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { session } = useContext(AuthContext);
@@ -170,13 +170,13 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     const alreadyGivenChange = editingOrder?.changeGiven || 0;
 
     const finalAmountPaid = alreadyPaid + amountPaid;
-    
+
     let effectivePayment = finalAmountPaid - alreadyGivenChange;
     const newBalance = finalTotal - effectivePayment;
 
     const deficit = newBalance > 0 ? newBalance : 0;
     const change = newBalance < 0 ? Math.abs(newBalance) : 0;
-    
+
     return {
       amountPaid,
       finalAmountPaid,
@@ -210,7 +210,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     setError(null);
     processOrder({ isPaid: false });
   };
-  
+
   const handleApplyReward = (appliedReward: RewardApplication) => {
     setReward(appliedReward);
     setIsApplyingReward(false);
@@ -221,20 +221,20 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     setError(null);
 
     const { isPaid, pardonDeficit = false } = options;
-    
+
     try {
       const pardonedAmount = isPaid && pardonDeficit && balances.newBalance > 0 ? balances.newBalance : 0;
-      
+
       const newCashPayment = paymentAmounts.cash;
       const newMomoPayment = paymentAmounts.momo;
 
       const orderData: any = {
         tag: orderTag,
         orderType,
-        items: Object.values(orderItems).map(i => ({ 
-          name: i.name, 
-          price: i.price, 
-          quantity: i.quantity 
+        items: Object.values(orderItems).map(i => ({
+          name: i.name,
+          price: i.price,
+          quantity: i.quantity
         })),
         total: total,
         pardonedAmount: (editingOrder?.pardonedAmount || 0) + pardonedAmount,
@@ -247,19 +247,57 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         rewardDiscount: (editingOrder?.rewardDiscount || 0) + (reward?.discount || 0),
         rewardCustomerTag: reward?.customer.customerTag || editingOrder?.rewardCustomerTag || '',
       };
-      
+
       if (pardonedAmount > 0) {
         orderData.notes = `Deficit of ${formatCurrency(pardonedAmount)} pardoned. ${orderData.notes}`.trim();
       }
 
       if (editingOrder) {
-          const orderRef = doc(db, "orders", editingOrder.id);
-          
-          const existingBreakdown = editingOrder.paymentBreakdown || { cash: 0, momo: 0 };
-          const newBreakdown = {
-              cash: existingBreakdown.cash + newCashPayment,
-              momo: existingBreakdown.momo + newMomoPayment
-          };
+        const orderRef = doc(db, "orders", editingOrder.id);
+
+        const existingBreakdown = editingOrder.paymentBreakdown || { cash: 0, momo: 0 };
+        const newBreakdown = {
+          cash: existingBreakdown.cash + newCashPayment,
+          momo: existingBreakdown.momo + newMomoPayment
+        };
+        orderData.paymentBreakdown = newBreakdown;
+
+        let finalPaymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid' = 'Unpaid';
+        if (newBreakdown.cash > 0 && newBreakdown.momo > 0) finalPaymentMethod = 'split';
+        else if (newBreakdown.cash > 0) finalPaymentMethod = 'cash';
+        else if (newBreakdown.momo > 0) finalPaymentMethod = 'momo';
+        orderData.paymentMethod = finalPaymentMethod;
+
+        orderData.amountPaid = (editingOrder.amountPaid || 0) + paymentAmounts.totalPaidNow;
+        const newChangeGiven = (editingOrder.changeGiven || 0) + (balances.change > 0 ? parseFloat(changeGivenInput) || 0 : 0);
+        orderData.changeGiven = newChangeGiven;
+
+        let balanceDue = finalTotal - (orderData.amountPaid - orderData.changeGiven);
+        if (pardonDeficit) balanceDue = 0;
+
+        orderData.balanceDue = balanceDue;
+
+        if (balanceDue <= 0.01) {
+          orderData.paymentStatus = 'Paid';
+        } else if (orderData.amountPaid > 0) {
+          orderData.paymentStatus = 'Partially Paid';
+        } else {
+          orderData.paymentStatus = 'Unpaid';
+        }
+
+        if (paymentAmounts.totalPaidNow > 0) {
+          orderData.lastPaymentTimestamp = serverTimestamp();
+          orderData.lastPaymentAmount = paymentAmounts.totalPaidNow;
+        }
+
+        await updateDoc(orderRef, orderData);
+        const docSnap = await getDoc(orderRef);
+        const finalOrderForPopup = { id: docSnap.id, ...docSnap.data() } as Order;
+        onOrderPlaced(finalOrderForPopup);
+
+      } else { // New Order
+        await runTransaction(db, async (transaction) => {
+          const newBreakdown = { cash: newCashPayment, momo: newMomoPayment };
           orderData.paymentBreakdown = newBreakdown;
 
           let finalPaymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid' = 'Unpaid';
@@ -268,95 +306,57 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           else if (newBreakdown.momo > 0) finalPaymentMethod = 'momo';
           orderData.paymentMethod = finalPaymentMethod;
 
-          orderData.amountPaid = (editingOrder.amountPaid || 0) + paymentAmounts.totalPaidNow;
-          const newChangeGiven = (editingOrder.changeGiven || 0) + (balances.change > 0 ? parseFloat(changeGivenInput) || balances.change : 0);
-          orderData.changeGiven = newChangeGiven;
-          
+          orderData.amountPaid = isPaid ? paymentAmounts.totalPaidNow : 0;
+          const changeGiven = isPaid && balances.change > 0 ? (parseFloat(changeGivenInput) || 0) : 0;
+          orderData.changeGiven = changeGiven;
+
           let balanceDue = finalTotal - (orderData.amountPaid - orderData.changeGiven);
           if (pardonDeficit) balanceDue = 0;
-
           orderData.balanceDue = balanceDue;
-          
-          if (balanceDue <= 0.01) {
-              orderData.paymentStatus = 'Paid';
-          } else if (orderData.amountPaid > 0) {
-              orderData.paymentStatus = 'Partially Paid';
+
+          if (isPaid && balanceDue <= 0.01) {
+            orderData.paymentStatus = 'Paid';
+          } else if (isPaid && balanceDue > 0) {
+            orderData.paymentStatus = 'Partially Paid';
           } else {
-              orderData.paymentStatus = 'Unpaid';
+            orderData.paymentStatus = 'Unpaid';
           }
+
+          const counterRef = doc(db, "counters", "orderIdCounter");
+          const newOrderRef = doc(collection(db, "orders"));
+
+          if (reward) {
+            const rewardRef = doc(db, 'rewards', reward.customer.id);
+            const newBagCount = reward.customer.bagCount - reward.bagsUsed;
+            const newTotalRedeemed = (reward.customer.totalRedeemed || 0) + reward.discount;
+            transaction.update(rewardRef, {
+              bagCount: newBagCount,
+              totalRedeemed: newTotalRedeemed,
+              updatedAt: serverTimestamp()
+            });
+          }
+
+          const counterDoc = await transaction.get(counterRef);
+          const newCount = (counterDoc.exists() ? counterDoc.data().count : 0) + 1;
+          const simplifiedId = generateSimpleOrderId(newCount);
+
+          const newOrderWithId = {
+            ...orderData,
+            simplifiedId,
+            timestamp: serverTimestamp(),
+          };
 
           if (paymentAmounts.totalPaidNow > 0) {
-            orderData.lastPaymentTimestamp = serverTimestamp();
-            orderData.lastPaymentAmount = paymentAmounts.totalPaidNow;
+            newOrderWithId.lastPaymentTimestamp = serverTimestamp();
+            newOrderWithId.lastPaymentAmount = paymentAmounts.totalPaidNow;
           }
-          
-          await updateDoc(orderRef, orderData);
-          const docSnap = await getDoc(orderRef);
-          const finalOrderForPopup = { id: docSnap.id, ...docSnap.data() } as Order;
+
+          transaction.set(newOrderRef, newOrderWithId);
+          transaction.set(counterRef, { count: newCount }, { merge: true });
+
+          const finalOrderForPopup: Order = { ...newOrderWithId, id: newOrderRef.id, timestamp: Timestamp.now(), balanceDue: orderData.balanceDue };
           onOrderPlaced(finalOrderForPopup);
-
-      } else { // New Order
-          await runTransaction(db, async (transaction) => {
-              const newBreakdown = { cash: newCashPayment, momo: newMomoPayment };
-              orderData.paymentBreakdown = newBreakdown;
-
-              let finalPaymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid' = 'Unpaid';
-              if (newBreakdown.cash > 0 && newBreakdown.momo > 0) finalPaymentMethod = 'split';
-              else if (newBreakdown.cash > 0) finalPaymentMethod = 'cash';
-              else if (newBreakdown.momo > 0) finalPaymentMethod = 'momo';
-              orderData.paymentMethod = finalPaymentMethod;
-
-              orderData.amountPaid = isPaid ? paymentAmounts.totalPaidNow : 0;
-              const changeGiven = isPaid && balances.change > 0 ? (parseFloat(changeGivenInput) || balances.change) : 0;
-              orderData.changeGiven = changeGiven;
-              
-              let balanceDue = finalTotal - (orderData.amountPaid - orderData.changeGiven);
-              if (pardonDeficit) balanceDue = 0;
-              orderData.balanceDue = balanceDue;
-
-              if (isPaid && balanceDue <= 0.01) {
-                orderData.paymentStatus = 'Paid';
-              } else if (isPaid && balanceDue > 0) {
-                orderData.paymentStatus = 'Partially Paid';
-              } else {
-                orderData.paymentStatus = 'Unpaid';
-              }
-              
-              const counterRef = doc(db, "counters", "orderIdCounter");
-              const newOrderRef = doc(collection(db, "orders"));
-              
-              if (reward) {
-                const rewardRef = doc(db, 'rewards', reward.customer.id);
-                const newBagCount = reward.customer.bagCount - reward.bagsUsed;
-                const newTotalRedeemed = (reward.customer.totalRedeemed || 0) + reward.discount;
-                transaction.update(rewardRef, { 
-                    bagCount: newBagCount,
-                    totalRedeemed: newTotalRedeemed,
-                    updatedAt: serverTimestamp() 
-                });
-              }
-
-              const counterDoc = await transaction.get(counterRef);
-              const newCount = (counterDoc.exists() ? counterDoc.data().count : 0) + 1;
-              const simplifiedId = generateSimpleOrderId(newCount);
-              
-              const newOrderWithId = { 
-                ...orderData, 
-                simplifiedId,
-                timestamp: serverTimestamp(),
-              };
-
-              if (paymentAmounts.totalPaidNow > 0) {
-                newOrderWithId.lastPaymentTimestamp = serverTimestamp();
-                newOrderWithId.lastPaymentAmount = paymentAmounts.totalPaidNow;
-              }
-
-              transaction.set(newOrderRef, newOrderWithId);
-              transaction.set(counterRef, { count: newCount }, { merge: true });
-              
-              const finalOrderForPopup: Order = { ...newOrderWithId, id: newOrderRef.id, timestamp: Timestamp.now(), balanceDue: orderData.balanceDue };
-              onOrderPlaced(finalOrderForPopup);
-          });
+        });
       }
     } catch (e) {
       console.error("Error processing order:", e);
@@ -390,7 +390,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               <span className="text-muted-foreground">Already Paid:</span>
               <span>{formatCurrency(editingOrder.amountPaid)}</span>
             </div>
-             <div className="flex justify-between">
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Change Already Given:</span>
               <span>-{formatCurrency(editingOrder.changeGiven || 0)}</span>
             </div>
@@ -415,7 +415,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
       </Card>
     );
   };
-  
+
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md w-[95vw] flex flex-col max-h-[90vh]">
@@ -426,13 +426,13 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 {editingOrder ? `Update Order ${editingOrder.simplifiedId}` : 'New Order Setup'}
               </DialogTitle>
               <DialogDescription>
-                {editingOrder 
-                  ? 'Update the order details and proceed to payment if needed.' 
+                {editingOrder
+                  ? 'Update the order details and proceed to payment if needed.'
                   : 'Configure the order details before payment.'
                 }
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4 py-4">
               {editingOrder && (
                 <Alert>
@@ -448,10 +448,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 <Label>Order Type</Label>
                 <div className="grid grid-cols-3 gap-2 mt-2">
                   {(['Dine-In', 'Takeout', 'Delivery'] as const).map(type => (
-                    <Button 
-                      key={type} 
-                      onClick={() => setOrderType(type)} 
-                      variant={orderType === type ? 'default' : 'outline'} 
+                    <Button
+                      key={type}
+                      onClick={() => setOrderType(type)}
+                      variant={orderType === type ? 'default' : 'outline'}
                       size="sm"
                       className="text-xs"
                     >
@@ -460,14 +460,14 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                   ))}
                 </div>
               </div>
-              
+
               <div>
                 <Label htmlFor="tag">Tag (Customer Name / Table No.) *</Label>
-                <Input 
-                  id="tag" 
-                  type="text" 
-                  value={orderTag} 
-                  onChange={(e) => setOrderTag(e.target.value)} 
+                <Input
+                  id="tag"
+                  type="text"
+                  value={orderTag}
+                  onChange={(e) => setOrderTag(e.target.value)}
                   placeholder="e.g., 'Table 5' or 'John D.'"
                   className="mt-2"
                 />
@@ -480,7 +480,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 </Alert>
               )}
             </div>
-            
+
             <DialogFooter className="grid grid-cols-2 gap-2">
               <Button
                 onClick={handlePayLater}
@@ -501,75 +501,75 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               <DialogTitle>
                 {editingOrder ? `Add Payment - ${editingOrder.simplifiedId}` : 'Process Payment'}
               </DialogTitle>
-                <div className="space-y-1 text-center pt-2">
-                    {reward && (
-                        <p className="text-sm text-muted-foreground line-through">{formatCurrency(total)}</p>
-                    )}
-                    <p className="text-3xl font-bold text-primary">{formatCurrency(finalTotal)}</p>
-                    {reward && (
-                        <Badge variant="secondary">
-                            <Gift className="h-3 w-3 mr-1.5" />
-                            {formatCurrency(reward.discount)} discount applied
-                        </Badge>
-                    )}
-                </div>
+              <div className="space-y-1 text-center pt-2">
+                {reward && (
+                  <p className="text-sm text-muted-foreground line-through">{formatCurrency(total)}</p>
+                )}
+                <p className="text-3xl font-bold text-primary">{formatCurrency(finalTotal)}</p>
+                {reward && (
+                  <Badge variant="secondary">
+                    <Gift className="h-3 w-3 mr-1.5" />
+                    {formatCurrency(reward.discount)} discount applied
+                  </Badge>
+                )}
+              </div>
             </DialogHeader>
-            
+
             <ScrollArea className="flex-1 -mx-6 px-6">
               <div className="space-y-4">
                 {renderBalanceBreakdown()}
-                
+
                 {!isOverpaid ? (
                   <div className="space-y-4 p-4 border rounded-lg">
-                      <div className="space-y-2">
-                          <Label htmlFor="amountPaidCash">Amount Paid (Cash)</Label>
-                          <Input id="amountPaidCash" type="number" value={amountPaidCashInput} onChange={(e) => setAmountPaidCashInput(e.target.value)} placeholder="0.00" autoFocus className="h-12 text-lg"/>
+                    <div className="space-y-2">
+                      <Label htmlFor="amountPaidCash">Amount Paid (Cash)</Label>
+                      <Input id="amountPaidCash" type="number" value={amountPaidCashInput} onChange={(e) => setAmountPaidCashInput(e.target.value)} placeholder="0.00" autoFocus className="h-12 text-lg" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="amountPaidMomo">Amount Paid (MoMo/Card)</Label>
+                      <Input id="amountPaidMomo" type="number" value={amountPaidMomoInput} onChange={(e) => setAmountPaidMomoInput(e.target.value)} placeholder="0.00" className="h-12 text-lg" />
+                    </div>
+
+                    {balances.change > 0 && (
+                      <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                        <p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
+                          Change Due: {formatCurrency(balances.change)}
+                        </p>
+                        <Label htmlFor="changeGiven">Amount Given as Change</Label>
+                        <Input
+                          id="changeGiven"
+                          type="number"
+                          value={changeGivenInput}
+                          onChange={(e) => setChangeGivenInput(e.target.value)}
+                          placeholder={formatCurrency(balances.change)}
+                          className="text-center mt-2"
+                        />
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
+                          Enter amount given. Leave empty if change not given yet.
+                        </p>
                       </div>
-                       <div className="space-y-2">
-                          <Label htmlFor="amountPaidMomo">Amount Paid (MoMo/Card)</Label>
-                          <Input id="amountPaidMomo" type="number" value={amountPaidMomoInput} onChange={(e) => setAmountPaidMomoInput(e.target.value)} placeholder="0.00" className="h-12 text-lg"/>
-                      </div>
-                      
-                      {balances.change > 0 && (
-                          <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                              <p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
-                              Change Due: {formatCurrency(balances.change)}
-                              </p>
-                              <Label htmlFor="changeGiven">Amount Given as Change</Label>
-                              <Input 
-                              id="changeGiven" 
-                              type="number" 
-                              value={changeGivenInput} 
-                              onChange={(e) => setChangeGivenInput(e.target.value)} 
-                              placeholder={formatCurrency(balances.change)} 
-                              className="text-center mt-2" 
-                              />
-                              <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
-                              Leave empty or enter less if not giving full change
-                              </p>
-                          </div>
-                      )}
-                      {showDeficitOptions && (
-                          <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
-                              <AlertTriangle className="h-4 w-4 text-orange-600" />
-                              <AlertTitle className="text-orange-800 dark:text-orange-200">Payment Insufficient</AlertTitle>
-                              <AlertDescription className="text-orange-700 dark:text-orange-300">
-                              Customer still owes: <span className="font-bold">{formatCurrency(balances.deficit)}</span>
-                              </AlertDescription>
-                          </Alert>
-                      )}
+                    )}
+                    {showDeficitOptions && (
+                      <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
+                        <AlertTriangle className="h-4 w-4 text-orange-600" />
+                        <AlertTitle className="text-orange-800 dark:text-orange-200">Payment Insufficient</AlertTitle>
+                        <AlertDescription className="text-orange-700 dark:text-orange-300">
+                          Customer still owes: <span className="font-bold">{formatCurrency(balances.deficit)}</span>
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
                 ) : (
-                   <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
+                  <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
                     <Info className="h-4 w-4 text-green-600" />
                     <AlertTitle className="text-green-800 dark:text-green-200">Customer Overpaid</AlertTitle>
                     <AlertDescription className="text-green-700 dark:text-green-300">
-                      The customer's previous payment covers the new total. 
+                      The customer's previous payment covers the new total.
                       A change of <span className="font-bold">{formatCurrency(Math.abs(amountOwedNow))}</span> is now due.
                     </AlertDescription>
                   </Alert>
                 )}
-                
+
                 {error && (
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
@@ -579,12 +579,12 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                 )}
               </div>
             </ScrollArea>
-            
+
             <DialogFooter className="grid grid-cols-1 gap-3 pt-4 border-t">
               {!isOverpaid && (
-                  <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
-                      <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
-                  </Button>
+                <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
+                  <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
+                </Button>
               )}
               {isOverpaid ? (
                 <Button
@@ -640,4 +640,3 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
 export default OrderOptionsModal;
 
-    

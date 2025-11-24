@@ -1,9 +1,9 @@
 
-import type {Metadata} from 'next';
+import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { ToastProvider } from '@/hooks/use-toast';
-import { AuthProvider } from '@/context/AuthContext';
+import { AuthProvider } from '@/context/AuthProvider';
 
 export const metadata: Metadata = {
   title: "Nuel's Foodzone Cafe",

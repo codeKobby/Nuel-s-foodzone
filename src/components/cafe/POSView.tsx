@@ -1,15 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
-import { collection, onSnapshot, runTransaction, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
+import { collection, onSnapshot, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Search, ShoppingBag, Plus, Minus, PlusCircle, X, Trash2 } from 'lucide-react';
+import { Search, PlusCircle, X } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import type { MenuItem, OrderItem, Order } from '@/lib/types';
+import type { MenuItem, Order } from '@/lib/types';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import OrderOptionsModal from './modals/OrderOptionsModal';
@@ -18,113 +17,21 @@ import CustomOrderModal from './modals/CustomOrderModal';
 import PartialSettleModal from './modals/PartialSettleModal';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { OrderEditingContext } from '@/context/OrderEditingContext';
+import { useCart } from '@/hooks/useCart';
+import { OrderCart } from './pos/OrderCart';
 
-interface OrderCartProps {
-    currentOrder: Record<string, OrderItem>;
-    total: number;
-    updateQuantity: (itemId: string, amount: number) => void;
-    setQuantity: (itemId: string, quantity: number) => void;
-    removeItem: (itemId: string) => void;
-    onClearOrder: () => void;
-    onPlaceOrder: () => void;
-    isSheet?: boolean;
-}
-
-const OrderCart: React.FC<OrderCartProps> = ({ currentOrder, total, updateQuantity, setQuantity, removeItem, onClearOrder, onPlaceOrder, isSheet = false }) => {
-    
-    const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>, itemId: string) => {
-        const value = e.target.value;
-        if (value === '') return;
-        const newQuantity = parseInt(value, 10);
-        if (!isNaN(newQuantity) && newQuantity >= 1) {
-            setQuantity(itemId, newQuantity);
-        }
-    };
-
-    const handleQuantityBlur = (e: React.FocusEvent<HTMLInputElement>, itemId: string) => {
-        const value = e.target.value;
-        if (value === '' || parseInt(value, 10) < 1) {
-            setQuantity(itemId, 1);
-        }
-    };
-    
-    const CartContent = () => (
-        <>
-            <div className="flex-grow flex flex-col p-0">
-                {Object.keys(currentOrder).length === 0 ? (
-                    <div className="flex-grow flex flex-col items-center justify-center text-center text-muted-foreground p-6">
-                        <ShoppingBag size={48} className="mb-4" />
-                        <p>Your cart is empty.</p>
-                        <p className="text-sm">Add items from the menu.</p>
-                    </div>
-                ) : (
-                    <div className="flex-grow overflow-y-auto px-4 md:px-6 space-y-3">
-                        {Object.values(currentOrder).map(item => (
-                            <div key={item.id} className="flex items-center p-2 bg-secondary rounded-lg">
-                                <div className="flex-grow">
-                                    <p className="font-semibold text-sm">{item.name}</p>
-                                    <p className="text-xs text-muted-foreground">{formatCurrency(item.price)}</p>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                    <Button size="icon" variant="ghost" className="h-6 w-6 rounded-full" onClick={() => updateQuantity(item.id, -1)}><Minus size={14} /></Button>
-                                    <Input 
-                                        type="number"
-                                        value={item.quantity}
-                                        onChange={(e) => handleQuantityChange(e, item.id)}
-                                        onBlur={(e) => handleQuantityBlur(e, item.id)}
-                                        className="font-bold w-10 text-center h-7 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    />
-                                    <Button size="icon" variant="ghost" className="h-6 w-6 rounded-full" onClick={() => updateQuantity(item.id, 1)}><Plus size={14} /></Button>
-                                </div>
-                                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full ml-1 text-red-500" onClick={() => removeItem(item.id)}><Trash2 size={16} /></Button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-            <div className={`mt-auto p-4 md:p-6 ${isSheet ? '' : 'border-t'}`}>
-                <div className="flex justify-between items-center text-xl md:text-2xl font-bold mb-4">
-                    <span>Total:</span>
-                    <span className="text-primary">{formatCurrency(total)}</span>
-                </div>
-                <div className="space-y-2">
-                    <Button onClick={onPlaceOrder} disabled={Object.keys(currentOrder).length === 0} className="w-full font-bold text-base h-11">Place Order</Button>
-                    <Button onClick={onClearOrder} disabled={Object.keys(currentOrder).length === 0} variant="secondary" className="w-full font-bold text-base h-11">Clear Order</Button>
-                </div>
-            </div>
-        </>
-    );
-
-    if (isSheet) {
-        return <CartContent />;
-    }
-
-    return (
-        <Card className="w-full md:w-80 lg:w-96 rounded-none md:rounded-l-2xl border-l-0 md:border-l shadow-lg flex-col hidden md:flex">
-            <CardHeader className="p-4 md:p-6">
-                <CardTitle className="text-xl md:text-2xl">Current Order</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-grow flex flex-col p-0">
-                 <CartContent />
-            </CardContent>
-        </Card>
-    );
-};
-
-
-const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveView }) => {
+const POSView: React.FC<{ setActiveView: (view: string) => void }> = ({ setActiveView }) => {
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-    const [currentOrder, setCurrentOrder] = useState<Record<string, OrderItem>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -139,21 +46,32 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
     const clearEditingOrder = orderEditingContext?.clearEditingOrder;
     const [orderWithChangeDue, setOrderWithChangeDue] = useState<Order | null>(null);
 
+    const {
+        currentOrder,
+        total,
+        totalItems,
+        addToOrder: addToCart,
+        updateQuantity,
+        setQuantity,
+        removeItem,
+        clearOrder,
+        setCart
+    } = useCart();
 
     useEffect(() => {
-        if(editingOrder) {
-            const orderItemsAsCart: Record<string, OrderItem> = editingOrder.items.reduce((acc: Record<string, OrderItem>, item: Omit<OrderItem, 'id' | 'category'>) => {
+        if (editingOrder) {
+            const orderItemsAsCart: Record<string, any> = editingOrder.items.reduce((acc: Record<string, any>, item: any) => {
                 const id = crypto.randomUUID();
                 acc[id] = {
                     ...item,
                     id: id,
-                    category: 'N/A' // Category is not stored on order items, default it
+                    category: 'N/A'
                 };
                 return acc;
             }, {});
-            setCurrentOrder(orderItemsAsCart);
+            setCart(orderItemsAsCart);
         }
-    }, [editingOrder]);
+    }, [editingOrder, setCart]);
 
     useEffect(() => {
         setLoading(true);
@@ -171,95 +89,41 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
         return () => unsubscribe();
     }, []);
 
-    const total = useMemo(() => {
-        return Object.values(currentOrder).reduce((acc, item) => acc + item.price * item.quantity, 0);
-    }, [currentOrder]);
-    
-    const totalItems = useMemo(() => {
-        return Object.values(currentOrder).reduce((acc, item) => acc + item.quantity, 0);
-    }, [currentOrder]);
-
-    const addToOrder = useCallback((item: MenuItem) => {
-        // Check if item is English Breakfast by name (case-insensitive)
+    const handleAddToOrder = useCallback((item: MenuItem) => {
         if (item.name.toLowerCase() === 'english breakfast' || item.requiresChoice) {
             setShowBreakfastModal(true);
             return;
         }
-        setCurrentOrder(prev => {
-            const existingItem = Object.values(prev).find(i => i.name === item.name);
-            if (existingItem) {
-                return { ...prev, [existingItem.id]: { ...existingItem, quantity: existingItem.quantity + 1 } };
-            } else {
-                 const newItemId = item.id || crypto.randomUUID();
-                return { ...prev, [newItemId]: { ...item, id: newItemId, quantity: 1 } };
-            }
-        });
-    }, []);
-    
+        addToCart(item);
+    }, [addToCart]);
+
     const addBreakfastToOrder = useCallback((drinkName: string) => {
         const breakfastItem = menuItems.find(item => item.name === 'English Breakfast');
         if (!breakfastItem) return;
 
         const combinedName = `English Breakfast with ${drinkName}`;
-        
-        setCurrentOrder(prev => {
-            const existingEntry = Object.entries(prev).find(([, item]) => item.name === combinedName);
 
-            if (existingEntry) {
-                const [existingId, existingItem] = existingEntry;
-                return { ...prev, [existingId]: { ...existingItem, quantity: existingItem.quantity + 1 } };
-            } else {
-                const newItemId = crypto.randomUUID();
-                return { ...prev, [newItemId]: { ...breakfastItem, id: newItemId, name: combinedName, quantity: 1 } };
-            }
-        });
+        const itemToAdd = {
+            ...breakfastItem,
+            name: combinedName
+        };
+        addToCart(itemToAdd);
         setShowBreakfastModal(false);
-    }, [menuItems]);
+    }, [menuItems, addToCart]);
 
     const addCustomItemToOrder = useCallback((item: { name: string; price: number }) => {
-        setCurrentOrder(prev => {
-            const newItemId = crypto.randomUUID();
-            return {
-                ...prev,
-                [newItemId]: { id: newItemId, name: item.name, price: item.price, quantity: 1, category: 'Custom' }
-            };
-        });
+        addToCart({
+            id: crypto.randomUUID(),
+            name: item.name,
+            price: item.price,
+            category: 'Custom',
+            quantity: 1
+        } as any);
         setShowCustomOrderModal(false);
-    }, []);
-
-    const updateQuantity = useCallback((itemId: string, amount: number) => {
-        setCurrentOrder(prev => {
-            const item = prev[itemId];
-            if (!item) return prev;
-            const newQuantity = item.quantity + amount;
-            if (newQuantity <= 0) {
-                const { [itemId]: removed, ...rest } = prev;
-                return rest;
-            }
-            return { ...prev, [itemId]: { ...item, quantity: newQuantity } };
-        });
-    }, []);
-    
-    const setQuantity = useCallback((itemId: string, quantity: number) => {
-        setCurrentOrder(prev => {
-            if (!prev[itemId]) return prev;
-            if (quantity <= 0) {
-                const { [itemId]: removed, ...rest } = prev;
-                return rest;
-            }
-            return { ...prev, [itemId]: { ...prev[itemId], quantity: quantity } };
-        });
-    }, []);
-    
-    const removeItem = useCallback((itemId: string) => {
-        setCurrentOrder(prev => {
-            const { [itemId]: removed, ...rest } = prev;
-            return rest;
-        });
-    }, []);
+    }, [addToCart]);
 
     const handleClearOrder = () => {
-        setCurrentOrder({});
+        clearOrder();
         if (clearEditingOrder) {
             clearEditingOrder();
         }
@@ -270,9 +134,9 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
         setIsCartSheetOpen(false);
         setShowOrderOptionsModal(true);
     };
-    
+
     const handleOrderPlaced = (order: Order) => {
-        setCurrentOrder({});
+        clearOrder();
         setShowOrderOptionsModal(false);
         if (clearEditingOrder) {
             clearEditingOrder();
@@ -283,20 +147,20 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
             setActiveView('orders');
         }
     };
-    
-     const handleSettleChange = async (orderId: string, settleAmount: number, isFullSettlement: boolean) => {
+
+    const handleSettleChange = async (orderId: string, settleAmount: number, isFullSettlement: boolean) => {
         const orderRef = doc(db, "orders", orderId);
         try {
-             await runTransaction(db, async (transaction) => {
+            await runTransaction(db, async (transaction) => {
                 const orderDoc = await transaction.get(orderRef);
                 if (!orderDoc.exists()) throw "Document does not exist!";
-                
+
                 const currentBalance = orderDoc.data().balanceDue || 0;
                 const newBalance = currentBalance + settleAmount;
                 const currentChangeGiven = orderDoc.data().changeGiven || 0;
                 const newChangeGiven = currentChangeGiven + settleAmount;
 
-                transaction.update(orderRef, { 
+                transaction.update(orderRef, {
                     balanceDue: newBalance,
                     changeGiven: newChangeGiven,
                     lastPaymentTimestamp: serverTimestamp(),
@@ -313,110 +177,135 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
 
 
     const categories = ['All', ...Array.from(new Set(menuItems.map(item => item.category)))].sort();
-    const filteredItems = menuItems.filter(item => 
+    const filteredItems = menuItems.filter(item =>
         (activeCategory === 'All' || item.category === activeCategory) &&
         item.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (
-        <div className="flex h-screen md:flex-row flex-col bg-background">
-            <div className="flex-1 p-4 bg-secondary/50 dark:bg-background overflow-y-auto">
-                <header className="mb-4">
-                     <div className="flex justify-between items-center">
+        <div className="flex h-full overflow-hidden bg-background">
+            {/* Left Pane (Menu) */}
+            <div className="flex-1 flex flex-col overflow-hidden relative">
+                {/* Header & Search (Sticky) */}
+                <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10 border-b p-4 pb-2">
+                    <header className="mb-2 flex justify-between items-center">
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-bold">{editingOrder ? 'Editing Order' : 'Menu'}</h1>
-                            <p className="text-sm text-muted-foreground">
-                                {editingOrder ? `Editing Order ID: ${editingOrder.simplifiedId}` : 'Select items to add to the order.'}
-                            </p>
+                            <h1 className="text-xl font-bold leading-none">{editingOrder ? 'Editing Order' : 'Menu'}</h1>
+                            {editingOrder && <p className="text-xs text-muted-foreground">ID: {editingOrder.simplifiedId}</p>}
                         </div>
                         {editingOrder && (
-                            <Button variant="destructive" onClick={handleClearOrder}>Cancel Edit</Button>
+                            <Button variant="destructive" size="sm" onClick={handleClearOrder}>Cancel Edit</Button>
                         )}
-                    </div>
-                </header>
-                <div className="sticky top-0 bg-secondary/50 dark:bg-background py-2 z-10 -mx-4 px-4 shadow-sm">
-                    <div className="flex gap-2 mb-2">
-                        <div className="relative flex-grow">
-                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
-                            <Input
-                                type="text"
-                                placeholder="Search menu..."
-                                value={searchQuery}
-                                onClick={(e) => e.currentTarget.select()}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full h-10 bg-card border-border rounded-lg focus:ring-2 focus:ring-primary pr-8 pl-9"
-                            />
-                            {searchQuery && (
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full" 
-                                    onClick={() => setSearchQuery('')}
-                                >
-                                    <X size={16} />
-                                </Button>
-                            )}
-                        </div>
-                        <Button
-                            onClick={() => setShowCustomOrderModal(true)}
-                            className="h-10 px-3 rounded-lg"
-                            variant="outline"
-                        >
-                            <PlusCircle size={18} className="mr-0 sm:mr-2"/> <span className="hidden sm:inline">Custom</span>
-                        </Button>
-                    </div>
-                    <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2">
-                        {categories.map(category => (
+                    </header>
+
+                    <div className="space-y-2">
+                        <div className="flex gap-2">
+                            <div className="relative flex-grow">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search menu..."
+                                    value={searchQuery}
+                                    onClick={(e) => e.currentTarget.select()}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full h-9 bg-secondary/50 border-transparent focus:bg-background focus:border-primary rounded-md pl-9"
+                                />
+                                {searchQuery && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full"
+                                        onClick={() => setSearchQuery('')}
+                                    >
+                                        <X size={14} />
+                                    </Button>
+                                )}
+                            </div>
                             <Button
-                                key={category}
-                                onClick={() => setActiveCategory(category)}
-                                variant={activeCategory === category ? 'default' : 'secondary'}
+                                onClick={() => setShowCustomOrderModal(true)}
+                                className="h-9 px-3"
+                                variant="outline"
                                 size="sm"
-                                className="flex-shrink-0 rounded-md"
                             >
-                                {category}
+                                <PlusCircle size={16} className="mr-0 sm:mr-2" /> <span className="hidden sm:inline">Custom</span>
                             </Button>
-                        ))}
+                        </div>
+                        <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar">
+                            {categories.map(category => (
+                                <Button
+                                    key={category}
+                                    onClick={() => setActiveCategory(category)}
+                                    variant={activeCategory === category ? 'default' : 'secondary'}
+                                    size="sm"
+                                    className="flex-shrink-0 rounded-full px-4 h-7 text-xs"
+                                >
+                                    {category}
+                                </Button>
+                            ))}
+                        </div>
                     </div>
                 </div>
-                {loading && <div className="mt-8"><LoadingSpinner /></div>}
-                {error && <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-                {!loading && !error && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pt-4">
-                        {filteredItems.map(item => (
-                            <Card key={item.id} onClick={() => addToOrder(item)} className="cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1 hover:border-primary/50">
-                                <CardHeader className="p-2 md:p-3">
-                                    <CardTitle className="text-sm md:text-base leading-tight">{item.name}</CardTitle>
-                                    <CardDescription className="text-xs">{item.category}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-2 md:p-3 pt-0">
-                                    <p className="text-sm md:text-base font-semibold text-primary mt-1">{formatCurrency(item.price)}</p>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+
+                {/* Menu Grid */}
+                <div className="flex-1 overflow-y-auto p-4">
+                    {loading && <div className="mt-8"><LoadingSpinner /></div>}
+                    {error && <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+
+                    {!loading && !error && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 pb-20 md:pb-4">
+                            {filteredItems.map(item => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => handleAddToOrder(item)}
+                                    className="flex flex-col justify-between p-3 h-24 bg-card border rounded-lg transition-all text-left shadow-sm hover:shadow-md active:scale-95 hover:border-primary hover:ring-1 hover:ring-primary/50"
+                                >
+                                    <span className="font-bold text-sm leading-tight line-clamp-2 text-foreground">{item.name}</span>
+                                    <span className="font-mono text-primary font-semibold">{formatCurrency(item.price)}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
-            <OrderCart currentOrder={currentOrder} total={total} updateQuantity={updateQuantity} setQuantity={setQuantity} removeItem={removeItem} onClearOrder={() => setShowClearConfirm(true)} onPlaceOrder={handlePlaceOrder} />
-            
-            <div className="md:hidden fixed bottom-4 right-4 z-20">
-                 <Sheet open={isCartSheetOpen} onOpenChange={setIsCartSheetOpen}>
+
+            {/* Right Pane (Cart) */}
+            <div className="hidden md:flex w-[350px] lg:w-[400px] border-l bg-background flex-col h-full">
+                <div className="p-4 border-b">
+                    <h2 className="text-lg font-bold">Current Order</h2>
+                </div>
+                <div className="flex-grow flex flex-col overflow-hidden">
+                    <OrderCart
+                        currentOrder={currentOrder}
+                        total={total}
+                        updateQuantity={updateQuantity}
+                        setQuantity={setQuantity}
+                        removeItem={removeItem}
+                        onClearOrder={() => setShowClearConfirm(true)}
+                        onPlaceOrder={handlePlaceOrder}
+                    />
+                </div>
+            </div>
+
+            {/* Mobile Cart Trigger */}
+            <div className="md:hidden">
+                <Sheet open={isCartSheetOpen} onOpenChange={setIsCartSheetOpen}>
                     <SheetTrigger asChild>
-                        <Button className="h-16 w-16 rounded-full shadow-lg text-lg">
-                            <ShoppingBag size={24} />
-                             {totalItems > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-background text-primary text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center border-2 border-primary">
-                                    {totalItems}
+                        <div className="fixed bottom-0 left-0 right-0 bg-primary text-primary-foreground p-4 flex justify-between items-center z-50 cursor-pointer shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                            <span className="font-medium flex items-center gap-2">
+                                View Order
+                                <span className="bg-primary-foreground/20 px-2 py-0.5 rounded-full text-xs">
+                                    {totalItems} items
                                 </span>
-                            )}
-                        </Button>
+                            </span>
+                            <span className="font-bold text-lg">{formatCurrency(total)}</span>
+                        </div>
                     </SheetTrigger>
                     <SheetContent side="bottom" className="flex flex-col h-[90vh]">
                         <SheetHeader className="p-4 border-b">
                             <SheetTitle className="text-2xl">{editingOrder ? 'Editing Order' : 'Current Order'}</SheetTitle>
                         </SheetHeader>
                         <div className="flex-grow overflow-y-auto">
-                           <OrderCart
+                            <OrderCart
                                 currentOrder={currentOrder}
                                 total={total}
                                 updateQuantity={updateQuantity}
@@ -441,7 +330,7 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                 />
             )}
             {orderWithChangeDue && (
-                 <PartialSettleModal
+                <PartialSettleModal
                     order={orderWithChangeDue}
                     onClose={() => {
                         setOrderWithChangeDue(null);
@@ -455,7 +344,7 @@ const POSView: React.FC<{setActiveView: (view: string) => void}> = ({ setActiveV
                 <BreakfastModal onSelect={addBreakfastToOrder} onClose={() => setShowBreakfastModal(false)} />
             )}
             {showCustomOrderModal && (
-                 <CustomOrderModal
+                <CustomOrderModal
                     menuItems={menuItems}
                     onAddItem={addCustomItemToOrder}
                     onClose={() => setShowCustomOrderModal(false)}

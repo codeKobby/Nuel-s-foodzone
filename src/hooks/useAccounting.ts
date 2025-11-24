@@ -1,0 +1,298 @@
+import { useState, useEffect, useMemo } from "react";
+import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import type {
+  Order,
+  MiscExpense,
+  ReconciliationReport,
+  PeriodStats,
+} from "@/lib/types";
+import { isToday } from "date-fns";
+
+export const useAccounting = () => {
+  const [stats, setStats] = useState<PeriodStats | null>(null);
+  const [reports, setReports] = useState<ReconciliationReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const todayStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+  const todayEnd = useMemo(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, []);
+
+  const isTodayClosedOut = useMemo(() => {
+    return reports.some(
+      (report) => report.timestamp && isToday(report.timestamp.toDate())
+    );
+  }, [reports]);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+
+    const ordersQuery = query(collection(db, "orders"));
+    const miscExpensesQuery = query(collection(db, "miscExpenses"));
+
+    const unsubAllOrders = onSnapshot(
+      ordersQuery,
+      (allOrdersSnapshot) => {
+        const unsubMiscExpenses = onSnapshot(
+          miscExpensesQuery,
+          (miscExpensesSnapshot) => {
+            let totalSales = 0,
+              totalItemsSold = 0;
+            let cashSales = 0,
+              momoSales = 0;
+            let todayUnpaidOrdersValue = 0,
+              previousUnpaidOrdersValue = 0;
+            let totalPardonedAmount = 0,
+              changeOwedForPeriod = 0;
+            let settledUnpaidOrdersValue = 0,
+              previousDaysChangeGiven = 0;
+            let totalRewardDiscount = 0;
+
+            const todayOrders: Order[] = [];
+            const activityOrders: Order[] = [];
+            const itemStats: Record<
+              string,
+              { count: number; totalValue: number }
+            > = {};
+
+            const allOrders = allOrdersSnapshot.docs.map(
+              (doc) => ({ id: doc.id, ...doc.data() } as Order)
+            );
+
+            allOrders.forEach((order) => {
+              let hasPaymentActivityToday = false;
+              if (!order.timestamp) return;
+              const orderDate = order.timestamp.toDate();
+              const isTodayOrder =
+                orderDate >= todayStart && orderDate <= todayEnd;
+
+              if (
+                orderDate < todayStart &&
+                (order.paymentStatus === "Unpaid" ||
+                  order.paymentStatus === "Partially Paid")
+              ) {
+                previousUnpaidOrdersValue += order.balanceDue;
+              }
+
+              if (isTodayOrder) {
+                todayOrders.push(order);
+
+                if (order.status === "Completed") {
+                  totalSales += order.total;
+                  order.items.forEach((item) => {
+                    totalItemsSold += item.quantity;
+                    itemStats[item.name] = {
+                      count: (itemStats[item.name]?.count || 0) + item.quantity,
+                      totalValue:
+                        (itemStats[item.name]?.totalValue || 0) +
+                        item.quantity * item.price,
+                    };
+                  });
+                }
+
+                if (order.balanceDue > 0) {
+                  todayUnpaidOrdersValue += order.balanceDue;
+                }
+
+                totalPardonedAmount += order.pardonedAmount || 0;
+                totalRewardDiscount += order.rewardDiscount || 0;
+                if (order.balanceDue < 0) {
+                  changeOwedForPeriod += Math.abs(order.balanceDue);
+                }
+              }
+
+              if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
+                let cashPaid = 0;
+                let momoPaid = 0;
+                order.paymentHistory.forEach((payment) => {
+                  const paymentDate = payment.timestamp?.toDate();
+                  if (
+                    paymentDate &&
+                    paymentDate >= todayStart &&
+                    paymentDate <= todayEnd
+                  ) {
+                    hasPaymentActivityToday = true;
+                    const paymentAmount = payment.amount || 0;
+                    if (payment.method === "cash") {
+                      cashPaid += paymentAmount;
+                    } else if (
+                      payment.method === "momo" ||
+                      payment.method === "card"
+                    ) {
+                      momoPaid += paymentAmount;
+                    }
+                    if (!isTodayOrder) {
+                      settledUnpaidOrdersValue += paymentAmount;
+                    }
+                  }
+                });
+                if (isTodayOrder) {
+                  cashSales += Math.min(order.total, cashPaid);
+                  momoSales += Math.min(order.total, momoPaid);
+                }
+              } else {
+                const paymentDate = order.lastPaymentTimestamp?.toDate(); // Fallback for old orders
+                if (
+                  paymentDate &&
+                  paymentDate >= todayStart &&
+                  paymentDate <= todayEnd
+                ) {
+                  hasPaymentActivityToday = true;
+                  const amountPaidTowardsOrder =
+                    order.amountPaid - order.changeGiven;
+
+                  // Only add to momo/cash sales if order was created today
+                  if (isTodayOrder && order.paymentBreakdown) {
+                    if (order.paymentBreakdown.cash) {
+                      cashSales += Math.min(order.total, order.paymentBreakdown.cash);
+                    }
+                    if (order.paymentBreakdown.momo) {
+                      momoSales += Math.min(order.total, order.paymentBreakdown.momo);
+                    }
+                  }
+
+                  if (!isTodayOrder) {
+                    settledUnpaidOrdersValue += amountPaidTowardsOrder;
+                  }
+                }
+              }
+
+              const settledDate = order.settledOn?.toDate();
+              if (
+                settledDate &&
+                settledDate >= todayStart &&
+                settledDate <= todayEnd &&
+                !isTodayOrder
+              ) {
+                if (order.changeGiven > (order.pardonedAmount || 0)) {
+                  previousDaysChangeGiven +=
+                    order.changeGiven - (order.pardonedAmount || 0);
+                }
+              }
+
+              if (isTodayOrder || hasPaymentActivityToday) {
+                activityOrders.push(order);
+              }
+            });
+
+            let miscCashExpenses = 0,
+              miscMomoExpenses = 0;
+            miscExpensesSnapshot.docs.forEach((doc) => {
+              const expense = doc.data() as MiscExpense;
+              if (!expense.timestamp) return;
+              const expenseDate = expense.timestamp.toDate();
+              if (expenseDate >= todayStart && expenseDate <= todayEnd) {
+                if (expense.source === "cash")
+                  miscCashExpenses += expense.amount;
+                else miscMomoExpenses += expense.amount;
+              }
+            });
+
+            const allTimeUnpaidOrdersValue =
+              previousUnpaidOrdersValue + todayUnpaidOrdersValue;
+
+            const expectedCash =
+              cashSales -
+              miscCashExpenses +
+              settledUnpaidOrdersValue -
+              previousDaysChangeGiven;
+            const expectedMomo = momoSales - miscMomoExpenses;
+            const netRevenue =
+              cashSales +
+              momoSales -
+              (miscCashExpenses + miscMomoExpenses) -
+              totalRewardDiscount;
+
+            setStats({
+              totalSales,
+              totalItemsSold,
+              cashSales,
+              momoSales,
+              miscCashExpenses,
+              miscMomoExpenses,
+              expectedCash,
+              expectedMomo,
+              netRevenue,
+              todayUnpaidOrdersValue,
+              allTimeUnpaidOrdersValue,
+              previousUnpaidOrdersValue,
+              totalPardonedAmount,
+              changeOwedForPeriod,
+              settledUnpaidOrdersValue,
+              previousDaysChangeGiven,
+              totalRewardDiscount,
+              orders: todayOrders,
+              activityOrders,
+              itemStats,
+            });
+
+            setLoading(false);
+          },
+          (error) => {
+            console.error("Error fetching misc expenses:", error);
+            setError("Failed to load miscellaneous expenses data.");
+            setLoading(false);
+          }
+        );
+
+        return () => unsubMiscExpenses();
+      },
+      (error) => {
+        console.error("Error fetching all orders:", error);
+        setError("Failed to load order data.");
+        setLoading(false);
+      }
+    );
+
+    const reportsQuery = query(
+      collection(db, "reconciliationReports"),
+      orderBy("timestamp", "desc")
+    );
+    const unsubReports = onSnapshot(
+      reportsQuery,
+      (snapshot) => {
+        setReports(
+          snapshot.docs.map(
+            (doc) => ({ id: doc.id, ...doc.data() } as ReconciliationReport)
+          )
+        );
+      },
+      (error) => {
+        console.error("Error fetching reports:", error);
+        setError("Failed to load reconciliation reports.");
+      }
+    );
+
+    return () => {
+      unsubAllOrders();
+      unsubReports();
+    };
+  }, [todayStart, todayEnd]);
+
+  const adjustedExpectedCash = useMemo(() => {
+    if (!stats) return 0;
+    let expected = stats.cashSales;
+    expected += stats.settledUnpaidOrdersValue;
+    expected -= stats.miscCashExpenses;
+    expected -= stats.previousDaysChangeGiven;
+    return expected;
+  }, [stats]);
+
+  return {
+    stats,
+    reports,
+    loading,
+    error,
+    isTodayClosedOut,
+    adjustedExpectedCash,
+  };
+};

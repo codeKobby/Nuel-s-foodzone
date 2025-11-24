@@ -15,14 +15,14 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -43,7 +43,7 @@ const AdminForm = ({
 }: {
     editingItem: MenuItem | null;
     formState: { name: string; price: string; category: string; stock: string, requiresChoice: boolean };
-    handleFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLButtonElement>) => void;
+    handleFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement>) => void;
     handleSubmit: (e: React.FormEvent) => void;
     onCancel: () => void;
 }) => (
@@ -64,11 +64,11 @@ const AdminForm = ({
             <Label htmlFor="stock">Stock Quantity</Label>
             <Input type="number" name="stock" id="stock" value={formState.stock} onChange={handleFormChange} />
         </div>
-         <div className="flex items-center space-x-2">
-            <Checkbox 
-                id="requiresChoice" 
+        <div className="flex items-center space-x-2">
+            <Checkbox
+                id="requiresChoice"
                 name="requiresChoice"
-                checked={formState.requiresChoice} 
+                checked={formState.requiresChoice}
                 onCheckedChange={(checked) => handleFormChange({ target: { name: 'requiresChoice', value: checked } } as any)}
             />
             <Label htmlFor="requiresChoice" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
@@ -105,7 +105,7 @@ const SecuritySettings = () => {
             currentPassword: currentPassword,
             newPassword: newPassword,
         });
-        
+
         toast({
             type: result.success ? 'success' : 'error',
             title: result.success ? "Success" : "Error",
@@ -121,7 +121,7 @@ const SecuritySettings = () => {
     };
 
     return (
-         <form onSubmit={handlePasswordUpdate} className="space-y-4">
+        <form onSubmit={handlePasswordUpdate} className="space-y-4">
             <div>
                 <Label htmlFor="current-password">Current Password</Label>
                 <Input type="password" id="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
@@ -135,7 +135,7 @@ const SecuritySettings = () => {
                 <Input type="password" id="confirm-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
             </div>
             <Button type="submit" className="w-full" disabled={isUpdatingPassword}>
-                {isUpdatingPassword ? <><Loader className="animate-spin mr-2"/>Updating...</> : <><KeyRound className="mr-2"/>Update Password</>}
+                {isUpdatingPassword ? <><Loader className="animate-spin mr-2" />Updating...</> : <><KeyRound className="mr-2" />Update Password</>}
             </Button>
         </form>
     )
@@ -171,14 +171,14 @@ const AdminView: React.FC = () => {
             setIsMenuSheetOpen(true);
         }
     }, [editingItem]);
-    
-    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLButtonElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         if (type === 'checkbox') {
-             const checked = (e.target as HTMLInputElement).checked;
-             setFormState(prev => ({ ...prev, [name]: checked }));
+            const checked = (e.target as HTMLInputElement).checked;
+            setFormState(prev => ({ ...prev, [name]: checked }));
         } else {
-             setFormState(prev => ({ ...prev, [name]: value }));
+            setFormState(prev => ({ ...prev, [name]: value }));
         }
     };
 
@@ -191,10 +191,10 @@ const AdminView: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formState.name || !formState.price || !formState.category) return;
-        const data = { 
-            name: formState.name, 
-            price: parseFloat(formState.price), 
-            category: formState.category, 
+        const data = {
+            name: formState.name,
+            price: parseFloat(formState.price),
+            category: formState.category,
             stock: parseInt(formState.stock, 10) || 0,
             requiresChoice: formState.requiresChoice,
         };
@@ -210,10 +210,10 @@ const AdminView: React.FC = () => {
 
     const handleEdit = (item: MenuItem) => {
         setEditingItem(item);
-        setFormState({ 
-            name: String(item.name), 
-            price: String(item.price), 
-            category: String(item.category), 
+        setFormState({
+            name: String(item.name),
+            price: String(item.price),
+            category: String(item.category),
             stock: String(item.stock || ''),
             requiresChoice: item.requiresChoice || false
         });
@@ -223,7 +223,7 @@ const AdminView: React.FC = () => {
         try { await deleteDoc(doc(db, "menuItems", itemId)); } catch (e) { setError("Failed to delete expense."); }
         setShowDeleteConfirm(null);
     };
-    
+
     const handleSyncInitialMenu = async () => {
         setIsSyncing(true);
         setError(null);
@@ -231,7 +231,7 @@ const AdminView: React.FC = () => {
             const menuRef = collection(db, "menuItems");
             const existingSnapshot = await getDocs(menuRef);
             const existingNames = new Set(existingSnapshot.docs.map(doc => doc.data().name));
-            
+
             const itemsToAdd = initialMenuData.filter(item => !existingNames.has(item.name));
 
             if (itemsToAdd.length > 0) {
@@ -241,12 +241,12 @@ const AdminView: React.FC = () => {
                     batch.set(newItemRef, item);
                 }
                 await batch.commit();
-                 toast({
+                toast({
                     title: "Menu Synced",
                     description: `Added ${itemsToAdd.length} new items to the menu.`,
                 });
             } else {
-                 toast({
+                toast({
                     title: "Menu Synced",
                     description: "No new items to add. Menu is already up to date.",
                 });
@@ -270,9 +270,9 @@ const AdminView: React.FC = () => {
             item.category.toLowerCase().includes(searchQuery.toLowerCase())
         );
         const categories = [...new Set(filteredItems.map(item => item.category))].sort();
-        return categories.map(category => ({ 
-            category, 
-            items: filteredItems.filter(item => item.category === category) 
+        return categories.map(category => ({
+            category,
+            items: filteredItems.filter(item => item.category === category)
         }));
     }, [menuItems, searchQuery]);
 
@@ -285,9 +285,9 @@ const AdminView: React.FC = () => {
                     <h2 className="text-2xl md:text-3xl font-bold">Admin Panel</h2>
                     <div className="flex gap-2">
                         <div className="relative flex-grow">
-                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                             <Input 
-                                placeholder="Search menu..." 
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search menu..."
                                 className="pl-10"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -304,13 +304,13 @@ const AdminView: React.FC = () => {
                                             <SheetTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</SheetTitle>
                                         </SheetHeader>
                                         <div className="p-4 overflow-y-auto">
-                                        <AdminForm 
-                                            editingItem={editingItem}
-                                            formState={formState}
-                                            handleFormChange={handleFormChange}
-                                            handleSubmit={handleSubmit}
-                                            onCancel={clearForm}
-                                        />
+                                            <AdminForm
+                                                editingItem={editingItem}
+                                                formState={formState}
+                                                handleFormChange={handleFormChange}
+                                                handleSubmit={handleSubmit}
+                                                onCancel={clearForm}
+                                            />
                                         </div>
                                     </SheetContent>
                                 </Sheet>
@@ -350,13 +350,13 @@ const AdminView: React.FC = () => {
                                                     <span>{formatCurrency(item.price)}</span>
                                                     {isDrinkCategory(category) && (
                                                         <>
-                                                         <span>- Stock: {item.stock ?? 'N/A'}</span>
-                                                          {(item.stock ?? 0) <= 5 && (
-                                                            <Badge variant="destructive" className="flex items-center gap-1">
-                                                                <AlertCircle className="h-3 w-3" />
-                                                                Low Stock
-                                                            </Badge>
-                                                          )}
+                                                            <span>- Stock: {item.stock ?? 'N/A'}</span>
+                                                            {(item.stock ?? 0) <= 5 && (
+                                                                <Badge variant="destructive" className="flex items-center gap-1">
+                                                                    <AlertCircle className="h-3 w-3" />
+                                                                    Low Stock
+                                                                </Badge>
+                                                            )}
                                                         </>
                                                     )}
                                                 </div>
@@ -373,20 +373,20 @@ const AdminView: React.FC = () => {
                     </div>
                 )}
             </div>
-            
+
             {!isMobile && (
                 <Card className="w-full md:w-80 lg:w-96 rounded-none border-t md:border-t-0 md:border-l flex flex-col">
-                     <Tabs defaultValue="menu" className="w-full flex flex-col flex-grow">
+                    <Tabs defaultValue="menu" className="w-full flex flex-col flex-grow">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="menu">Menu</TabsTrigger>
                             <TabsTrigger value="security">Security</TabsTrigger>
                         </TabsList>
                         <TabsContent value="menu" className="flex-grow">
-                             <CardHeader>
+                            <CardHeader>
                                 <CardTitle className="text-xl md:text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <AdminForm 
+                                <AdminForm
                                     editingItem={editingItem}
                                     formState={formState}
                                     handleFormChange={handleFormChange}
@@ -394,23 +394,23 @@ const AdminView: React.FC = () => {
                                     onCancel={clearForm}
                                 />
                                 <div className="mt-4 pt-4 border-t">
-                                     <Button variant="outline" className="w-full" onClick={handleSyncInitialMenu} disabled={isSyncing}>
-                                        {isSyncing ? <><RefreshCw className="mr-2 animate-spin"/> Syncing...</> : <><RefreshCw className="mr-2"/>Sync Initial Menu</>}
+                                    <Button variant="outline" className="w-full" onClick={handleSyncInitialMenu} disabled={isSyncing}>
+                                        {isSyncing ? <><RefreshCw className="mr-2 animate-spin" /> Syncing...</> : <><RefreshCw className="mr-2" />Sync Initial Menu</>}
                                     </Button>
                                     <p className="text-xs text-muted-foreground mt-2">Adds any missing default menu items to your database. This will not overwrite any changes you have made.</p>
                                 </div>
                             </CardContent>
                         </TabsContent>
                         <TabsContent value="security" className="flex-grow">
-                             <CardHeader>
-                                <CardTitle className="text-xl md:text-2xl flex items-center"><ShieldCheck className="mr-2"/> Security Settings</CardTitle>
+                            <CardHeader>
+                                <CardTitle className="text-xl md:text-2xl flex items-center"><ShieldCheck className="mr-2" /> Security Settings</CardTitle>
                                 <CardDescription>Update your account password.</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <SecuritySettings />
                             </CardContent>
                         </TabsContent>
-                     </Tabs>
+                    </Tabs>
                 </Card>
             )}
 
