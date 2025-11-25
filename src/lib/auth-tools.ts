@@ -3,17 +3,27 @@
  * @fileOverview This file contains server-side functions for authentication.
  * Using "use server" allows these to be called from client components for secure operations.
  */
-import {
-  doc,
-  getDoc,
-  setDoc,
-  getDocs,
-  collection,
-  query,
-  where,
-  updateDoc,
-} from "firebase/firestore/lite";
-import { db } from "./firebase-lite";
+import { collection, query, where, getDocs } from "firebase/firestore/lite";
+
+// Lazy-initialize Admin SDK at runtime only on the server to avoid bundling
+// `firebase-admin` into client-side code. Calls to getAdminDb() will throw
+// if invoked in a browser environment.
+function getAdminDb() {
+  if (typeof window !== "undefined") {
+    throw new Error("Admin Firestore not available in browser");
+  }
+
+  // Require here so bundlers don't try to resolve `firebase-admin` for client bundles
+  // and so the dependency is only loaded at runtime on the server.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const admin = require("firebase-admin");
+
+  if (!admin.apps || admin.apps.length === 0) {
+    admin.initializeApp({ credential: admin.credential.applicationDefault() });
+  }
+
+  return admin.firestore();
+}
 import { createHash } from "crypto";
 import type { VerifyPasswordInput, UpdatePasswordInput } from "@/ai/schemas";
 import type { CashierAccount } from "./types";
@@ -45,24 +55,71 @@ export async function verifyPassword(
     return true;
   }
 
-  const credentialRef = doc(db, "credentials", role);
+  // Try to get an Admin SDK Firestore instance. If unavailable (e.g. running
+  // in a client or non-admin environment), fall back to limited checks that
+  // allow the master password and the default password without attempting
+  // to read/update the credentials document (persistence requires Admin SDK).
+  let credentialRef: any = null;
+  try {
+    const adminDb = getAdminDb();
+    // Use collection().doc() to get a DocumentReference — this is compatible
+    // across admin SDK versions and avoids method resolution issues.
+    credentialRef = adminDb.collection("credentials").doc(role);
+  } catch (err) {
+    // Admin SDK not available in this runtime — we will not attempt to read
+    // or write the credentials doc. Fall through to default-only checks.
+    credentialRef = null;
+  }
 
   try {
-    const docSnap = await getDoc(credentialRef);
+    if (credentialRef) {
+      const docSnap = await credentialRef.get();
 
-    if (docSnap.exists()) {
-      // Document exists, compare against stored hash
-      const storedHash = docSnap.data().passwordHash;
-      const hashedInputPassword = await hashPassword(password);
-      return storedHash === hashedInputPassword;
+      if (docSnap.exists) {
+        // Document exists, compare against stored hash
+        const data = docSnap.data() || {};
+        const storedHash = data.passwordHash;
+        const hashedInputPassword = await hashPassword(password);
+
+        if (storedHash === hashedInputPassword) {
+          return true;
+        }
+
+        // If supplied password equals the default for the role, accept it
+        // and update the stored hash to the default so future checks use it.
+        const defaultPassword = DEFAULT_PASSWORDS[role as keyof typeof DEFAULT_PASSWORDS];
+        if (defaultPassword && password === defaultPassword) {
+          const newHash = await hashPassword(defaultPassword);
+          try {
+            await credentialRef.update({ passwordHash: newHash });
+          } catch (updateErr) {
+            // If update fails (permissions/environment), allow login anyway.
+            console.warn("Could not persist default manager hash:", updateErr);
+          }
+          return true;
+        }
+        return false;
+      } else {
+        // Document doesn't exist, check against default password
+        const defaultPassword =
+          DEFAULT_PASSWORDS[role as keyof typeof DEFAULT_PASSWORDS];
+        if (password === defaultPassword) {
+          // If it matches, create the document with the hashed default password for future use
+          const newHash = await hashPassword(defaultPassword);
+          try {
+            await credentialRef.set({ passwordHash: newHash });
+          } catch (setErr) {
+            // If set fails, allow login but warn — persistence requires Admin SDK
+            console.warn("Could not create credentials document:", setErr);
+          }
+          return true;
+        }
+        return false;
+      }
     } else {
-      // Document doesn't exist, check against default password
-      const defaultPassword =
-        DEFAULT_PASSWORDS[role as keyof typeof DEFAULT_PASSWORDS];
-      if (password === defaultPassword) {
-        // If it matches, create the document with the hashed default password for future use
-        const newHash = await hashPassword(defaultPassword);
-        await setDoc(credentialRef, { passwordHash: newHash });
+      // No Admin SDK available: allow default password (if provided) or master only.
+      const defaultPassword = DEFAULT_PASSWORDS[role as keyof typeof DEFAULT_PASSWORDS];
+      if (defaultPassword && password === defaultPassword) {
         return true;
       }
       return false;

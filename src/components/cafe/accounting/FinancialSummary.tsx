@@ -23,11 +23,11 @@ import {
 } from "@/components/ui/table";
 import { formatTimestamp } from '@/lib/utils';
 
-const StatCard: React.FC<{ 
-    icon: React.ReactNode, 
-    title: string, 
-    value: string | number, 
-    color?: string, 
+const StatCard: React.FC<{
+    icon: React.ReactNode,
+    title: string,
+    value: string | number,
+    color?: string,
     description?: string | React.ReactNode,
     onClick?: () => void,
     className?: string
@@ -49,54 +49,54 @@ interface FinancialSummaryProps {
 }
 
 export const FinancialSummary: React.FC<FinancialSummaryProps> = ({ stats }) => {
-            // Helper function: must be defined before use
-            const getOrderContribution = (order: Order, method: 'cash' | 'momo' = 'cash') => {
-                const todayStart = new Date();
-                todayStart.setHours(0, 0, 0, 0);
-                const todayEnd = new Date();
-                todayEnd.setHours(23, 59, 59, 999);
-                if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
-                    let cashPaid = 0;
-                    let momoPaid = 0;
-                    order.paymentHistory.forEach(p => {
-                        const pDate = p.timestamp?.toDate();
-                        if (pDate && pDate >= todayStart && pDate <= todayEnd) {
-                            if (p.method === 'cash') cashPaid += p.amount;
-                            if (p.method === 'momo' || p.method === 'card') momoPaid += p.amount;
-                        }
-                    });
-                    if (method === 'cash') return Math.min(order.total, cashPaid);
-                    if (method === 'momo') return Math.min(order.total, momoPaid);
-                    return 0;
-                }
-                const paymentDate = order.lastPaymentTimestamp?.toDate() || order.timestamp.toDate();
-                if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
-                    if (order.paymentBreakdown) {
-                        if (method === 'cash') return Math.min(order.total, order.paymentBreakdown.cash || 0);
-                        if (method === 'momo') return Math.min(order.total, order.paymentBreakdown.momo || 0);
-                    } else {
-                        if (method === 'cash') {
-                            if (order.paymentMethod === 'cash' || order.paymentMethod === 'split') return Math.min(order.total, order.amountPaid);
-                        }
-                        if (method === 'momo') {
-                            if (order.paymentMethod === 'momo') return Math.min(order.total, order.amountPaid);
-                        }
-                    }
-                }
-                return 0;
-            };
-        // Only include orders created today
+    // Helper function: must be defined before use
+    const getOrderContribution = (order: Order, method: 'cash' | 'momo' = 'cash') => {
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
         const todayEnd = new Date();
         todayEnd.setHours(23, 59, 59, 999);
-        const sourceOrders = (stats.orders || []).filter(order => {
-            const orderDate = order.timestamp?.toDate?.() || order.timestamp;
-            return orderDate >= todayStart && orderDate <= todayEnd;
-        });
+        if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
+            let cashPaid = 0;
+            let momoPaid = 0;
+            order.paymentHistory.forEach(p => {
+                const pDate = p.timestamp?.toDate();
+                if (pDate && pDate >= todayStart && pDate <= todayEnd) {
+                    if (p.method === 'cash') cashPaid += p.amount;
+                    if (p.method === 'momo' || p.method === 'card') momoPaid += p.amount;
+                }
+            });
+            if (method === 'cash') return Math.min(order.total, cashPaid);
+            if (method === 'momo') return Math.min(order.total, momoPaid);
+            return 0;
+        }
+        const paymentDate = order.lastPaymentTimestamp?.toDate() || order.timestamp.toDate();
+        if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
+            if (order.paymentBreakdown) {
+                if (method === 'cash') return Math.min(order.total, order.paymentBreakdown.cash || 0);
+                if (method === 'momo') return Math.min(order.total, order.paymentBreakdown.momo || 0);
+            } else {
+                if (method === 'cash') {
+                    if (order.paymentMethod === 'cash' || order.paymentMethod === 'split') return Math.min(order.total, order.amountPaid);
+                }
+                if (method === 'momo') {
+                    if (order.paymentMethod === 'momo') return Math.min(order.total, order.amountPaid);
+                }
+            }
+        }
+        return 0;
+    };
+    // Only include orders created today
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const sourceOrders = (stats.orders || []).filter(order => {
+        const orderDate = order.timestamp?.toDate?.() || order.timestamp;
+        return orderDate >= todayStart && orderDate <= todayEnd;
+    });
 
-        // Cash sales card value: sum of contributions for today's orders
-        const cashSalesCardValue = sourceOrders.reduce((sum, order) => sum + getOrderContribution(order), 0);
+    // Cash sales card value: sum of contributions for today's orders
+    const cashSalesCardValue = sourceOrders.reduce((sum, order) => sum + getOrderContribution(order), 0);
     const sortedItemStats = Object.entries(stats.itemStats).sort(([, a], [, b]) => b.count - a.count);
     const [detailsOpen, setDetailsOpen] = React.useState(false);
     const [selectedMethod, setSelectedMethod] = React.useState<'cash' | 'momo' | null>(null);
@@ -136,19 +136,19 @@ export const FinancialSummary: React.FC<FinancialSummaryProps> = ({ stats }) => 
                         </CardHeader>
                         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <StatCard icon={<DollarSign className="text-muted-foreground" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold from completed orders`} />
-                            <StatCard 
-                                icon={<Landmark className="text-muted-foreground" />} 
-                                title="Cash Sales" 
-                                value={formatCurrency(cashSalesCardValue)} 
-                                description="All cash payments received today" 
+                            <StatCard
+                                icon={<Landmark className="text-muted-foreground" />}
+                                title="Cash Sales"
+                                value={formatCurrency(cashSalesCardValue)}
+                                description="All cash payments received today"
                                 onClick={() => handleShowDetails('cash')}
                                 className="cursor-pointer hover:bg-accent/50 transition-colors"
                             />
-                            <StatCard 
-                                icon={<CreditCard className="text-muted-foreground" />} 
-                                title="Momo/Card Sales" 
-                                value={formatCurrency(stats.momoSales)} 
-                                description="All momo/card payments received" 
+                            <StatCard
+                                icon={<CreditCard className="text-muted-foreground" />}
+                                title="Momo/Card Sales"
+                                value={formatCurrency(stats.momoSales)}
+                                description="All momo/card payments received"
                                 onClick={() => handleShowDetails('momo')}
                                 className="cursor-pointer hover:bg-accent/50 transition-colors"
                             />

@@ -153,10 +153,16 @@ export const useAccounting = () => {
                   // Only add to momo/cash sales if order was created today
                   if (isTodayOrder && order.paymentBreakdown) {
                     if (order.paymentBreakdown.cash) {
-                      cashSales += Math.min(order.total, order.paymentBreakdown.cash);
+                      cashSales += Math.min(
+                        order.total,
+                        order.paymentBreakdown.cash
+                      );
                     }
                     if (order.paymentBreakdown.momo) {
-                      momoSales += Math.min(order.total, order.paymentBreakdown.momo);
+                      momoSales += Math.min(
+                        order.total,
+                        order.paymentBreakdown.momo
+                      );
                     }
                   }
 
