@@ -1,4 +1,4 @@
-import admin from 'firebase-admin';
+import admin from "firebase-admin";
 
 // Initialize Admin SDK using Application Default Credentials. Set
 // GOOGLE_APPLICATION_CREDENTIALS in your environment to the service
@@ -12,7 +12,7 @@ if (!admin.apps.length) {
     });
   } catch (err) {
     // If initialization fails, rethrow so callers can handle it.
-    console.warn('firebase-admin initialization warning:', err.message || err);
+    console.warn("firebase-admin initialization warning:", err.message || err);
   }
 }
 

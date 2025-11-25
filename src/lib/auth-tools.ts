@@ -87,7 +87,8 @@ export async function verifyPassword(
 
         // If supplied password equals the default for the role, accept it
         // and update the stored hash to the default so future checks use it.
-        const defaultPassword = DEFAULT_PASSWORDS[role as keyof typeof DEFAULT_PASSWORDS];
+        const defaultPassword =
+          DEFAULT_PASSWORDS[role as keyof typeof DEFAULT_PASSWORDS];
         if (defaultPassword && password === defaultPassword) {
           const newHash = await hashPassword(defaultPassword);
           try {
@@ -118,7 +119,8 @@ export async function verifyPassword(
       }
     } else {
       // No Admin SDK available: allow default password (if provided) or master only.
-      const defaultPassword = DEFAULT_PASSWORDS[role as keyof typeof DEFAULT_PASSWORDS];
+      const defaultPassword =
+        DEFAULT_PASSWORDS[role as keyof typeof DEFAULT_PASSWORDS];
       if (defaultPassword && password === defaultPassword) {
         return true;
       }

@@ -14,13 +14,13 @@
  * IMPORTANT: Do NOT commit your service account JSON to source control.
  */
 
-const admin = require('firebase-admin');
-const crypto = require('crypto');
+const admin = require("firebase-admin");
+const crypto = require("crypto");
 
 async function main() {
   const password = process.argv[2];
   if (!password) {
-    console.error('Usage: node scripts/reset-manager-password.js <password>');
+    console.error("Usage: node scripts/reset-manager-password.js <password>");
     process.exit(1);
   }
 
@@ -33,20 +33,22 @@ async function main() {
   } catch (err) {
     // If already initialized in this process, ignore
     if (!/already exists/.test(String(err))) {
-      console.error('Failed to initialize firebase-admin:', err);
+      console.error("Failed to initialize firebase-admin:", err);
       process.exit(1);
     }
   }
 
   const db = admin.firestore();
 
-  const hash = crypto.createHash('sha256').update(password).digest('hex');
+  const hash = crypto.createHash("sha256").update(password).digest("hex");
 
   try {
-    await db.doc('credentials/manager').set({ passwordHash: hash }, { merge: true });
-    console.log('Successfully set manager password hash in Firestore.');
+    await db
+      .doc("credentials/manager")
+      .set({ passwordHash: hash }, { merge: true });
+    console.log("Successfully set manager password hash in Firestore.");
   } catch (err) {
-    console.error('Error writing to Firestore:', err);
+    console.error("Error writing to Firestore:", err);
     process.exit(1);
   }
 }
