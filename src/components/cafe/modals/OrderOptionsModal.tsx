@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { doc, getDoc, updateDoc, writeBatch, serverTimestamp, collection, Timestamp, runTransaction, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
@@ -14,7 +15,6 @@ import { AlertTriangle, Calculator, Info, Gift, Search as SearchIcon, User as Us
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { AuthContext } from '@/context/AuthContext';
-import { useContext } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -149,7 +149,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
   useEffect(() => {
     if (editingOrder) {
-      setOrderType(editingOrder.orderType);
+      setOrderType(editingOrder.orderType || 'Dine-In');
       setOrderTag(editingOrder.tag || '');
       setStep(2);
     }
@@ -300,10 +300,14 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           const newBreakdown = { cash: newCashPayment, momo: newMomoPayment };
           orderData.paymentBreakdown = newBreakdown;
 
-          let finalPaymentMethod: 'cash' | 'momo' | 'split' | 'Unpaid' = 'Unpaid';
+          // For a new order `editingOrder` may be null — default to 'Unpaid'.
+          // Use an explicit cast so TypeScript doesn't infer `editingOrder` as `never` here.
+          let finalPaymentMethod: Order['paymentMethod'] = (editingOrder as Order | null)?.paymentMethod ?? 'Unpaid';
+
           if (newBreakdown.cash > 0 && newBreakdown.momo > 0) finalPaymentMethod = 'split';
-          else if (newBreakdown.cash > 0) finalPaymentMethod = 'cash';
-          else if (newBreakdown.momo > 0) finalPaymentMethod = 'momo';
+          else if (newBreakdown.cash > 0 && newBreakdown.momo === 0) finalPaymentMethod = 'cash';
+          else if (newBreakdown.momo > 0 && newBreakdown.cash === 0) finalPaymentMethod = 'momo';
+
           orderData.paymentMethod = finalPaymentMethod;
 
           orderData.amountPaid = isPaid ? paymentAmounts.totalPaidNow : 0;
@@ -380,7 +384,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Original Order Total:</span>
-              <span>{formatCurrency(editingOrder.total)}</span>
+              <span>{formatCurrency(editingOrder?.total || 0)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">New Total:</span>
@@ -388,7 +392,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Already Paid:</span>
-              <span>{formatCurrency(editingOrder.amountPaid)}</span>
+              <span>{formatCurrency(editingOrder?.amountPaid || 0)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Change Already Given:</span>
@@ -439,7 +443,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                   <Info className="h-4 w-4" />
                   <AlertTitle>Order Edit</AlertTitle>
                   <AlertDescription>
-                    Total changed from {formatCurrency(editingOrder.total)} to {formatCurrency(total)}
+                    Total changed from {formatCurrency(editingOrder?.total || 0)} to {formatCurrency(total)}
                   </AlertDescription>
                 </Alert>
               )}
