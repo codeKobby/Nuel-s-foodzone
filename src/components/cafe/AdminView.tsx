@@ -296,7 +296,7 @@ const AdminView: React.FC = () => {
                         {isMobile && (
                             <>
                                 <Sheet open={isMenuSheetOpen} onOpenChange={(open) => { setIsMenuSheetOpen(open); if (!open) clearForm(); }}>
-                                        <SheetTrigger asChild>
+                                    <SheetTrigger asChild>
                                         <Button size="icon" className="flex-shrink-0" title="Add item" aria-label="Add item"><PlusCircle /></Button>
                                     </SheetTrigger>
                                     <SheetContent side="bottom" className="h-[85vh]">
@@ -315,7 +315,7 @@ const AdminView: React.FC = () => {
                                     </SheetContent>
                                 </Sheet>
                                 <Sheet open={isSecuritySheetOpen} onOpenChange={setIsSecuritySheetOpen}>
-                                        <SheetTrigger asChild>
+                                    <SheetTrigger asChild>
                                         <Button size="icon" variant="outline" className="flex-shrink-0" title="Security settings" aria-label="Open security settings"><ShieldCheck /></Button>
                                     </SheetTrigger>
                                     <SheetContent side="bottom" className="h-auto">

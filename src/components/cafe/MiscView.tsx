@@ -16,14 +16,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -45,21 +45,21 @@ const MiscExpenseForm = ({
     source: 'cash' | 'momo' | null;
     setSource: (source: 'cash' | 'momo') => void;
 }) => (
-     <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
         <div>
             <Label>Source</Label>
             <div className="grid grid-cols-2 gap-2 mt-2">
-                <Button type="button" onClick={() => setSource('cash')} variant={source === 'cash' ? 'default' : 'outline'}><Coins className="mr-2"/>Cash</Button>
-                <Button type="button" onClick={() => setSource('momo')} variant={source === 'momo' ? 'default' : 'outline'}><CreditCard className="mr-2"/>Momo</Button>
+                <Button type="button" onClick={() => setSource('cash')} variant={source === 'cash' ? 'default' : 'outline'}><Coins className="mr-2" />Cash</Button>
+                <Button type="button" onClick={() => setSource('momo')} variant={source === 'momo' ? 'default' : 'outline'}><CreditCard className="mr-2" />Momo</Button>
             </div>
         </div>
         <div>
             <Label htmlFor="purpose">Purpose</Label>
-            <Input type="text" name="purpose" id="purpose" value={formState.purpose} onChange={handleFormChange} required placeholder="e.g., 'Bought new napkins'"/>
+            <Input type="text" name="purpose" id="purpose" value={formState.purpose} onChange={handleFormChange} required placeholder="e.g., 'Bought new napkins'" />
         </div>
         <div>
             <Label htmlFor="amount">Amount</Label>
-            <Input type="number" name="amount" id="amount" value={formState.amount} onChange={handleFormChange} required placeholder="0.00"/>
+            <Input type="number" name="amount" id="amount" value={formState.amount} onChange={handleFormChange} required placeholder="0.00" />
         </div>
         <div className="pt-4">
             <Button type="submit" className="w-full font-bold" disabled={!formState.purpose || !formState.amount || !source}>Add Expense</Button>
@@ -79,7 +79,7 @@ const MiscView: React.FC = () => {
     const isMobile = useIsMobile();
     const [lastReconciliationDate, setLastReconciliationDate] = useState<Date | null>(null);
     const { session } = useContext(AuthContext);
-    
+
     const groupedExpenses = useMemo(() => groupOrdersByDate(expenses), [expenses]);
 
     useEffect(() => {
@@ -104,14 +104,14 @@ const MiscView: React.FC = () => {
             unsubscribeExpenses();
         };
     }, []);
-    
+
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => setFormState(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formState.purpose || !formState.amount || !source) return;
-        const data = { 
-            purpose: formState.purpose, 
+        const data = {
+            purpose: formState.purpose,
             amount: parseFloat(formState.amount),
             source: source,
             settled: false,
@@ -121,7 +121,7 @@ const MiscView: React.FC = () => {
         };
         try {
             await addDoc(collection(db, "miscExpenses"), data);
-            setFormState({ purpose: '', amount: ''});
+            setFormState({ purpose: '', amount: '' });
             setSource('cash');
             setIsSheetOpen(false); // Close sheet on mobile after submission
         } catch (e) { setError("Failed to save expense."); }
@@ -143,7 +143,7 @@ const MiscView: React.FC = () => {
             <div className="flex-1 p-6 overflow-y-auto">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-3xl font-bold">Miscellaneous Expenses</h2>
-                     {isMobile && (
+                    {isMobile && (
                         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                             <SheetTrigger asChild>
                                 <Button size="icon" title="Add miscellaneous expense" aria-label="Add miscellaneous expense"><PlusCircle /></Button>
@@ -153,13 +153,13 @@ const MiscView: React.FC = () => {
                                     <SheetTitle className="text-2xl">Add New Expense</SheetTitle>
                                 </SheetHeader>
                                 <div className="p-4 overflow-y-auto">
-                                <MiscExpenseForm
-                                    formState={formState}
-                                    handleFormChange={handleFormChange}
-                                    handleSubmit={handleSubmit}
-                                    source={source}
-                                    setSource={setSource}
-                                />
+                                    <MiscExpenseForm
+                                        formState={formState}
+                                        handleFormChange={handleFormChange}
+                                        handleSubmit={handleSubmit}
+                                        source={source}
+                                        setSource={setSource}
+                                    />
                                 </div>
                             </SheetContent>
                         </Sheet>
@@ -177,7 +177,7 @@ const MiscView: React.FC = () => {
                             {Object.keys(groupedExpenses).length === 0 && <p className="text-muted-foreground italic text-center py-4">No expenses recorded yet.</p>}
                             {Object.entries(groupedExpenses).map(([date, expensesOnDate]) => (
                                 <div key={date}>
-                                     <div className="flex items-center gap-3 mb-3">
+                                    <div className="flex items-center gap-3 mb-3">
                                         <h3 className="text-lg font-semibold">{date}</h3>
                                         <Separator className="flex-1" />
                                     </div>
@@ -185,25 +185,25 @@ const MiscView: React.FC = () => {
                                         {expensesOnDate.map(item => {
                                             const locked = isExpenseLocked(item);
                                             return (
-                                            <div key={item.id} className={cn('p-3 rounded-lg flex justify-between items-center', item.settled ? 'bg-green-100 dark:bg-green-900/20' : 'bg-secondary')}>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge variant={item.source === 'cash' ? 'outline' : 'secondary'} className="capitalize">{item.source}</Badge>
-                                                        <p className="font-semibold">{item.purpose}</p>
+                                                <div key={item.id} className={cn('p-3 rounded-lg flex justify-between items-center', item.settled ? 'bg-green-100 dark:bg-green-900/20' : 'bg-secondary')}>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge variant={item.source === 'cash' ? 'outline' : 'secondary'} className="capitalize">{item.source}</Badge>
+                                                            <p className="font-semibold">{item.purpose}</p>
+                                                        </div>
+                                                        <p className="text-sm text-muted-foreground mt-1">{formatCurrency(item.amount)} - {formatTimestamp(item.timestamp, true)}</p>
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground mt-1">{formatCurrency(item.amount)} - {formatTimestamp(item.timestamp, true)}</p>
+                                                    <div className="flex items-center space-x-1">
+                                                        {item.settled ? (
+                                                            <Badge variant="default" className="bg-green-500 hover:bg-green-500">Settled</Badge>
+                                                        ) : locked ? (
+                                                            <Badge variant="secondary"><Lock className="mr-2 h-3 w-3" />Locked</Badge>
+                                                        ) : null}
+                                                        {!locked && (
+                                                            <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)} title="Delete expense" aria-label="Delete expense"><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center space-x-1">
-                                                    {item.settled ? (
-                                                        <Badge variant="default" className="bg-green-500 hover:bg-green-500">Settled</Badge>
-                                                    ) : locked ? (
-                                                        <Badge variant="secondary"><Lock className="mr-2 h-3 w-3" />Locked</Badge>
-                                                    ) : null}
-                                                    {!locked && (
-                                                         <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)} title="Delete expense" aria-label="Delete expense"><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                                                    )}
-                                                </div>
-                                            </div>
                                             )
                                         })}
                                     </div>
@@ -213,8 +213,8 @@ const MiscView: React.FC = () => {
                     </Card>
                 )}
             </div>
-             {!isMobile && (
-                 <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-l">
+            {!isMobile && (
+                <Card className="w-full md:w-96 rounded-none border-t md:border-t-0 md:border-l">
                     <CardHeader>
                         <CardTitle className="text-2xl">Add New Expense</CardTitle>
                     </CardHeader>
@@ -252,4 +252,4 @@ const MiscView: React.FC = () => {
 
 export default MiscView;
 
-    
+

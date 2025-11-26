@@ -48,7 +48,7 @@ const MenuPage = () => {
             return { ...prev, [newId]: { ...item, id: newId, quantity: 1 } };
         });
     };
-    
+
     const updateQuantity = (itemId: string, amount: number) => {
         setCart(prev => {
             const item = prev[itemId];
@@ -73,7 +73,7 @@ const MenuPage = () => {
             item.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [menu, selectedCategory, searchQuery]);
-    
+
     const handleCheckout = () => {
         // Here you would navigate to a checkout page, passing cart info
         // For now, we'll just log it
@@ -96,7 +96,7 @@ const MenuPage = () => {
                     Object.values(cart).map(item => (
                         <div key={item.id} className="flex items-center gap-3">
                             <div className="w-16 h-16 rounded-md bg-secondary overflow-hidden">
-                                <Image src={`https://picsum.photos/seed/${item.name.split(' ').join('-')}/200`} alt={item.name} data-ai-hint={item.name} width={64} height={64} className="object-cover"/>
+                                <Image src={`https://picsum.photos/seed/${item.name.split(' ').join('-')}/200`} alt={item.name} data-ai-hint={item.name} width={64} height={64} className="object-cover" />
                             </div>
                             <div className="flex-1">
                                 <p className="font-semibold text-sm">{item.name}</p>
@@ -125,100 +125,99 @@ const MenuPage = () => {
 
     return (
         <>
-        <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b">
-            <div className="container mx-auto px-4 h-20 flex justify-between items-center">
-                <Link href="/" className="flex items-center gap-2">
-                    <Image src={logo} alt="Nuel's Cafe Logo" width={40} height={40} className="rounded-lg"/>
-                    <h1 className="text-xl font-bold">Nuel's Cafe</h1>
-                </Link>
-                <nav className="hidden md:flex items-center gap-6">
-                    <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">Home</Link>
-                    <Link href="/menu" className="text-sm font-medium text-primary transition-colors">Menu</Link>
-                    <Link href="/catering" className="text-sm font-medium hover:text-primary transition-colors">Catering</Link>
-                    <Link href="/contact" className="text-sm font-medium hover:text-primary transition-colors">Contact</Link>
-                </nav>
-                 <div className="flex items-center gap-2">
-                    <Sheet>
-                        <SheetTrigger asChild>
-                            <Button variant="outline" className="md:hidden relative">
-                                <ShoppingBag />
-                                {cartCount > 0 && <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 justify-center p-0">{cartCount}</Badge>}
-                            </Button>
-                        </SheetTrigger>
-                        <SheetContent side="right" className="p-0 flex flex-col">
-                            <CartSidebar />
-                        </SheetContent>
-                    </Sheet>
-                </div>
-            </div>
-        </header>
-
-        <div className="flex">
-            <main className="flex-1 container mx-auto px-4 py-8">
-                <div className="mb-8">
-                    <h2 className="text-4xl font-bold tracking-tight">Our Menu</h2>
-                    <p className="text-muted-foreground mt-2">Explore our delicious offerings, crafted with passion.</p>
-                </div>
-
-                {/* Filters */}
-                <div className="sticky top-20 z-30 bg-background/95 py-4">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Search for a dish..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
-                        </div>
-                        <div className="flex-shrink-0 overflow-x-auto">
-                            <div className="flex gap-2">
-                            {categories.map(cat => (
-                                <Button key={cat} variant={selectedCategory === cat ? 'default' : 'outline'} onClick={() => setSelectedCategory(cat)}>
-                                    {cat}
+            <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b">
+                <div className="container mx-auto px-4 h-20 flex justify-between items-center">
+                    <Link href="/" className="flex items-center gap-2">
+                        <Image src={logo} alt="Nuel's Cafe Logo" width={40} height={40} className="rounded-lg" />
+                        <h1 className="text-xl font-bold">Nuel's Cafe</h1>
+                    </Link>
+                    <nav className="hidden md:flex items-center gap-6">
+                        <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">Home</Link>
+                        <Link href="/menu" className="text-sm font-medium text-primary transition-colors">Menu</Link>
+                        <Link href="/catering" className="text-sm font-medium hover:text-primary transition-colors">Catering</Link>
+                        <Link href="/contact" className="text-sm font-medium hover:text-primary transition-colors">Contact</Link>
+                    </nav>
+                    <div className="flex items-center gap-2">
+                        <Sheet>
+                            <SheetTrigger asChild>
+                                <Button variant="outline" className="md:hidden relative">
+                                    <ShoppingBag />
+                                    {cartCount > 0 && <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 justify-center p-0">{cartCount}</Badge>}
                                 </Button>
-                            ))}
+                            </SheetTrigger>
+                            <SheetContent side="right" className="p-0 flex flex-col">
+                                <CartSidebar />
+                            </SheetContent>
+                        </Sheet>
+                    </div>
+                </div>
+            </header>
+
+            <div className="flex">
+                <main className="flex-1 container mx-auto px-4 py-8">
+                    <div className="mb-8">
+                        <h2 className="text-4xl font-bold tracking-tight">Our Menu</h2>
+                        <p className="text-muted-foreground mt-2">Explore our delicious offerings, crafted with passion.</p>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="sticky top-20 z-30 bg-background/95 py-4">
+                        <div className="flex flex-col md:flex-row gap-4">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input placeholder="Search for a dish..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+                            </div>
+                            <div className="flex-shrink-0 overflow-x-auto">
+                                <div className="flex gap-2">
+                                    {categories.map(cat => (
+                                        <Button key={cat} variant={selectedCategory === cat ? 'default' : 'outline'} onClick={() => setSelectedCategory(cat)}>
+                                            {cat}
+                                        </Button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                
-                {/* Menu Grid */}
-                {loading ? (
-                    <div className="flex justify-center items-center h-64"><LoadingSpinner /></div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-                        {filteredMenu.map(item => (
-                            <Card key={item.id} className="group overflow-hidden">
-                                <div className="relative h-48 bg-secondary">
-                                    <Image 
-                                        src={`https://picsum.photos/seed/${item.name.split(' ').join('-')}/400/300`} 
-                                        alt={item.name}
-                                        data-ai-hint={item.name}
-                                        fill
-                                        className="object-cover transition-transform duration-300 group-hover:scale-105"
-                                    />
-                                </div>
-                                <CardContent className="p-4">
-                                    <div className="flex justify-between items-start">
-                                        <h3 className="font-semibold text-lg">{item.name}</h3>
-                                        <p className="font-bold text-primary">{formatCurrency(item.price)}</p>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mt-1 h-10">{item.category}</p>
-                                    <Button className="w-full mt-4" onClick={() => addToCart(item)}>
-                                        <Plus className="mr-2 h-4 w-4" /> Add to Order
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                )}
-            </main>
 
-            <aside className="hidden md:block w-96 sticky top-20 h-[calc(100vh-5rem)]">
-                <CartSidebar />
-            </aside>
-        </div>
+                    {/* Menu Grid */}
+                    {loading ? (
+                        <div className="flex justify-center items-center h-64"><LoadingSpinner /></div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+                            {filteredMenu.map(item => (
+                                <Card key={item.id} className="group overflow-hidden">
+                                    <div className="relative h-48 bg-secondary">
+                                        <Image
+                                            src={`https://picsum.photos/seed/${item.name.split(' ').join('-')}/400/300`}
+                                            alt={item.name}
+                                            data-ai-hint={item.name}
+                                            fill
+                                            className="object-cover transition-transform duration-300 group-hover:scale-105"
+                                        />
+                                    </div>
+                                    <CardContent className="p-4">
+                                        <div className="flex justify-between items-start">
+                                            <h3 className="font-semibold text-lg">{item.name}</h3>
+                                            <p className="font-bold text-primary">{formatCurrency(item.price)}</p>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mt-1 h-10">{item.category}</p>
+                                        <Button className="w-full mt-4" onClick={() => addToCart(item)}>
+                                            <Plus className="mr-2 h-4 w-4" /> Add to Order
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
+                </main>
+
+                <aside className="hidden md:block w-96 sticky top-20 h-[calc(100vh-5rem)]">
+                    <CartSidebar />
+                </aside>
+            </div>
         </>
     );
 };
 
 export default MenuPage;
 
-    
