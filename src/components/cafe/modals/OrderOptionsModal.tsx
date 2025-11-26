@@ -186,6 +186,20 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
     };
   }, [paymentAmounts.totalPaidNow, finalTotal, editingOrder]);
 
+  const hasChangeInput = changeGivenInput.trim().length > 0;
+  const rawChangeInput = parseFloat(changeGivenInput);
+  const normalizedChangeInput = hasChangeInput && Number.isFinite(rawChangeInput)
+    ? Math.max(0, rawChangeInput)
+    : 0;
+  const changeGivenAmount = hasChangeInput && balances.change > 0
+    ? Math.min(normalizedChangeInput, balances.change)
+    : 0;
+  const changeStillDue = balances.change > 0
+    ? Math.max(0, Number((balances.change - changeGivenAmount).toFixed(2)))
+    : 0;
+  const hasOutstandingChange = balances.change > 0 && (!hasChangeInput || changeStillDue > 0.009);
+  const exceedsChangeDue = hasChangeInput && balances.change > 0 && normalizedChangeInput - balances.change > 0.009;
+
   const isAmountPaidEntered = paymentAmounts.totalPaidNow > 0;
   const amountOwedNow = editingOrder ? finalTotal - (editingOrder.amountPaid - (editingOrder.changeGiven || 0)) : finalTotal;
   const isOverpaid = editingOrder && (editingOrder.amountPaid - (editingOrder.changeGiven || 0)) >= finalTotal;
@@ -269,20 +283,23 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         orderData.paymentMethod = finalPaymentMethod;
 
         orderData.amountPaid = (editingOrder.amountPaid || 0) + paymentAmounts.totalPaidNow;
-        const newChangeGiven = (editingOrder.changeGiven || 0) + (balances.change > 0 ? parseFloat(changeGivenInput) || 0 : 0);
+        const changeGivenIncrement = isPaid && balances.change > 0 ? changeGivenAmount : 0;
+        const newChangeGiven = (editingOrder.changeGiven || 0) + changeGivenIncrement;
         orderData.changeGiven = newChangeGiven;
 
         let balanceDue = finalTotal - (orderData.amountPaid - orderData.changeGiven);
         if (pardonDeficit) balanceDue = 0;
 
         orderData.balanceDue = balanceDue;
+        const customerStillOwes = balanceDue > 0.01;
+        const changeOutstanding = balanceDue < -0.01 || hasOutstandingChange;
 
-        if (balanceDue <= 0.01) {
+        if (!customerStillOwes && !changeOutstanding) {
           orderData.paymentStatus = 'Paid';
-        } else if (orderData.amountPaid > 0) {
-          orderData.paymentStatus = 'Partially Paid';
+        } else if (customerStillOwes) {
+          orderData.paymentStatus = orderData.amountPaid > 0 ? 'Partially Paid' : 'Unpaid';
         } else {
-          orderData.paymentStatus = 'Unpaid';
+          orderData.paymentStatus = 'Partially Paid';
         }
 
         if (paymentAmounts.totalPaidNow > 0) {
@@ -311,16 +328,20 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           orderData.paymentMethod = finalPaymentMethod;
 
           orderData.amountPaid = isPaid ? paymentAmounts.totalPaidNow : 0;
-          const changeGiven = isPaid && balances.change > 0 ? (parseFloat(changeGivenInput) || 0) : 0;
+          const allowChangeTracking = isPaid && balances.change > 0;
+          const changeGiven = allowChangeTracking ? changeGivenAmount : 0;
           orderData.changeGiven = changeGiven;
 
           let balanceDue = finalTotal - (orderData.amountPaid - orderData.changeGiven);
           if (pardonDeficit) balanceDue = 0;
           orderData.balanceDue = balanceDue;
 
-          if (isPaid && balanceDue <= 0.01) {
+          const customerStillOwes = balanceDue > 0.01;
+          const changeOutstanding = balanceDue < -0.01 || hasOutstandingChange;
+
+          if (isPaid && !customerStillOwes && !changeOutstanding) {
             orderData.paymentStatus = 'Paid';
-          } else if (isPaid && balanceDue > 0) {
+          } else if (isPaid && (customerStillOwes || changeOutstanding)) {
             orderData.paymentStatus = 'Partially Paid';
           } else {
             orderData.paymentStatus = 'Unpaid';
@@ -422,7 +443,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md w-[95vw] flex flex-col max-h-[90vh]">
+      <DialogContent className="sm:max-w-2xl w-[95vw] flex flex-col max-h-[90vh] min-h-[70vh] overflow-hidden p-4 sm:p-6">
         {isApplyingReward ? <RewardContent total={total} onApplyReward={handleApplyReward} onBack={() => setIsApplyingReward(false)} /> : step === 1 ? (
           <>
             <DialogHeader>
@@ -519,7 +540,7 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
               </div>
             </DialogHeader>
 
-            <ScrollArea className="flex-1 -mx-6 px-6">
+            <ScrollArea className="flex-1">
               <div className="space-y-4">
                 {renderBalanceBreakdown()}
 
@@ -546,11 +567,22 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                           value={changeGivenInput}
                           onChange={(e) => setChangeGivenInput(e.target.value)}
                           placeholder={formatCurrency(balances.change)}
+                          max={balances.change}
                           className="text-center mt-2"
                         />
                         <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
                           Enter amount given. Leave empty if change not given yet.
                         </p>
+                        {hasOutstandingChange && (
+                          <p className="text-xs text-orange-600 dark:text-orange-300 mt-1 text-center">
+                            Remaining change owed: {formatCurrency(changeStillDue)}
+                          </p>
+                        )}
+                        {exceedsChangeDue && (
+                          <p className="text-xs text-amber-600 dark:text-amber-300 mt-1 text-center">
+                            Amount exceeds required change and will be capped at {formatCurrency(balances.change)}.
+                          </p>
+                        )}
                       </div>
                     )}
                     {showDeficitOptions && (

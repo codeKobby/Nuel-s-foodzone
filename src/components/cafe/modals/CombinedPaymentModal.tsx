@@ -144,6 +144,19 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 
     const deficit = amountPaidNum < finalTotal ? finalTotal - amountPaidNum : 0;
     const change = amountPaidNum > finalTotal ? amountPaidNum - finalTotal : 0;
+
+    const rawChangeInput = parseFloat(changeGivenInput);
+    const normalizedChangeInput = Number.isFinite(rawChangeInput)
+        ? Math.max(0, rawChangeInput)
+        : 0;
+    const changeGivenAmount = change > 0
+        ? Math.min(normalizedChangeInput, change)
+        : 0;
+    const changeStillDue = change > 0
+        ? Math.max(0, Number((change - changeGivenAmount).toFixed(2)))
+        : 0;
+    const hasOutstandingChange = changeStillDue > 0.009;
+    const exceedsChangeDue = change > 0 && normalizedChangeInput - change > 0.009;
     
     const isAmountPaidEntered = amountPaidInput.trim() !== '';
     const showDeficitOptions = isAmountPaidEntered && deficit > 0;
@@ -165,8 +178,6 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         try {
             const batch = writeBatch(db);
             const now = serverTimestamp();
-            const changeGiven = parseFloat(changeGivenInput) || (change > 0 ? change : 0);
-    
             let paymentToApply = amountPaidNum;
             
             // This will hold the total payments applied to each order
@@ -234,10 +245,11 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 let finalUpdate: any = {};
     
                 if (change > 0) {
-                    finalUpdate.balanceDue = -(change - changeGiven); 
-                    finalUpdate.changeGiven = (lastOrder.changeGiven || 0) + changeGiven;
-                    finalUpdate.paymentStatus = 'Paid';
-                    finalUpdate.settledOn = (change - changeGiven) < 0.01 ? now : null;
+                    const newChangeStillDue = Math.max(0, Number((change - changeGivenAmount).toFixed(2)));
+                    finalUpdate.balanceDue = -(change - changeGivenAmount); 
+                    finalUpdate.changeGiven = (lastOrder.changeGiven || 0) + changeGivenAmount;
+                    finalUpdate.paymentStatus = newChangeStillDue < 0.01 ? 'Paid' : 'Partially Paid';
+                    finalUpdate.settledOn = newChangeStillDue < 0.01 ? now : null;
                 }
                 else if (deficit > 0 && pardonDeficit) {
                     finalUpdate.pardonedAmount = (lastOrder.pardonedAmount || 0) + deficit;
@@ -321,6 +333,19 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                         <div className="mt-2">
                             <Label htmlFor="changeGiven">Amount Given as Change</Label>
                             <Input id="changeGiven" type="number" value={changeGivenInput} onChange={(e) => setChangeGivenInput(e.target.value)} placeholder={formatCurrency(change)} className="text-center" />
+                            <p className="text-xs text-red-600 mt-1">
+                                Enter amount given. Leave empty if change not given yet.
+                            </p>
+                            {hasOutstandingChange && (
+                                <p className="text-xs text-orange-600 mt-1">
+                                    Remaining change owed: {formatCurrency(changeStillDue)}
+                                </p>
+                            )}
+                            {exceedsChangeDue && (
+                                <p className="text-xs text-amber-600 mt-1">
+                                    Amount exceeds required change and will be capped at {formatCurrency(change)}.
+                                </p>
+                            )}
                         </div>
                     </div>
                 )}

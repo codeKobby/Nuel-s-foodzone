@@ -1,16 +1,31 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { useAccounting } from '@/hooks/useAccounting';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, FileSignature, ShoppingCart } from 'lucide-react';
+import { AlertTriangle, FileSignature, ShoppingCart, CheckCircle, Banknote, Smartphone, FileText, Search, X, TrendingUp, TrendingDown, DollarSign, Landmark, CreditCard, Hourglass, MinusCircle, Gift, Ban, ArrowRightLeft, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import HistoryView from '@/components/cafe/HistoryView';
 import { ScrollArea } from '../ui/scroll-area';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator as UiSeparator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { formatCurrency } from '@/lib/utils';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { format, isToday } from 'date-fns';
+import { AuthContext } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
 
 interface PeriodStats {
     totalSales: number;
@@ -443,6 +458,8 @@ const ReconciliationView: React.FC<{
                                                 <button 
                                                     onClick={() => removeMomoTransaction(index)} 
                                                     className="ml-2 hover:bg-destructive/20 rounded-full p-0.5"
+                                                    title={`Remove ${formatCurrency(amount)} transaction`} 
+                                                    aria-label={`Remove ${formatCurrency(amount)} transaction`}
                                                 >
                                                     <X className="h-3 w-3" />
                                                 </button>

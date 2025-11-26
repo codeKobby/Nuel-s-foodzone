@@ -338,7 +338,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
             <ScrollArea className="h-full">
                 <div className="p-4 md:p-6 flex flex-col">
                     <div className="flex items-center gap-4 mb-6">
-                        <Button variant="outline" size="icon" onClick={onBack}>
+                        <Button variant="outline" size="icon" onClick={onBack} title="Back" aria-label="Back">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
                         <div>
@@ -420,6 +420,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                                                     <button 
                                                         onClick={() => removeMomoTransaction(index)} 
                                                         className="ml-2 hover:bg-destructive/20 rounded-full p-0.5"
+                                                        title={`Remove MoMo transaction ${index + 1}`} 
+                                                        aria-label={`Remove MoMo transaction ${index + 1}`}
                                                     >
                                                         <X className="h-3 w-3" />
                                                     </button>

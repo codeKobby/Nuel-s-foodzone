@@ -12,7 +12,11 @@ if (!admin.apps.length) {
     });
   } catch (err) {
     // If initialization fails, rethrow so callers can handle it.
-    console.warn("firebase-admin initialization warning:", err.message || err);
+    if (err instanceof Error) {
+      console.warn("firebase-admin initialization warning:", err.message);
+    } else {
+      console.warn("firebase-admin initialization warning:", err);
+    }
   }
 }
 

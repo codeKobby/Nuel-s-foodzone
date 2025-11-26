@@ -146,7 +146,7 @@ const MiscView: React.FC = () => {
                      {isMobile && (
                         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                             <SheetTrigger asChild>
-                                <Button size="icon"><PlusCircle /></Button>
+                                <Button size="icon" title="Add miscellaneous expense" aria-label="Add miscellaneous expense"><PlusCircle /></Button>
                             </SheetTrigger>
                             <SheetContent side="bottom" className="h-auto">
                                 <SheetHeader>
@@ -200,7 +200,7 @@ const MiscView: React.FC = () => {
                                                         <Badge variant="secondary"><Lock className="mr-2 h-3 w-3" />Locked</Badge>
                                                     ) : null}
                                                     {!locked && (
-                                                         <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                                         <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)} title="Delete expense" aria-label="Delete expense"><Trash2 className="h-4 w-4 text-red-500" /></Button>
                                                     )}
                                                 </div>
                                             </div>

@@ -296,8 +296,8 @@ const AdminView: React.FC = () => {
                         {isMobile && (
                             <>
                                 <Sheet open={isMenuSheetOpen} onOpenChange={(open) => { setIsMenuSheetOpen(open); if (!open) clearForm(); }}>
-                                    <SheetTrigger asChild>
-                                        <Button size="icon" className="flex-shrink-0"><PlusCircle /></Button>
+                                        <SheetTrigger asChild>
+                                        <Button size="icon" className="flex-shrink-0" title="Add item" aria-label="Add item"><PlusCircle /></Button>
                                     </SheetTrigger>
                                     <SheetContent side="bottom" className="h-[85vh]">
                                         <SheetHeader>
@@ -315,8 +315,8 @@ const AdminView: React.FC = () => {
                                     </SheetContent>
                                 </Sheet>
                                 <Sheet open={isSecuritySheetOpen} onOpenChange={setIsSecuritySheetOpen}>
-                                    <SheetTrigger asChild>
-                                        <Button size="icon" variant="outline" className="flex-shrink-0"><ShieldCheck /></Button>
+                                        <SheetTrigger asChild>
+                                        <Button size="icon" variant="outline" className="flex-shrink-0" title="Security settings" aria-label="Open security settings"><ShieldCheck /></Button>
                                     </SheetTrigger>
                                     <SheetContent side="bottom" className="h-auto">
                                         <SheetHeader>
@@ -362,8 +362,8 @@ const AdminView: React.FC = () => {
                                                 </div>
                                             </div>
                                             <div className="flex space-x-1">
-                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}><Edit className="h-4 w-4 text-blue-500" /></Button>
-                                                <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(item)} title="Edit item" aria-label="Edit item"><Edit className="h-4 w-4 text-blue-500" /></Button>
+                                                <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)} title="Delete item" aria-label="Delete item"><Trash2 className="h-4 w-4 text-red-500" /></Button>
                                             </div>
                                         </div>
                                     ))}

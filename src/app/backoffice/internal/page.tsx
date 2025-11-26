@@ -85,8 +85,8 @@ const MobileNav = ({
                     <Image src={logo} alt="Nuel's Food Zone Logo" width={32} height={32} className="rounded-md" />
                     <h1 className="font-bold text-lg">Nuel's Foodzone Cafe</h1>
                 </div>
-                <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon"><Menu /></Button>
+                    <SheetTrigger asChild>
+                    <Button variant="ghost" size="icon" title="Open menu" aria-label="Open menu"><Menu /></Button>
                 </SheetTrigger>
             </div>
             <SheetContent side="left" className="w-64 p-0 flex flex-col">
@@ -179,9 +179,10 @@ function CafePage() {
             }
 
             if (typeof window !== 'undefined') {
-                const storedTheme = localStorage.getItem('theme') || 'light';
-                setTheme(storedTheme);
-                document.documentElement.classList.add(storedTheme);
+                const storedTheme = localStorage.getItem('theme');
+                const normalizedTheme: 'light' | 'dark' = storedTheme === 'dark' ? 'dark' : 'light';
+                setTheme(normalizedTheme);
+                document.documentElement.classList.add(normalizedTheme);
             }
 
             const { onAuthStateChanged, signInAnonymously } = await import('firebase/auth');

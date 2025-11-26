@@ -3,7 +3,17 @@
  * @fileOverview This file contains server-side functions for authentication.
  * Using "use server" allows these to be called from client components for secure operations.
  */
-import { collection, query, where, getDocs } from "firebase/firestore/lite";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore/lite";
+import { db } from "./firebase";
 
 // Lazy-initialize Admin SDK at runtime only on the server to avoid bundling
 // `firebase-admin` into client-side code. Calls to getAdminDb() will throw

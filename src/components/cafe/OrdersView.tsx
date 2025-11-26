@@ -75,11 +75,12 @@ const OrderCard: React.FC<OrderCardProps> = ({
     'Paid': { variant: 'default', className: 'bg-green-500 hover:bg-green-500 text-white' },
     'Unpaid': { variant: 'destructive', className: 'bg-red-500 hover:bg-red-500 text-white' },
     'Partially Paid': { variant: 'secondary', className: 'bg-yellow-500 hover:bg-yellow-500 text-black' },
+    'Change Due': { variant: 'secondary', className: 'bg-blue-600 hover:bg-blue-600 text-white' },
   } as const;
   
-  let displayedStatus = order.paymentStatus;
+  let displayedStatus = order.paymentStatus as keyof typeof paymentStatusConfig;
   if (isChangeOwedToCustomer) {
-    displayedStatus = 'Paid';
+    displayedStatus = 'Change Due';
   }
 
   const isFullyPaidAndSettled = displayedStatus === 'Paid' && !isBalanceOwedByCustomer && !isChangeOwedToCustomer;

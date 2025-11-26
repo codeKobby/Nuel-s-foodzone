@@ -103,9 +103,9 @@ const MenuPage = () => {
                                 <p className="text-xs text-muted-foreground">{formatCurrency(item.price)}</p>
                             </div>
                             <div className="flex items-center gap-1">
-                                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.id, -1)}><Minus className="h-4 w-4" /></Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.id, -1)} title="Decrease quantity" aria-label="Decrease quantity"><Minus className="h-4 w-4" /></Button>
                                 <span className="font-bold text-sm w-6 text-center">{item.quantity}</span>
-                                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.id, 1)}><Plus className="h-4 w-4" /></Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.id, 1)} title="Increase quantity" aria-label="Increase quantity"><Plus className="h-4 w-4" /></Button>
                             </div>
                         </div>
                     ))
