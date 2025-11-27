@@ -230,8 +230,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                                         <div
                                             key={order.id}
                                             className={`flex items-center space-x-3 p-3 rounded-lg border transition-colors ${checkedOrderIds.has(order.id)
-                                                    ? 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800'
-                                                    : 'bg-card hover:bg-muted/50'
+                                                ? 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800'
+                                                : 'bg-card hover:bg-muted/50'
                                                 }`}
                                         >
                                             <Checkbox
@@ -325,16 +325,16 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
     };
 
     const confirmationDescription = `You are about to finalize the financial report for today. ${stats.changeOwedForPeriod > 0
-            ? `You have indicated that customer change of ${formatCurrency(stats.changeOwedForPeriod)} will be ${deductCustomerChange ? 'DEDUCTED from the available cash' : 'LEFT IN the cash drawer'}.`
-            : ''
+        ? `You have indicated that customer change of ${formatCurrency(stats.changeOwedForPeriod)} will be ${deductCustomerChange ? 'DEDUCTED from the available cash' : 'LEFT IN the cash drawer'}.`
+        : ''
         } This action cannot be undone.`;
 
     const BalanceIcon = balanceStatus.icon;
 
     return (
-        <div className="h-full">
-            <ScrollArea className="h-full">
-                <div className="p-4 md:p-6 flex flex-col">
+        <div className="h-full flex flex-col min-h-0">
+            <ScrollArea className="flex-1 min-h-0">
+                <div className="p-4 md:p-6 flex flex-col min-h-0">
                     <div className="flex items-center gap-4 mb-6">
                         <Button variant="outline" size="icon" onClick={onBack} title="Back" aria-label="Back">
                             <ArrowLeft className="h-4 w-4" />
@@ -515,8 +515,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                                             </div>
                                             <Separator />
                                             <div className={`flex justify-between items-center font-bold ${momoBalanceDifference === 0
-                                                    ? 'text-green-600'
-                                                    : 'text-red-600'
+                                                ? 'text-green-600'
+                                                : 'text-red-600'
                                                 }`}>
                                                 <p>MoMo Discrepancy</p>
                                                 <p>{formatCurrency(momoBalanceDifference)}</p>
@@ -556,7 +556,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                             </Card>
 
                             {/* Action Buttons */}
-                            <div className="space-y-3 pt-4">
+                            <div className="space-y-3 pt-4 mt-auto">
                                 <Button variant="outline" className="w-full" onClick={() => setShowAuditModal(true)}>
                                     <FileText className="mr-2 h-4 w-4" />
                                     Cross-Check Orders

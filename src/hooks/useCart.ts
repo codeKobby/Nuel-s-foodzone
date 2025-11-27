@@ -39,16 +39,20 @@ export const useCart = () => {
           },
         };
       } else {
-        const newItemId = item.id || crypto.randomUUID();
-        // Ensure the item has all OrderItem properties
+        // Always use a fresh id for new cart entries so modified variants
+        // (e.g. "English Breakfast with Tea") don't overwrite other
+        // entries that share the original menu id.
+        const newItemId = crypto.randomUUID();
+        const { id: _oldId, ...rest } = item as any;
+        // Ensure the item has all OrderItem properties and do NOT include the
+        // original `id` from the menu item (that would cause key collisions).
         const newItem: OrderItem = {
           id: newItemId,
           name: item.name,
           price: item.price,
           quantity: 1,
           category: (item as MenuItem).category || "Custom",
-          // Add other properties if they exist on item
-          ...(item as any),
+          ...rest,
         };
         return { ...prev, [newItemId]: newItem };
       }
