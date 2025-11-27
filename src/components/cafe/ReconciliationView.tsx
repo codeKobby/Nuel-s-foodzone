@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import type { Order } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { db } from '@/lib/firebase';
@@ -57,6 +57,43 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
     const [momoTransactions, setMomoTransactions] = useState<number[]>([]);
     const [momoInput, setMomoInput] = useState('');
     const [deductCustomerChange, setDeductCustomerChange] = useState(true);
+    // Persist reconciliation inputs until the report is saved or the page is
+    // refreshed. This allows users to navigate away and return without
+    // losing their entries.
+    const STORAGE_KEY = 'reconciliation:draft';
+
+    // Load draft from localStorage on mount
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed.denominationQuantities) setDenominationQuantities(parsed.denominationQuantities);
+                if (Array.isArray(parsed.momoTransactions)) setMomoTransactions(parsed.momoTransactions);
+                if (typeof parsed.momoInput === 'string') setMomoInput(parsed.momoInput);
+                if (typeof parsed.deductCustomerChange === 'boolean') setDeductCustomerChange(parsed.deductCustomerChange);
+                if (typeof parsed.notes === 'string') setNotes(parsed.notes);
+            }
+        } catch (e) {
+            console.error('Failed to load reconciliation draft:', e);
+        }
+    }, []);
+
+    // Save draft to localStorage whenever relevant fields change
+    useEffect(() => {
+        try {
+            const payload = {
+                denominationQuantities,
+                momoTransactions,
+                momoInput,
+                deductCustomerChange,
+                notes,
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        } catch (e) {
+            console.error('Failed to save reconciliation draft:', e);
+        }
+    }, [denominationQuantities, momoTransactions, momoInput, deductCustomerChange, notes]);
 
     const totalCountedCash = useMemo(() => {
         return cashDenominations.reduce((total, den) => {
@@ -93,6 +130,14 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
         setDeductCustomerChange(true);
     }, []);
 
+    const clearDraft = useCallback(() => {
+        try {
+            localStorage.removeItem('reconciliation:draft');
+        } catch (e) {
+            console.error('Failed to clear reconciliation draft:', e);
+        }
+    }, []);
+
     const handleSaveReport = async () => {
         if (!stats) {
             toast({
@@ -126,6 +171,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                 type: "success"
             });
             resetForm();
+            clearDraft();
             setShowConfirm(false);
             onBack();
         } catch (e) {

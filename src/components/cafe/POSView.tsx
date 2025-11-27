@@ -160,11 +160,26 @@ const POSView: React.FC<{ setActiveView: (view: string) => void }> = ({ setActiv
                 const currentChangeGiven = orderDoc.data().changeGiven || 0;
                 const newChangeGiven = currentChangeGiven + settleAmount;
 
+                // Preserve existing payment method unless it's unset/Unpaid —
+                // settling change in the POS should mark an otherwise-unpaid
+                // order as cash-settled. Also mark paymentStatus as Paid when
+                // the balance reaches zero.
+                const existingPaymentMethod = orderDoc.data().paymentMethod || 'Unpaid';
+                // If the order was previously paid via momo and we are now
+                // giving cash change, mark it as a split payment (momo+cash).
+                let newPaymentMethod = existingPaymentMethod === 'Unpaid' ? 'cash' : existingPaymentMethod;
+                if (existingPaymentMethod === 'momo' && settleAmount > 0) {
+                    newPaymentMethod = 'split';
+                }
+                const newPaymentStatus = Math.abs(newBalance) < 0.01 ? 'Paid' : (orderDoc.data().amountPaid && orderDoc.data().amountPaid > 0 ? 'Partially Paid' : orderDoc.data().paymentStatus || 'Unpaid');
+
                 transaction.update(orderRef, {
                     balanceDue: newBalance,
                     changeGiven: newChangeGiven,
                     lastPaymentTimestamp: serverTimestamp(),
                     settledOn: isFullSettlement ? serverTimestamp() : orderDoc.data().settledOn || null,
+                    paymentMethod: newPaymentMethod,
+                    paymentStatus: newPaymentStatus,
                 });
             });
             setOrderWithChangeDue(null);
