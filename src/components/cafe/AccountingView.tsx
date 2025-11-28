@@ -279,8 +279,8 @@ const ReconciliationView: React.FC<{
                                         <div
                                             key={order.id}
                                             className={`flex items-center space-x-3 p-3 rounded-lg border transition-colors ${checkedOrderIds.has(order.id)
-                                                    ? 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800'
-                                                    : 'bg-card hover:bg-muted/50'
+                                                ? 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800'
+                                                : 'bg-card hover:bg-muted/50'
                                                 }`}
                                         >
                                             <Checkbox
@@ -736,16 +736,16 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
                                 if (!isTodayOrder) {
                                     settledUnpaidOrdersValue += paymentAmount;
-                                            // record details for modal
-                                            collectionsDetails.push({
-                                                orderId: order.id,
-                                                simplifiedId: order.simplifiedId,
-                                                tag: order.tag,
-                                                amount: paymentAmount,
-                                                method: payment.method,
-                                                timestamp: paymentDate,
-                                                items: order.items,
-                                            });
+                                    // record details for modal
+                                    collectionsDetails.push({
+                                        orderId: order.id,
+                                        simplifiedId: order.simplifiedId,
+                                        tag: order.tag,
+                                        amount: paymentAmount,
+                                        method: payment.method,
+                                        timestamp: paymentDate,
+                                        items: order.items,
+                                    });
                                 }
                             }
                         });
@@ -974,7 +974,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                                         <div className="flex justify-between items-center text-green-700 dark:text-green-300">
                                                             <span className="font-bold">Today's Net: {formatCurrency(stats.netRevenue)}</span>
                                                             <span className="font-semibold">
-                                                                + Collections: 
+                                                                + Collections:
                                                                 <button
                                                                     onClick={() => setShowCollectionsModal(true)}
                                                                     className="font-semibold underline ml-1"
@@ -1015,40 +1015,40 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                                 )}
 
                                                 {showCollectionsModal && (
-                                                        <Dialog open={showCollectionsModal} onOpenChange={setShowCollectionsModal}>
-                                                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                                                                <DialogHeader>
-                                                                    <DialogTitle>Collections From Previous Orders</DialogTitle>
-                                                                    <DialogDescription>Payments received today for orders placed on previous days.</DialogDescription>
-                                                                </DialogHeader>
-                                                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
-                                                                    {previousCollections.length === 0 ? (
-                                                                        <p className="text-muted-foreground">No collections recorded.</p>
-                                                                    ) : (
-                                                                        previousCollections.map((c, idx) => (
-                                                                            <div key={`${c.orderId}-${idx}`} className="p-3 border rounded-lg bg-card">
-                                                                                <div className="flex justify-between items-start">
-                                                                                    <div>
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <span className="font-semibold">{c.simplifiedId || c.orderId}</span>
-                                                                                            {c.tag && <Badge variant="outline" className="text-xs">{c.tag}</Badge>}
-                                                                                            <Badge className="text-xs">{c.method?.toUpperCase()}</Badge>
-                                                                                        </div>
-                                                                                        <p className="text-sm text-muted-foreground mt-1">{c.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
-                                                                                        <p className="text-xs text-muted-foreground mt-1">{c.timestamp ? format(new Date(c.timestamp), 'hh:mm a') : ''}</p>
+                                                    <Dialog open={showCollectionsModal} onOpenChange={setShowCollectionsModal}>
+                                                        <DialogContent className="max-w-3xl max-h-[80vh]">
+                                                            <DialogHeader>
+                                                                <DialogTitle>Collections From Previous Orders</DialogTitle>
+                                                                <DialogDescription>Payments received today for orders placed on previous days.</DialogDescription>
+                                                            </DialogHeader>
+                                                            <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                                                {previousCollections.length === 0 ? (
+                                                                    <p className="text-muted-foreground">No collections recorded.</p>
+                                                                ) : (
+                                                                    previousCollections.map((c, idx) => (
+                                                                        <div key={`${c.orderId}-${idx}`} className="p-3 border rounded-lg bg-card">
+                                                                            <div className="flex justify-between items-start">
+                                                                                <div>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className="font-semibold">{c.simplifiedId || c.orderId}</span>
+                                                                                        {c.tag && <Badge variant="outline" className="text-xs">{c.tag}</Badge>}
+                                                                                        <Badge className="text-xs">{c.method?.toUpperCase()}</Badge>
                                                                                     </div>
-                                                                                    <div className="font-bold">{formatCurrency(c.amount)}</div>
+                                                                                    <p className="text-sm text-muted-foreground mt-1">{c.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                                                    <p className="text-xs text-muted-foreground mt-1">{c.timestamp ? format(new Date(c.timestamp), 'hh:mm a') : ''}</p>
                                                                                 </div>
+                                                                                <div className="font-bold">{formatCurrency(c.amount)}</div>
                                                                             </div>
-                                                                        ))
-                                                                    )}
-                                                                </div>
-                                                                <DialogFooter>
-                                                                    <Button variant="ghost" onClick={() => setShowCollectionsModal(false)}>Close</Button>
-                                                                </DialogFooter>
-                                                            </DialogContent>
-                                                        </Dialog>
-                                                    )}
+                                                                        </div>
+                                                                    ))
+                                                                )}
+                                                            </div>
+                                                            <DialogFooter>
+                                                                <Button variant="ghost" onClick={() => setShowCollectionsModal(false)}>Close</Button>
+                                                            </DialogFooter>
+                                                        </DialogContent>
+                                                    </Dialog>
+                                                )}
                                             </div>
                                         </CardContent>
                                     </Card>
