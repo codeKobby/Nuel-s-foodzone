@@ -646,6 +646,9 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
     const [showUnpaidOrdersWarning, setShowUnpaidOrdersWarning] = useState(false);
     const [previousCollections, setPreviousCollections] = useState<any[]>([]);
     const [showCollectionsModal, setShowCollectionsModal] = useState(false);
+    const [showCashModal, setShowCashModal] = useState(false);
+    const [showMomoModal, setShowMomoModal] = useState(false);
+    const [selectedSalesOrders, setSelectedSalesOrders] = useState<any[]>([]);
 
     const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
     const todayEnd = useMemo(() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; }, []);
@@ -942,8 +945,82 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                         </CardHeader>
                                         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <StatCard icon={<DollarSign className="text-muted-foreground" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold from completed orders`} />
-                                            <StatCard icon={<Landmark className="text-muted-foreground" />} title="Cash Sales" value={formatCurrency(stats.cashSales)} description="All cash payments received today" />
-                                            <StatCard icon={<CreditCard className="text-muted-foreground" />} title="Momo/Card Sales" value={formatCurrency(stats.momoSales)} description="All momo/card payments received" />
+                                            <Card>
+                                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                    <CardTitle className="text-sm font-medium">Cash Sales</CardTitle>
+                                                    <Banknote className="text-muted-foreground" />
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="text-xl md:text-2xl font-bold">
+                                                        <button
+                                                            className="underline font-semibold"
+                                                            onClick={() => {
+                                                                // compute orders contributing to cash sales
+                                                                const ordersList: any[] = [];
+                                                                (stats.orders || []).forEach((order: any) => {
+                                                                    // payments in history for today
+                                                                    if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
+                                                                        const amt = order.paymentHistory.reduce((sum: number, p: any) => {
+                                                                            if (p.method === 'cash') return sum + (p.amount || 0);
+                                                                            return sum;
+                                                                        }, 0);
+                                                                        if (amt > 0) ordersList.push({ order, amount: amt, method: 'cash' });
+                                                                    } else if (order.paymentBreakdown && order.paymentBreakdown.cash) {
+                                                                        const amt = order.paymentBreakdown.cash || 0;
+                                                                        if (amt > 0) ordersList.push({ order, amount: amt, method: 'cash' });
+                                                                    } else if (order.paymentMethod === 'cash') {
+                                                                        // fallback: attribute full paid amount (amountPaid - changeGiven)
+                                                                        const amt = Math.max(0, (order.amountPaid || 0) - (order.changeGiven || 0));
+                                                                        if (amt > 0) ordersList.push({ order, amount: amt, method: 'cash' });
+                                                                    }
+                                                                });
+                                                                setSelectedSalesOrders(ordersList);
+                                                                setShowCashModal(true);
+                                                            }}
+                                                        >
+                                                            {formatCurrency(stats.cashSales)}
+                                                        </button>
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">All cash payments received today</div>
+                                                </CardContent>
+                                            </Card>
+
+                                            <Card>
+                                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                    <CardTitle className="text-sm font-medium">Momo/Card Sales</CardTitle>
+                                                    <CreditCard className="text-muted-foreground" />
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="text-xl md:text-2xl font-bold">
+                                                        <button
+                                                            className="underline font-semibold"
+                                                            onClick={() => {
+                                                                const ordersList: any[] = [];
+                                                                (stats.orders || []).forEach((order: any) => {
+                                                                    if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
+                                                                        const amt = order.paymentHistory.reduce((sum: number, p: any) => {
+                                                                            if (p.method === 'momo' || p.method === 'card') return sum + (p.amount || 0);
+                                                                            return sum;
+                                                                        }, 0);
+                                                                        if (amt > 0) ordersList.push({ order, amount: amt, method: 'momo' });
+                                                                    } else if (order.paymentBreakdown && order.paymentBreakdown.momo) {
+                                                                        const amt = order.paymentBreakdown.momo || 0;
+                                                                        if (amt > 0) ordersList.push({ order, amount: amt, method: 'momo' });
+                                                                    } else if (order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
+                                                                        const amt = Math.max(0, (order.amountPaid || 0) - (order.changeGiven || 0));
+                                                                        if (amt > 0) ordersList.push({ order, amount: amt, method: order.paymentMethod });
+                                                                    }
+                                                                });
+                                                                setSelectedSalesOrders(ordersList);
+                                                                setShowMomoModal(true);
+                                                            }}
+                                                        >
+                                                            {formatCurrency(stats.momoSales)}
+                                                        </button>
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">All momo/card payments received</div>
+                                                </CardContent>
+                                            </Card>
                                             <StatCard
                                                 icon={<Hourglass className="text-muted-foreground" />}
                                                 title="Unpaid Orders (All Time)"
@@ -1057,6 +1134,77 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         </div>
                     ) : (
                         <p className="p-6 text-muted-foreground">No data for today.</p>
+                    )}
+                    {showCashModal && (
+                        <Dialog open={showCashModal} onOpenChange={setShowCashModal}>
+                            <DialogContent className="max-w-3xl max-h-[80vh]">
+                                <DialogHeader>
+                                    <DialogTitle>Cash Sales - Orders</DialogTitle>
+                                    <DialogDescription>Orders contributing to today's cash sales.</DialogDescription>
+                                </DialogHeader>
+                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                    {selectedSalesOrders.length === 0 ? (
+                                        <p className="text-muted-foreground">No cash sales found.</p>
+                                    ) : (
+                                        selectedSalesOrders.map((c: any, idx: number) => (
+                                            <div key={`${c.order.id}-${idx}`} className="p-3 border rounded-lg bg-card">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-semibold">{c.order.simplifiedId}</span>
+                                                            {c.order.tag && <Badge variant="outline" className="text-xs">{c.order.tag}</Badge>}
+                                                            <Badge className="text-xs">{c.method?.toUpperCase()}</Badge>
+                                                        </div>
+                                                        <p className="text-sm text-muted-foreground mt-1">{c.order.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">{c.order.timestamp ? format(c.order.timestamp.toDate(), 'hh:mm a') : ''}</p>
+                                                    </div>
+                                                    <div className="font-bold">{formatCurrency(c.amount)}</div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="ghost" onClick={() => setShowCashModal(false)}>Close</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    )}
+
+                    {showMomoModal && (
+                        <Dialog open={showMomoModal} onOpenChange={setShowMomoModal}>
+                            <DialogContent className="max-w-3xl max-h-[80vh]">
+                                <DialogHeader>
+                                    <DialogTitle>MoMo/Card Sales - Orders</DialogTitle>
+                                    <DialogDescription>Orders contributing to today's momo/card sales.</DialogDescription>
+                                </DialogHeader>
+                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                    {selectedSalesOrders.length === 0 ? (
+                                        <p className="text-muted-foreground">No momo/card sales found.</p>
+                                    ) : (
+                                        selectedSalesOrders.map((c: any, idx: number) => (
+                                            <div key={`${c.order.id}-${idx}`} className="p-3 border rounded-lg bg-card">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-semibold">{c.order.simplifiedId}</span>
+                                                            {c.order.tag && <Badge variant="outline" className="text-xs">{c.order.tag}</Badge>}
+                                                            <Badge className="text-xs">{(c.method || '').toUpperCase()}</Badge>
+                                                        </div>
+                                                        <p className="text-sm text-muted-foreground mt-1">{c.order.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">{c.order.timestamp ? format(c.order.timestamp.toDate(), 'hh:mm a') : ''}</p>
+                                                    </div>
+                                                    <div className="font-bold">{formatCurrency(c.amount)}</div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="ghost" onClick={() => setShowMomoModal(false)}>Close</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     )}
                 </TabsContent>
                 <TabsContent value="history" className="flex-1 overflow-hidden mt-4">

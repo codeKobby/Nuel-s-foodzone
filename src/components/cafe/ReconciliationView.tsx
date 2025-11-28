@@ -164,7 +164,19 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                 changeOwedForPeriod: stats.changeOwedForPeriod,
                 changeOwedSetAside: deductCustomerChange,
             };
-            await addDoc(collection(db, "reconciliationReports"), reportData);
+            const docRef = await addDoc(collection(db, "reconciliationReports"), reportData);
+            // Send the report to the email recipient and trigger AI analysis
+            // via the server API route. We include some of the report data so
+            // the server can compose the email and analysis.
+            try {
+                await fetch('/api/send-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: docRef.id, ...reportData })
+                });
+            } catch (e) {
+                console.error('Failed to notify reporting API:', e);
+            }
             toast({
                 title: "Day Closed Successfully",
                 description: "The financial report has been saved.",
