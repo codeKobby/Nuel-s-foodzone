@@ -644,12 +644,26 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
     const [error, setError] = useState<string | null>(null);
     const [showReconciliation, setShowReconciliation] = useState(false);
     const [showUnpaidOrdersWarning, setShowUnpaidOrdersWarning] = useState(false);
+    const [previousCollections, setPreviousCollections] = useState<any[]>([]);
+    const [showCollectionsModal, setShowCollectionsModal] = useState(false);
 
     const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
     const todayEnd = useMemo(() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; }, []);
 
     const isTodayClosedOut = useMemo(() => {
-        return reports.some(report => isToday(report.timestamp.toDate()));
+        return reports.some(report => {
+            // Guard against missing/null timestamps coming from the DB
+            // (e.g., partially written docs). Only call toDate() when
+            // a timestamp is present.
+            const ts: any = report.timestamp;
+            if (!ts) return false;
+            try {
+                return isToday(ts.toDate());
+            } catch (e) {
+                console.warn('Invalid report timestamp', report.id, e);
+                return false;
+            }
+        });
     }, [reports]);
 
     useEffect(() => {
@@ -668,6 +682,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                 let totalPardonedAmount = 0, changeOwedForPeriod = 0;
                 let settledUnpaidOrdersValue = 0, previousDaysChangeGiven = 0;
                 let totalRewardDiscount = 0;
+                const collectionsDetails: any[] = [];
 
                 const todayOrders: Order[] = [];
                 const itemStats: Record<string, { count: number; totalValue: number }> = {};
@@ -721,6 +736,16 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
                                 if (!isTodayOrder) {
                                     settledUnpaidOrdersValue += paymentAmount;
+                                            // record details for modal
+                                            collectionsDetails.push({
+                                                orderId: order.id,
+                                                simplifiedId: order.simplifiedId,
+                                                tag: order.tag,
+                                                amount: paymentAmount,
+                                                method: payment.method,
+                                                timestamp: paymentDate,
+                                                items: order.items,
+                                            });
                                 }
                             }
                         });
@@ -749,6 +774,22 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
                             if (!isTodayOrder) {
                                 settledUnpaidOrdersValue += amountPaidTowardsOrder;
+                                // Determine method for this payment (best-effort)
+                                let method = order.paymentMethod || 'cash';
+                                if (order.paymentBreakdown) {
+                                    if ((order.paymentBreakdown.cash || 0) > 0 && (order.paymentBreakdown.momo || 0) > 0) method = 'split';
+                                    else if ((order.paymentBreakdown.momo || 0) > 0) method = 'momo';
+                                    else method = 'cash';
+                                }
+                                collectionsDetails.push({
+                                    orderId: order.id,
+                                    simplifiedId: order.simplifiedId,
+                                    tag: order.tag,
+                                    amount: amountPaidTowardsOrder,
+                                    method,
+                                    timestamp: paymentDate,
+                                    items: order.items,
+                                });
                             }
                         }
                     }
@@ -795,6 +836,11 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                     orders: todayOrders,
                     itemStats
                 });
+
+                // Save the collections details to state so the UI can display the
+                // individual orders that contributed to today's collections from
+                // previous days.
+                setPreviousCollections(collectionsDetails);
 
                 setLoading(false);
             }, (error) => {
@@ -927,7 +973,16 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                                     <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 text-sm">
                                                         <div className="flex justify-between items-center text-green-700 dark:text-green-300">
                                                             <span className="font-bold">Today's Net: {formatCurrency(stats.netRevenue)}</span>
-                                                            <span className="font-semibold">+ Collections: {formatCurrency(stats.settledUnpaidOrdersValue)}</span>
+                                                            <span className="font-semibold">
+                                                                + Collections: 
+                                                                <button
+                                                                    onClick={() => setShowCollectionsModal(true)}
+                                                                    className="font-semibold underline ml-1"
+                                                                    title="View orders contributing to collections"
+                                                                >
+                                                                    {formatCurrency(stats.settledUnpaidOrdersValue)}
+                                                                </button>
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 )}
@@ -958,6 +1013,42 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                                         <p>No items sold today.</p>
                                                     </div>
                                                 )}
+
+                                                {showCollectionsModal && (
+                                                        <Dialog open={showCollectionsModal} onOpenChange={setShowCollectionsModal}>
+                                                            <DialogContent className="max-w-3xl max-h-[80vh]">
+                                                                <DialogHeader>
+                                                                    <DialogTitle>Collections From Previous Orders</DialogTitle>
+                                                                    <DialogDescription>Payments received today for orders placed on previous days.</DialogDescription>
+                                                                </DialogHeader>
+                                                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                                                    {previousCollections.length === 0 ? (
+                                                                        <p className="text-muted-foreground">No collections recorded.</p>
+                                                                    ) : (
+                                                                        previousCollections.map((c, idx) => (
+                                                                            <div key={`${c.orderId}-${idx}`} className="p-3 border rounded-lg bg-card">
+                                                                                <div className="flex justify-between items-start">
+                                                                                    <div>
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="font-semibold">{c.simplifiedId || c.orderId}</span>
+                                                                                            {c.tag && <Badge variant="outline" className="text-xs">{c.tag}</Badge>}
+                                                                                            <Badge className="text-xs">{c.method?.toUpperCase()}</Badge>
+                                                                                        </div>
+                                                                                        <p className="text-sm text-muted-foreground mt-1">{c.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                                                        <p className="text-xs text-muted-foreground mt-1">{c.timestamp ? format(new Date(c.timestamp), 'hh:mm a') : ''}</p>
+                                                                                    </div>
+                                                                                    <div className="font-bold">{formatCurrency(c.amount)}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))
+                                                                    )}
+                                                                </div>
+                                                                <DialogFooter>
+                                                                    <Button variant="ghost" onClick={() => setShowCollectionsModal(false)}>Close</Button>
+                                                                </DialogFooter>
+                                                            </DialogContent>
+                                                        </Dialog>
+                                                    )}
                                             </div>
                                         </CardContent>
                                     </Card>
