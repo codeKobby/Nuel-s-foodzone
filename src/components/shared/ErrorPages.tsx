@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ error, errorInfo });
-    
+
     // Log error to your monitoring service
     console.error('Error Boundary caught an error:', error, errorInfo);
   }
@@ -43,10 +43,10 @@ export class ErrorBoundary extends Component<
       if (this.props.fallback) {
         return this.props.fallback;
       }
-      
+
       return (
-        <ApplicationError 
-          error={this.state.error} 
+        <ApplicationError
+          error={this.state.error}
           onRetry={this.handleRetry}
         />
       );
@@ -66,21 +66,21 @@ export const NotFoundPage: React.FC<{ onNavigateHome?: () => void }> = ({ onNavi
           <Badge variant="secondary" className="text-lg px-4 py-2">404</Badge>
           <h1 className="text-3xl font-bold text-foreground">Page Not Found</h1>
           <p className="text-muted-foreground">
-            Oops! The page you're looking for seems to have wandered off. 
+            Oops! The page you're looking for seems to have wandered off.
             Maybe it's taking a coffee break?
           </p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row gap-3">
-           <Button 
-            onClick={onNavigateHome || (() => window.location.href = '/')} 
+          <Button
+            onClick={onNavigateHome || (() => window.location.href = '/')}
             className="flex items-center gap-2"
           >
             <Home className="h-4 w-4" />
             Go Home
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => window.history.back()}
             className="flex items-center gap-2"
           >
@@ -103,7 +103,7 @@ export const NetworkErrorPage: React.FC<{ onRetry?: () => void }> = ({ onRetry }
           <Badge variant="destructive" className="text-lg px-4 py-2">Connection Error</Badge>
           <h1 className="text-3xl font-bold text-foreground">No Internet Connection</h1>
           <p className="text-muted-foreground">
-            Unable to connect to the server. Please check your internet connection 
+            Unable to connect to the server. Please check your internet connection
             and try again.
           </p>
         </div>
@@ -118,8 +118,8 @@ export const NetworkErrorPage: React.FC<{ onRetry?: () => void }> = ({ onRetry }
 };
 
 // Application Error Page
-export const ApplicationError: React.FC<{ 
-  error?: Error; 
+export const ApplicationError: React.FC<{
+  error?: Error;
   onRetry?: () => void;
   showDetails?: boolean;
 }> = ({ error, onRetry, showDetails = false }) => {
@@ -161,67 +161,67 @@ export const ApplicationError: React.FC<{
 
 
 // Loading Error (when data fails to load)
-export const LoadingError: React.FC<{ 
+export const LoadingError: React.FC<{
   title?: string;
   description?: string;
   onRetry?: () => void;
-}> = ({ 
+}> = ({
   title = "Failed to load data",
   description = "Unable to fetch the requested information. Please try again.",
   onRetry
 }) => {
-  return (
-    <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
-      <AlertTriangle className="h-12 w-12 text-yellow-500" />
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
+        <AlertTriangle className="h-12 w-12 text-yellow-500" />
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        {onRetry && (
+          <Button onClick={onRetry} size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+        )}
       </div>
-      {onRetry && (
-        <Button onClick={onRetry} size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Try Again
-        </Button>
-      )}
-    </div>
-  );
-};
+    );
+  };
 
 // Maintenance Page
 export const MaintenancePage: React.FC<{
   estimatedTime?: string;
   message?: string;
-}> = ({ 
+}> = ({
   estimatedTime = "30 minutes",
   message = "We're performing scheduled maintenance to improve your experience."
 }) => {
-  return (
-    <div className="min-h-dvh bg-background flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-6 text-center">
-        <div className="space-y-4">
-          <div className="relative">
-            <Coffee className="h-16 w-16 text-blue-500 mx-auto" />
-            <div className="absolute -top-1 -right-1 h-6 w-6 bg-yellow-500 rounded-full flex items-center justify-center">
-              <span className="text-xs text-white">⚡</span>
+    return (
+      <div className="min-h-dvh bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full space-y-6 text-center">
+          <div className="space-y-4">
+            <div className="relative">
+              <Coffee className="h-16 w-16 text-blue-500 mx-auto" />
+              <div className="absolute -top-1 -right-1 h-6 w-6 bg-yellow-500 rounded-full flex items-center justify-center">
+                <span className="text-xs text-white">⚡</span>
+              </div>
             </div>
+            <Badge variant="secondary" className="text-lg px-4 py-2">Under Maintenance</Badge>
+            <h1 className="text-3xl font-bold text-foreground">We'll be right back!</h1>
+            <p className="text-muted-foreground">{message}</p>
           </div>
-          <Badge variant="secondary" className="text-lg px-4 py-2">Under Maintenance</Badge>
-          <h1 className="text-3xl font-bold text-foreground">We'll be right back!</h1>
-          <p className="text-muted-foreground">{message}</p>
-        </div>
 
-        <Button 
-          variant="outline" 
-          onClick={() => window.location.reload()}
-          className="w-full"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Check Again
-        </Button>
+          <Button
+            variant="outline"
+            onClick={() => window.location.reload()}
+            className="w-full"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Check Again
+          </Button>
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 // Search No Results
 export const NoSearchResults: React.FC<{
@@ -231,7 +231,7 @@ export const NoSearchResults: React.FC<{
   return (
     <div className="flex flex-col items-center justify-center p-8 text-center space-y-6">
       <Search className="h-16 w-16 text-muted-foreground" />
-      
+
       <div className="space-y-2">
         <h3 className="text-xl font-semibold text-foreground">No results found</h3>
         <p className="text-muted-foreground">
@@ -261,7 +261,7 @@ export const EmptyState: React.FC<{
   return (
     <div className="flex flex-col items-center justify-center p-12 text-center space-y-6">
       <Icon className="h-20 w-20 text-muted-foreground/50" />
-      
+
       <div className="space-y-2">
         <h3 className="text-xl font-semibold text-foreground">{title}</h3>
         <p className="text-muted-foreground max-w-sm">{description}</p>
@@ -276,4 +276,3 @@ export const EmptyState: React.FC<{
   );
 };
 
-    

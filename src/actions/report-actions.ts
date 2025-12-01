@@ -11,11 +11,11 @@ const RECIPIENT_EMAIL = "nuelgee54@gmail.com";
 
 export async function sendDailyReconciliationEmail(report: any) {
   const subject = `Daily Financial Summary - ${report.period}`;
-  
+
   const html = `
     <h1>Daily Financial Summary</h1>
     <p><strong>Date:</strong> ${report.period}</p>
-    <p><strong>Cashier:</strong> ${report.cashierName || 'Unknown'}</p>
+    <p><strong>Cashier:</strong> ${report.cashierName || "Unknown"}</p>
     
     <h2>Revenue Overview</h2>
     <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse;">
@@ -33,7 +33,7 @@ export async function sendDailyReconciliationEmail(report: any) {
       </tr>
       <tr>
         <td><strong>Total Discrepancy</strong></td>
-        <td style="color: ${report.totalDiscrepancy < 0 ? 'red' : 'green'}">
+        <td style="color: ${report.totalDiscrepancy < 0 ? "red" : "green"}">
           GH₵${report.totalDiscrepancy.toFixed(2)}
         </td>
       </tr>
@@ -41,8 +41,12 @@ export async function sendDailyReconciliationEmail(report: any) {
 
     <h2>Breakdown</h2>
     <ul>
-      <li><strong>Cash Sales:</strong> GH₵${report.expectedCash.toFixed(2)} (Counted: GH₵${report.countedCash.toFixed(2)})</li>
-      <li><strong>MoMo Sales:</strong> GH₵${report.expectedMomo.toFixed(2)} (Counted: GH₵${report.countedMomo.toFixed(2)})</li>
+      <li><strong>Cash Sales:</strong> GH₵${report.expectedCash.toFixed(
+        2
+      )} (Counted: GH₵${report.countedCash.toFixed(2)})</li>
+      <li><strong>MoMo Sales:</strong> GH₵${report.expectedMomo.toFixed(
+        2
+      )} (Counted: GH₵${report.countedMomo.toFixed(2)})</li>
     </ul>
 
     <h2>Notes</h2>
@@ -63,9 +67,12 @@ export async function generateAndSendAiAnalysis(dailyStats: any) {
 
   let analysisContext = "";
   let subject = "";
-  
+
   if (isFriday) {
-    subject = `Weekly Financial Analysis (Auditor Report) - ${format(today, "yyyy-MM-dd")}`;
+    subject = `Weekly Financial Analysis (Auditor Report) - ${format(
+      today,
+      "yyyy-MM-dd"
+    )}`;
     // Fetch weekly data
     const weeklyData = await fetchWeeklyData();
     analysisContext = `
@@ -74,14 +81,19 @@ export async function generateAndSendAiAnalysis(dailyStats: any) {
       Weekly Data:
       - Total Sales: GH₵${weeklyData.totalSales.toFixed(2)}
       - Total Orders: ${weeklyData.totalOrders}
-      - Top Items: ${weeklyData.topItems.map((i: any) => `${i.name} (${i.count})`).join(", ")}
+      - Top Items: ${weeklyData.topItems
+        .map((i: any) => `${i.name} (${i.count})`)
+        .join(", ")}
       
       Daily Data (Today):
       - Total Sales: GH₵${dailyStats.totalSales.toFixed(2)}
       - Net Revenue: GH₵${dailyStats.netRevenue.toFixed(2)}
     `;
   } else {
-    subject = `Daily Financial Analysis (Auditor Report) - ${format(today, "yyyy-MM-dd")}`;
+    subject = `Daily Financial Analysis (Auditor Report) - ${format(
+      today,
+      "yyyy-MM-dd"
+    )}`;
     analysisContext = `
       This is a DAILY report.
       
@@ -107,14 +119,16 @@ export async function generateAndSendAiAnalysis(dailyStats: any) {
   });
 
   // Convert Markdown to basic HTML for email (optional, but good for readability)
-  // For now, we'll just wrap it in <pre> or simple formatting if needed, 
+  // For now, we'll just wrap it in <pre> or simple formatting if needed,
   // but sending as text/markdown is often acceptable or we can use a library.
   // We'll send it as plain text body or simple HTML.
-  
+
   const html = `
     <h2>${subject}</h2>
     <div style="white-space: pre-wrap; font-family: sans-serif;">
-      ${text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
+      ${text
+        .replace(/\n/g, "<br>")
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")}
     </div>
   `;
 
@@ -129,10 +143,10 @@ export async function generateAndSendAiAnalysis(dailyStats: any) {
 async function fetchWeeklyData() {
   const end = new Date();
   const start = subDays(end, 7);
-  
+
   // Dynamically import Timestamp to avoid build-time initialization
   const { Timestamp } = await import("firebase-admin/firestore");
-  
+
   // We need to query orders from Firestore Admin
   // Note: This assumes 'timestamp' field exists on orders
   const adminDb = getAdminDb();
@@ -146,15 +160,16 @@ async function fetchWeeklyData() {
   let totalOrders = 0;
   const itemCounts: Record<string, number> = {};
 
-  snapshot.forEach(doc => {
+  snapshot.forEach((doc) => {
     const data = doc.data();
-    if (data.status === 'Completed') {
+    if (data.status === "Completed") {
       totalSales += data.total || 0;
       totalOrders += 1;
-      
+
       if (data.items && Array.isArray(data.items)) {
         data.items.forEach((item: any) => {
-          itemCounts[item.name] = (itemCounts[item.name] || 0) + (item.quantity || 0);
+          itemCounts[item.name] =
+            (itemCounts[item.name] || 0) + (item.quantity || 0);
         });
       }
     }
@@ -168,6 +183,6 @@ async function fetchWeeklyData() {
   return {
     totalSales,
     totalOrders,
-    topItems
+    topItems,
   };
 }

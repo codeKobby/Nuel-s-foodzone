@@ -11,7 +11,7 @@ function initializeFirebaseAdmin() {
   if (initialized || admin.apps.length > 0) {
     return;
   }
-  
+
   try {
     admin.initializeApp({
       credential: admin.credential.applicationDefault(),
@@ -36,7 +36,9 @@ export function getAdminDb() {
 
 // For backwards compatibility - but prefer getAdminDb()
 export const adminDb = {
-  collection: (...args: Parameters<admin.firestore.Firestore['collection']>) => {
+  collection: (
+    ...args: Parameters<admin.firestore.Firestore["collection"]>
+  ) => {
     initializeFirebaseAdmin();
     return admin.firestore().collection(...args);
   },

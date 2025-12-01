@@ -9,21 +9,21 @@ export function useIsMobile() {
 
   React.useEffect(() => {
     setHasMounted(true)
-    
+
     // Check if window is available (client-side)
     if (typeof window === 'undefined') return
-    
+
     const checkMobile = () => {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
     }
-    
+
     // Initial check
     checkMobile()
-    
+
     // Use matchMedia for efficient resize detection
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
     const onChange = () => checkMobile()
-    
+
     // Modern browsers
     if (mql.addEventListener) {
       mql.addEventListener("change", onChange)
@@ -31,7 +31,7 @@ export function useIsMobile() {
       // Fallback for older Safari
       mql.addListener(onChange)
     }
-    
+
     return () => {
       if (mql.removeEventListener) {
         mql.removeEventListener("change", onChange)

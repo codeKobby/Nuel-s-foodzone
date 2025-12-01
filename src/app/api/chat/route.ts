@@ -20,10 +20,10 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
-    
+
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
+    const todayStr = today.toISOString().split("T")[0];
+    const dayOfWeek = today.toLocaleDateString("en-US", { weekday: "long" });
 
     const result = streamText({
       model: google("gemini-1.5-pro"),
@@ -58,7 +58,13 @@ Your role is to answer questions from the business owner or manager based on sal
               .string()
               .describe("The end date for the query in 'YYYY-MM-DD' format."),
           }),
-          execute: async ({ startDate, endDate }: { startDate: string; endDate: string }) => {
+          execute: async ({
+            startDate,
+            endDate,
+          }: {
+            startDate: string;
+            endDate: string;
+          }) => {
             return await getBusinessDataForRange(startDate, endDate);
           },
         } as any),
@@ -71,7 +77,8 @@ Your role is to answer questions from the business owner or manager based on sal
           },
         } as any),
         addMenuItem: tool({
-          description: "Adds a new item to the menu. Requires name, price, and category.",
+          description:
+            "Adds a new item to the menu. Requires name, price, and category.",
           parameters: AddMenuItemInputSchema,
           execute: async (input: any) => {
             return await addMenuItem(input);
@@ -86,7 +93,8 @@ Your role is to answer questions from the business owner or manager based on sal
           },
         } as any),
         deleteMenuItem: tool({
-          description: "Removes an item from the menu. Requires the menu item ID.",
+          description:
+            "Removes an item from the menu. Requires the menu item ID.",
           parameters: DeleteMenuItemInputSchema,
           execute: async (input: any) => {
             return await deleteMenuItem(input);

@@ -25,11 +25,10 @@ const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: s
                 <button
                     onClick={() => setActiveView(item.id)}
                     aria-label={item.label}
-                    className={`w-14 h-14 flex items-center justify-center rounded-xl transition-all duration-300 group ${
-                        activeView === item.id 
-                        ? 'bg-primary text-primary-foreground shadow-lg scale-110' 
-                        : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
-                    }`}
+                    className={`w-14 h-14 flex items-center justify-center rounded-xl transition-all duration-300 group ${activeView === item.id
+                            ? 'bg-primary text-primary-foreground shadow-lg scale-110'
+                            : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                        }`}
                 >
                     <item.icon size={24} />
                 </button>
@@ -47,7 +46,7 @@ const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: s
 );
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, setTheme, pendingOrdersCount, lowStockCount, role, onLogout }) => {
-    
+
     const navItemsConfig = {
         manager: [
             { id: 'dashboard', icon: BarChart2, label: 'Dashboard' },
@@ -70,7 +69,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
             <nav className="hidden md:flex w-20 bg-card border-r border-border flex-col items-center justify-between py-6 z-20">
                 <div className="flex flex-col items-center gap-10">
                     <Tooltip>
-                         <TooltipTrigger asChild>
+                        <TooltipTrigger asChild>
                             <div className='mx-auto text-center'>
                                 <Image src={logo} alt="Nuel's Food Zone Logo" width={48} height={48} className="rounded-md" />
                             </div>
@@ -79,7 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
                             <p className="capitalize">Nuel's Foodzone Cafe - {role} View</p>
                         </TooltipContent>
                     </Tooltip>
-                    
+
                     <ul className="space-y-4">
                         {navItems.map(item => (
                             <NavItem key={item.id} item={item} activeView={activeView} setActiveView={setActiveView} />
@@ -98,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
                         </TooltipContent>
                     </Tooltip>
                     <Separator className="w-10" />
-                     <Tooltip>
+                    <Tooltip>
                         <TooltipTrigger asChild>
                             <button onClick={onLogout} aria-label="Logout" className="w-14 h-14 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-500/10">
                                 <LogOut size={24} />

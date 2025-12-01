@@ -175,7 +175,7 @@ const DashboardView: React.FC = () => {
             // An order is truly unpaid if:
             // 1. balanceDue > 0 (has outstanding balance)
             // 2. paymentStatus is NOT "Paid" (explicitly marked as not fully paid)
-            const unpaidOrders = allOrders.filter(o => 
+            const unpaidOrders = allOrders.filter(o =>
               o.balanceDue > 0 && o.paymentStatus !== 'Paid'
             );
             setAllUnpaidOrders(unpaidOrders);
