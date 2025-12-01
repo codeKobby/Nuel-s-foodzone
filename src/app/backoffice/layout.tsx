@@ -9,7 +9,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 export default function BackofficeLayout({ children }: { children: React.ReactNode }) {
   return (
     <OrderEditingProvider>
-      <Suspense fallback={<div className="h-screen w-screen bg-background flex flex-col items-center justify-center"><LoadingSpinner /><p className="mt-4 text-lg text-muted-foreground">Loading Backoffice...</p></div>}>
+      <Suspense fallback={<div className="min-h-dvh h-dvh w-screen bg-background flex flex-col items-center justify-center"><LoadingSpinner /><p className="mt-4 text-lg text-muted-foreground">Loading Backoffice...</p></div>}>
         {children}
       </Suspense>
     </OrderEditingProvider>

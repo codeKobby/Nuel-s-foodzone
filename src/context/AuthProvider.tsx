@@ -13,13 +13,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     useEffect(() => {
         const initializeSession = () => {
             try {
-                const storedSession = localStorage.getItem('userSession');
-                if (storedSession) {
-                    setSession(JSON.parse(storedSession));
+                // Guard against localStorage being unavailable (Safari private mode, etc.)
+                if (typeof window !== 'undefined' && window.localStorage) {
+                    const storedSession = localStorage.getItem('userSession');
+                    if (storedSession) {
+                        setSession(JSON.parse(storedSession));
+                    }
                 }
             } catch (error) {
                 console.error("Failed to parse session from localStorage", error);
-                localStorage.removeItem('userSession');
+                try {
+                    localStorage.removeItem('userSession');
+                } catch (e) {
+                    // localStorage not available
+                }
             } finally {
                 setIsLoading(false);
             }
@@ -90,7 +97,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
 
         setSession(fullSession);
-        localStorage.setItem('userSession', JSON.stringify(fullSession));
+        try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+                localStorage.setItem('userSession', JSON.stringify(fullSession));
+            }
+        } catch (e) {
+            console.warn('localStorage not available, session will not persist');
+        }
 
         if (auth && !auth.currentUser) {
             import('firebase/auth').then(({ signInAnonymously }) => {
@@ -101,7 +114,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const logout = useCallback(() => {
         setSession(null);
-        localStorage.removeItem('userSession');
+        try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+                localStorage.removeItem('userSession');
+            }
+        } catch (e) {
+            // localStorage not available
+        }
     }, []);
 
     const contextValue = {

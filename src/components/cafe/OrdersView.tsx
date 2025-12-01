@@ -527,15 +527,15 @@ const OrdersView: React.FC<{ setActiveView: (view: string) => void }> = ({ setAc
     }
 
     return (
-      <div className="space-y-8 pb-6">
+      <div className="space-y-4 md:space-y-6 pb-4">
         {groups.map(groupName => (
           <div key={groupName}>
-            <div className="flex items-center gap-3 mb-4">
-              <h3 className="text-lg font-semibold text-foreground">{groupName}</h3>
+            <div className="flex items-center gap-2 mb-2 md:mb-3">
+              <h3 className="text-sm md:text-base font-semibold text-foreground">{groupName}</h3>
               <Separator className="flex-1" />
-              <Badge variant="secondary">{groupedOrders[groupName].length}</Badge>
+              <Badge variant="secondary" className="text-[10px] md:text-xs">{groupedOrders[groupName].length}</Badge>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-3">
               {groupedOrders[groupName].map(order =>
                 <OrderCard
                   key={order.id}
@@ -560,25 +560,25 @@ const OrdersView: React.FC<{ setActiveView: (view: string) => void }> = ({ setAc
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full bg-background">
-        {/* FIXED HEADER - Mobile-first design */}
+        {/* FIXED HEADER - Mobile-first compact design */}
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-          <div className="p-4">
+          <div className="px-3 py-2 md:p-4">
             {/* Top row - Title and main actions */}
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl sm:text-2xl font-bold">Manage Orders</h1>
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
+              <h1 className="text-base md:text-xl font-bold">Manage Orders</h1>
+              <div className="flex items-center gap-1.5">
                 {/* Change Due Indicator */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant={filters.showChangeOnly ? "default" : "outline"}
                       size="sm"
+                      className="relative h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
                       onClick={() => setFilters(prev => ({ ...prev, dateRange: 'All Time', showChangeOnly: !prev.showChangeOnly, showUnpaidOnly: false }))}
-                      className="relative"
                     >
                       <Coins className="h-4 w-4" />
                       {totalCounts.changeDue > 0 && (
-                        <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 text-xs p-0 flex items-center justify-center">
+                        <Badge variant="destructive" className="absolute -top-1.5 -right-1.5 h-4 w-4 text-[10px] p-0 flex items-center justify-center">
                           {totalCounts.changeDue}
                         </Badge>
                       )}
@@ -595,8 +595,8 @@ const OrdersView: React.FC<{ setActiveView: (view: string) => void }> = ({ setAc
                     <Button
                       variant={filters.showUnpaidOnly ? "default" : "outline"}
                       size="sm"
+                      className="relative h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
                       onClick={() => setFilters(prev => ({ ...prev, dateRange: 'All Time', showUnpaidOnly: !prev.showUnpaidOnly, showChangeOnly: false }))}
-                      className="relative"
                     >
                       <Clock className="h-4 w-4" />
                       {totalCounts.unpaid > 0 && (
@@ -614,27 +614,27 @@ const OrdersView: React.FC<{ setActiveView: (view: string) => void }> = ({ setAc
             </div>
 
             {/* Search and filters row */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex gap-2">
               {/* Search */}
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
-                  placeholder="Search orders..."
+                  placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-8 h-8 text-sm"
                 />
               </div>
 
               {/* Filters */}
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="relative">
-                      <Filter className="h-4 w-4 mr-2" />
-                      Filters
+                    <Button variant="outline" size="sm" className="relative h-8 px-2 md:px-3">
+                      <Filter className="h-3.5 w-3.5 md:mr-1.5" />
+                      <span className="hidden md:inline text-xs">Filters</span>
                       {activeFiltersCount > 0 && (
-                        <Badge variant="secondary" className="ml-2 h-5 w-5 text-xs p-0 flex items-center justify-center">
+                        <Badge variant="secondary" className="ml-1 h-4 w-4 text-[10px] p-0 flex items-center justify-center">
                           {activeFiltersCount}
                         </Badge>
                       )}
@@ -683,18 +683,18 @@ const OrdersView: React.FC<{ setActiveView: (view: string) => void }> = ({ setAc
                     <TooltipTrigger asChild>
                       <Button
                         onClick={() => setIsCombinedPaymentModalOpen(true)}
-                        className="relative"
+                        className="relative h-8"
                         size="sm"
                       >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        <span className="hidden sm:inline">Pay Selected</span>
-                        <Badge variant="secondary" className="ml-2">
-                          {selectedOrderIds.size} • {formatCurrency(selectedOrdersTotal)}
+                        <ShoppingCart className="h-3.5 w-3.5 md:mr-1.5" />
+                        <span className="hidden md:inline text-xs">Pay</span>
+                        <Badge variant="secondary" className="ml-1 text-[10px]">
+                          {selectedOrderIds.size}
                         </Badge>
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Pay for {selectedOrderIds.size} selected orders</p>
+                      <p>Pay {formatCurrency(selectedOrdersTotal)} for {selectedOrderIds.size} orders</p>
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -704,37 +704,37 @@ const OrdersView: React.FC<{ setActiveView: (view: string) => void }> = ({ setAc
         </div>
 
         {/* MAIN CONTENT */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden min-h-0">
           {filters.showChangeOnly ? (
-            <div className="h-full overflow-y-auto px-4">
+            <div className="h-full overflow-y-auto px-3 md:px-4">
               {renderGroupedOrderList(filteredOrders.changeDue, "No orders with change due.")}
             </div>
           ) : filters.showUnpaidOnly ? (
-            <div className="h-full overflow-y-auto px-4">
+            <div className="h-full overflow-y-auto px-3 md:px-4">
               {renderGroupedOrderList(filteredOrders.unpaid, "No unpaid orders found.")}
             </div>
           ) : (
             <Tabs defaultValue="pending" className="h-full flex flex-col">
-              <TabsList className="grid w-full max-w-2xl grid-cols-3 mx-4 mt-4">
-                <TabsTrigger value="pending" className="text-xs sm:text-sm">
+              <TabsList className="grid w-full max-w-md grid-cols-3 mx-3 md:mx-4 mt-2 md:mt-3 h-8">
+                <TabsTrigger value="pending" className="text-[10px] md:text-xs h-7">
                   Pending ({filteredCounts.pending})
                 </TabsTrigger>
-                <TabsTrigger value="unpaid" className="text-xs sm:text-sm">
+                <TabsTrigger value="unpaid" className="text-[10px] md:text-xs h-7">
                   Unpaid ({filteredCounts.unpaid})
                 </TabsTrigger>
-                <TabsTrigger value="completed" className="text-xs sm:text-sm">
-                  Completed ({filteredCounts.completed})
+                <TabsTrigger value="completed" className="text-[10px] md:text-xs h-7">
+                  Done ({filteredCounts.completed})
                 </TabsTrigger>
               </TabsList>
 
-              <div className="flex-1 overflow-hidden">
-                <TabsContent value="pending" className="h-full overflow-y-auto px-4 mt-4">
+              <div className="flex-1 overflow-hidden min-h-0">
+                <TabsContent value="pending" className="h-full overflow-y-auto px-3 md:px-4 mt-2 md:mt-3">
                   {renderGroupedOrderList(filteredOrders.pending, "No pending orders found.")}
                 </TabsContent>
-                <TabsContent value="unpaid" className="h-full overflow-y-auto px-4 mt-4">
+                <TabsContent value="unpaid" className="h-full overflow-y-auto px-3 md:px-4 mt-2 md:mt-3">
                   {renderGroupedOrderList(filteredOrders.unpaid, "No unpaid orders found.")}
                 </TabsContent>
-                <TabsContent value="completed" className="h-full overflow-y-auto px-4 mt-4">
+                <TabsContent value="completed" className="h-full overflow-y-auto px-3 md:px-4 mt-2 md:mt-3">
                   {renderGroupedOrderList(filteredOrders.completed, "No completed orders found.")}
                 </TabsContent>
               </div>

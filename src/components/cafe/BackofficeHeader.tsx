@@ -86,39 +86,39 @@ const BackofficeHeader: React.FC<BackofficeHeaderProps> = ({
   };
 
   return (
-    <header className="flex flex-col gap-3 border-b bg-card/70 px-4 py-3 text-foreground backdrop-blur md:flex-row md:items-center md:justify-between md:px-6">
-      <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.35em] text-primary">Backoffice</p>
+    <header className="hidden md:flex flex-col gap-2 border-b bg-card/70 px-4 py-2 text-foreground backdrop-blur md:flex-row md:items-center md:justify-between md:px-6 md:py-3">
+      <div className="space-y-0.5">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-primary">Backoffice</p>
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold">{role === 'manager' ? 'Manager Console' : 'Cashier Console'}</h1>
-          <span className="rounded-full bg-muted/50 px-2 py-0.5 text-xs capitalize text-muted-foreground">{role} view</span>
+          <h1 className="text-lg md:text-xl font-semibold">{role === 'manager' ? 'Manager Console' : 'Cashier Console'}</h1>
+          <span className="rounded-full bg-muted/50 px-2 py-0.5 text-[10px] capitalize text-muted-foreground hidden sm:inline-block">{role} view</span>
         </div>
-        <p className="text-sm text-muted-foreground">Stay in sync with live orders, inventory, and online activity.</p>
+        <p className="text-xs text-muted-foreground hidden lg:block">Stay in sync with live orders, inventory, and online activity.</p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
         <span
-          className={`flex items-center gap-2 rounded-full px-3 py-1 font-medium ${isOnline ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'
+          className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium ${isOnline ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'
             }`}
         >
-          {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
-          {isOnline ? 'Online' : 'Offline'}
+          {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+          <span className="hidden sm:inline">{isOnline ? 'Online' : 'Offline'}</span>
         </span>
-        <Button variant="ghost" size="sm" className="gap-2 text-xs" onClick={onToggleTheme}>
-          {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
-          Toggle theme
+        <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-[10px] px-2 hidden lg:flex" onClick={onToggleTheme}>
+          {theme === 'light' ? <Moon size={12} /> : <Sun size={12} />}
+          Theme
         </Button>
-        <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
+        <div className="hidden xl:flex items-center gap-2 text-[10px] text-muted-foreground">
           <span>Pending {pendingOrdersCount}</span>
           <span className="text-muted-foreground/60">•</span>
           <span>Low stock {lowStockCount}</span>
         </div>
         <Popover onOpenChange={requestNotificationPermission}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="relative" onClick={handleNotificationClick}>
-              <Bell className="h-4 w-4" />
+            <Button variant="outline" size="sm" className="relative h-7 w-7 p-0" onClick={handleNotificationClick}>
+              <Bell className="h-3.5 w-3.5" />
               {newOrdersCount > 0 && (
-                <Badge className="absolute -top-2 -right-2 h-5 w-5 justify-center p-0 text-[11px]">{newOrdersCount}</Badge>
+                <Badge className="absolute -top-1.5 -right-1.5 h-4 w-4 justify-center p-0 text-[9px]">{newOrdersCount}</Badge>
               )}
             </Button>
           </PopoverTrigger>

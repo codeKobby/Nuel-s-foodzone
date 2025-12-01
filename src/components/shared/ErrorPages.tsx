@@ -59,7 +59,7 @@ export class ErrorBoundary extends Component<
 // 404 Not Found Page
 export const NotFoundPage: React.FC<{ onNavigateHome?: () => void }> = ({ onNavigateHome }) => {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-background flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-6 text-center">
         <div className="space-y-4">
           <Coffee className="h-16 w-16 text-muted-foreground mx-auto" />
@@ -96,7 +96,7 @@ export const NotFoundPage: React.FC<{ onNavigateHome?: () => void }> = ({ onNavi
 // Network Error Page
 export const NetworkErrorPage: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-background flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-6 text-center">
         <div className="space-y-4">
           <WifiOff className="h-16 w-16 text-red-500 mx-auto" />
@@ -124,7 +124,7 @@ export const ApplicationError: React.FC<{
   showDetails?: boolean;
 }> = ({ error, onRetry, showDetails = false }) => {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-background flex items-center justify-center p-4">
       <div className="max-w-lg w-full space-y-6">
         <div className="space-y-4 text-center">
           <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto" />
@@ -196,7 +196,7 @@ export const MaintenancePage: React.FC<{
   message = "We're performing scheduled maintenance to improve your experience."
 }) => {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-background flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-6 text-center">
         <div className="space-y-4">
           <div className="relative">

@@ -57,8 +57,39 @@
   * {
     @apply border-border;
   }
+  
+  /* Use dvh (dynamic viewport height) for iOS Safari address bar changes */
+  html, body {
+    height: 100%;
+    min-height: 100dvh;
+    /* Prevent pull-to-refresh on iOS */
+    overscroll-behavior-y: contain;
+  }
+  
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* iOS Safari momentum scrolling */
+  .scroll-container {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Hide scrollbars but allow scrolling */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Safe area insets for iOS notch/home indicator */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0);
   }
 }
 

@@ -24,6 +24,7 @@ const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: s
             <TooltipTrigger asChild>
                 <button
                     onClick={() => setActiveView(item.id)}
+                    aria-label={item.label}
                     className={`w-14 h-14 flex items-center justify-center rounded-xl transition-all duration-300 group ${
                         activeView === item.id 
                         ? 'bg-primary text-primary-foreground shadow-lg scale-110' 
@@ -88,7 +89,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
                 <div className="flex flex-col items-center gap-2">
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <button onClick={setTheme} className="w-14 h-14 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-primary">
+                            <button onClick={setTheme} aria-label="Toggle theme" className="w-14 h-14 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-primary">
                                 {theme === 'light' ? <Moon size={24} /> : <Sun size={24} />}
                             </button>
                         </TooltipTrigger>
@@ -99,7 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
                     <Separator className="w-10" />
                      <Tooltip>
                         <TooltipTrigger asChild>
-                            <button onClick={onLogout} className="w-14 h-14 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-500/10">
+                            <button onClick={onLogout} aria-label="Logout" className="w-14 h-14 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-500/10">
                                 <LogOut size={24} />
                             </button>
                         </TooltipTrigger>

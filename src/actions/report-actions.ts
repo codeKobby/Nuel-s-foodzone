@@ -3,9 +3,8 @@
 import { sendEmail } from "@/lib/email";
 import { google } from "@/lib/ai";
 import { generateText } from "ai";
-import { adminDb } from "@/lib/firebase-admin";
-import { Timestamp } from "firebase-admin/firestore";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { getAdminDb } from "@/lib/firebase-admin";
+import { format, subDays } from "date-fns";
 import type { ReconciliationReport, Order } from "@/lib/types";
 
 const RECIPIENT_EMAIL = "nuelgee54@gmail.com";
@@ -95,7 +94,7 @@ export async function generateAndSendAiAnalysis(dailyStats: any) {
   }
 
   const { text } = await generateText({
-    model: google("gemini-2.5-pro"),
+    model: google("gemini-1.5-pro"),
     system: `You are a professional financial auditor and accountant for "Nuel's Foodzone Cafe". 
     Your job is to analyze the provided sales data and generate a strict, professional performance report.
     You should act as an external auditor, highlighting any discrepancies, praising good performance, and suggesting improvements.
@@ -131,8 +130,12 @@ async function fetchWeeklyData() {
   const end = new Date();
   const start = subDays(end, 7);
   
+  // Dynamically import Timestamp to avoid build-time initialization
+  const { Timestamp } = await import("firebase-admin/firestore");
+  
   // We need to query orders from Firestore Admin
   // Note: This assumes 'timestamp' field exists on orders
+  const adminDb = getAdminDb();
   const ordersRef = adminDb.collection("orders");
   const snapshot = await ordersRef
     .where("timestamp", ">=", Timestamp.fromDate(start))

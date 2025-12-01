@@ -68,6 +68,22 @@ export default {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      // Dynamic viewport units for iOS Safari compatibility
+      height: {
+        'dvh': '100dvh',
+        'svh': '100svh',
+        'lvh': '100lvh',
+      },
+      minHeight: {
+        'dvh': '100dvh',
+        'svh': '100svh',
+        'lvh': '100lvh',
+      },
+      maxHeight: {
+        'dvh': '100dvh',
+        'svh': '100svh',
+        'lvh': '100lvh',
+      },
       keyframes: {
         'accordion-down': {
           from: {

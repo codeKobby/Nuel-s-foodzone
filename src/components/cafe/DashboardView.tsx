@@ -25,6 +25,8 @@ import {
   ChartTooltipContent,
   ChartConfig,
   ChartArea,
+  ChartLegend,
+  ChartLegendContent,
 } from "@/components/ui/chart"
 import { Area, ComposedChart, CartesianGrid, XAxis, YAxis, Line as ChartLine } from 'recharts';
 
@@ -132,10 +134,10 @@ const DashboardView: React.FC = () => {
   const [analysisContent, setAnalysisContent] = useState('');
   const [isGeneratingAnalysis, setIsGeneratingAnalysis] = useState(false);
 
-  const { messages, sendMessage, isLoading: isChatLoading, setMessages } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading: isChatLoading, setMessages, error: chatError } = useChat({
     api: '/api/chat',
-  } as any) as any;
-  const [chatInput, setChatInput] = useState('');
+    maxSteps: 5, // Allow multiple tool calls
+  });
   const [isChatSheetOpen, setIsChatSheetOpen] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -169,7 +171,13 @@ const DashboardView: React.FC = () => {
               o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate
             );
 
-            const unpaidOrders = allOrders.filter(o => o.balanceDue > 0);
+            // Fix: Filter unpaid orders using both balanceDue AND paymentStatus to handle data integrity edge cases
+            // An order is truly unpaid if:
+            // 1. balanceDue > 0 (has outstanding balance)
+            // 2. paymentStatus is NOT "Paid" (explicitly marked as not fully paid)
+            const unpaidOrders = allOrders.filter(o => 
+              o.balanceDue > 0 && o.paymentStatus !== 'Paid'
+            );
             setAllUnpaidOrders(unpaidOrders);
             const unpaidOrdersValue = unpaidOrders.reduce((sum, o) => sum + o.balanceDue, 0);
             const overdueOrdersCount = unpaidOrders.filter(o => differenceInDays(new Date(), o.timestamp.toDate()) > 2).length;
@@ -425,43 +433,69 @@ const DashboardView: React.FC = () => {
               <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="text-lg font-medium mb-2">AI Business Assistant</p>
               <p>Ask me anything about your business performance.</p>
+              <p className="text-sm mt-4">Try asking:</p>
+              <ul className="text-sm text-left max-w-xs mx-auto mt-2 space-y-1">
+                <li>• "What were my sales last week?"</li>
+                <li>• "Show me the top selling items today"</li>
+                <li>• "Add a new menu item called..."</li>
+              </ul>
+            </div>
+          )}
+          {chatError && (
+            <div className="text-center text-red-500 p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
+              <p className="font-medium">Error connecting to AI</p>
+              <p className="text-sm">{chatError.message}</p>
             </div>
           )}
           {messages.map((message: any) => (
             <div key={message.id} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}>
-              {message.role === 'assistant' && <Avatar className="h-8 w-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>}
-              <div className={`rounded-lg px-4 py-2 max-w-sm ${message.role === 'assistant' ? 'bg-secondary' : 'bg-primary text-primary-foreground'}`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">{message.content}</ReactMarkdown>
+              {message.role === 'assistant' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback><Bot /></AvatarFallback></Avatar>}
+              <div className={`rounded-lg px-4 py-2 max-w-[85%] ${message.role === 'assistant' ? 'bg-secondary' : 'bg-primary text-primary-foreground'}`}>
+                {/* Handle message parts for AI SDK v5 */}
+                {message.parts ? (
+                  message.parts.map((part: any, index: number) => {
+                    switch (part.type) {
+                      case 'text':
+                        return <ReactMarkdown key={index} remarkPlugins={[remarkGfm]} className="markdown-content prose prose-sm dark:prose-invert max-w-none">{part.text}</ReactMarkdown>;
+                      case 'tool-invocation':
+                        return (
+                          <div key={index} className="text-xs text-muted-foreground italic my-1">
+                            {part.toolInvocation.state === 'call' && `Fetching ${part.toolInvocation.toolName}...`}
+                            {part.toolInvocation.state === 'result' && `✓ Got data from ${part.toolInvocation.toolName}`}
+                          </div>
+                        );
+                      default:
+                        return null;
+                    }
+                  })
+                ) : (
+                  // Fallback to content for simpler messages
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content prose prose-sm dark:prose-invert max-w-none">{message.content}</ReactMarkdown>
+                )}
               </div>
-              {message.role === 'user' && <Avatar className="h-8 w-8"><AvatarFallback><User /></AvatarFallback></Avatar>}
+              {message.role === 'user' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback><User /></AvatarFallback></Avatar>}
             </div>
           ))}
           {isChatLoading && (
             <div className="flex items-start gap-3">
-              <Avatar className="h-8 w-8"><AvatarFallback><Bot /></AvatarFallback></Avatar>
+              <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback><Bot /></AvatarFallback></Avatar>
               <div className="rounded-lg px-4 py-2 bg-secondary"><LoadingSpinner /></div>
             </div>
           )}
         </div>
       </ScrollArea>
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const text = chatInput.trim();
-          if (!text) return;
-          sendMessage(text);
-          setChatInput('');
-        }}
+        onSubmit={handleSubmit}
         className="flex-shrink-0 p-4 border-t bg-background flex gap-2"
       >
         <Input
           placeholder="Ask about your business..."
-          value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
+          value={input ?? ''}
+          onChange={handleInputChange}
           disabled={isChatLoading}
           className="h-12"
         />
-        <Button type="submit" disabled={isChatLoading || !chatInput.trim()} className="h-12"><Send /></Button>
+        <Button type="submit" disabled={isChatLoading || !(input?.trim())} className="h-12"><Send /></Button>
       </form>
     </div>
   );
@@ -472,28 +506,37 @@ const DashboardView: React.FC = () => {
         <DialogHeader>
           <DialogTitle>All Unpaid Orders</DialogTitle>
           <DialogDescription>
-            A complete list of all orders with an outstanding balance.
+            A complete list of all orders with an outstanding balance ({allUnpaidOrders.length} orders).
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] mt-4">
-          <div className="pr-4">
+          <div className="pr-4 space-y-2">
             {allUnpaidOrders.length > 0 ? (
-              allUnpaidOrders.map(order => (
-                <div key={order.id} className="mb-2 p-3 border rounded-md">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-semibold">{order.simplifiedId} - <span className="font-normal">{order.tag}</span></p>
-                      <p className="text-xs text-muted-foreground">{formatTimestamp(order.timestamp)}</p>
+              allUnpaidOrders
+                .sort((a, b) => b.timestamp.toDate().getTime() - a.timestamp.toDate().getTime())
+                .map(order => {
+                  const daysOld = differenceInDays(new Date(), order.timestamp.toDate());
+                  const isOverdue = daysOld > 2;
+                  return (
+                    <div key={order.id} className={cn("p-3 border rounded-md", isOverdue && "border-red-200 bg-red-50/50 dark:bg-red-950/20")}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-semibold">{order.simplifiedId} - <span className="font-normal">{order.tag}</span></p>
+                          <p className="text-xs text-muted-foreground">{formatTimestamp(order.timestamp)}</p>
+                          {isOverdue && <p className="text-xs text-red-500 font-medium mt-1">{daysOld} days overdue</p>}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Total: {formatCurrency(order.total)}</p>
+                          <p className="text-xs text-muted-foreground">Paid: {formatCurrency(order.amountPaid)}</p>
+                          <p className="font-bold text-red-500">{formatCurrency(order.balanceDue)} due</p>
+                          <Badge variant={order.paymentStatus === 'Unpaid' ? 'destructive' : 'secondary'} className="mt-1">{order.paymentStatus}</Badge>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-red-500">{formatCurrency(order.balanceDue)}</p>
-                      <Badge variant={order.paymentStatus === 'Unpaid' ? 'destructive' : 'secondary'}>{order.paymentStatus}</Badge>
-                    </div>
-                  </div>
-                </div>
-              ))
+                  );
+                })
             ) : (
-              <p className="text-center text-muted-foreground py-8">No unpaid orders found.</p>
+              <p className="text-center text-muted-foreground py-8">🎉 No unpaid orders found!</p>
             )}
           </div>
         </ScrollArea>
@@ -572,22 +615,54 @@ const DashboardView: React.FC = () => {
                     <XAxis dataKey="date" />
                     <YAxis tickFormatter={(value) => formatCurrency(Number(value))} />
                     <ChartTooltip
-                      content={({ payload, label }) => (
-                        <ChartTooltipContent
-                          label={label}
-                          payload={payload || []}
-                          formatter={(value, name, props) => (
-                            <div className="flex flex-col">
-                              <span className="font-bold">{formatCurrency(value as number)}</span>
-                              {props.payload.cashierNames && <span className="text-xs text-muted-foreground">{props.payload.cashierNames}</span>}
+                      content={({ payload, label }) => {
+                        if (!payload || payload.length === 0) return null;
+                        const data = payload[0]?.payload;
+                        return (
+                          <div className="bg-background border rounded-lg shadow-lg p-3 min-w-[200px]">
+                            <p className="font-semibold text-sm mb-2 border-b pb-2">{label}</p>
+                            <div className="space-y-1.5 text-sm">
+                              <div className="flex justify-between items-center">
+                                <span className="flex items-center gap-2">
+                                  <span className="w-3 h-3 rounded-full bg-[hsl(var(--chart-1))]" />
+                                  <span className="text-muted-foreground">New Sales:</span>
+                                </span>
+                                <span className="font-medium">{formatCurrency(data?.newSales || 0)}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="flex items-center gap-2">
+                                  <span className="w-3 h-3 rounded-full bg-[hsl(var(--chart-2))]" />
+                                  <span className="text-muted-foreground">Collections (Old Debts):</span>
+                                </span>
+                                <span className="font-medium">{formatCurrency(data?.collections || 0)}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="flex items-center gap-2">
+                                  <span className="w-3 h-3 rounded-full bg-[hsl(var(--chart-4))]" />
+                                  <span className="text-muted-foreground">Expenses:</span>
+                                </span>
+                                <span className="font-medium text-red-500">-{formatCurrency(data?.expenses || 0)}</span>
+                              </div>
+                              <div className="flex justify-between items-center pt-1.5 border-t mt-1.5">
+                                <span className="text-muted-foreground font-medium">Net Revenue:</span>
+                                <span className={cn("font-bold", (data?.netRevenue || 0) >= 0 ? "text-green-600" : "text-red-600")}>
+                                  {formatCurrency(data?.netRevenue || 0)}
+                                </span>
+                              </div>
+                              {data?.cashierNames && (
+                                <p className="text-xs text-muted-foreground pt-1 border-t mt-1.5">
+                                  Cashiers: {data.cashierNames}
+                                </p>
+                              )}
                             </div>
-                          )}
-                        />
-                      )}
+                          </div>
+                        );
+                      }}
                     />
-                    <Area dataKey="collections" type="natural" fill="var(--color-collections)" fillOpacity={0.4} stroke="var(--color-collections)" stackId="a" />
-                    <Area dataKey="newSales" type="natural" fill="var(--color-newSales)" fillOpacity={0.4} stroke="var(--color-newSales)" stackId="a" />
-                    <ChartLine dataKey="expenses" type="monotone" stroke="var(--color-expenses)" strokeWidth={2} dot={false} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Area dataKey="collections" type="natural" fill="var(--color-collections)" fillOpacity={0.4} stroke="var(--color-collections)" stackId="a" name="Collections (Old Debts)" />
+                    <Area dataKey="newSales" type="natural" fill="var(--color-newSales)" fillOpacity={0.4} stroke="var(--color-newSales)" stackId="a" name="New Sales" />
+                    <ChartLine dataKey="expenses" type="monotone" stroke="var(--color-expenses)" strokeWidth={2} dot={false} name="Expenses" />
                   </ComposedChart>
                 </ChartContainer>
               ) : (

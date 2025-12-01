@@ -80,35 +80,35 @@ const MobileNav = ({
 
     return (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <div className="md:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-card/90 px-4 py-3 shadow-sm backdrop-blur">
-                <div className="flex items-center space-x-2">
-                    <Image src={logo} alt="Nuel's Food Zone Logo" width={32} height={32} className="rounded-md" />
-                    <h1 className="font-bold text-lg">Nuel's Foodzone Cafe</h1>
+            <div className="md:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-card/95 px-3 py-2 shadow-sm backdrop-blur-md safe-top">
+                <div className="flex items-center space-x-2 min-w-0">
+                    <Image src={logo} alt="Nuel's Food Zone Logo" width={28} height={28} className="rounded-md flex-shrink-0" />
+                    <h1 className="font-bold text-base truncate">Nuel's Foodzone</h1>
                 </div>
-                    <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" title="Open menu" aria-label="Open menu"><Menu /></Button>
+                <SheetTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-9 w-9 p-0" title="Open menu" aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
                 </SheetTrigger>
             </div>
-            <SheetContent side="left" className="w-64 p-0 flex flex-col">
-                <SheetHeader className="p-4 border-b">
+            <SheetContent side="left" className="w-[280px] max-w-[85vw] p-0 flex flex-col">
+                <SheetHeader className="p-3 border-b">
                     <SheetTitle className="flex items-center gap-2">
-                        <Image src={logo} alt="Nuel's Food Zone Logo" width={32} height={32} className="rounded-md" />
-                        <div>
-                            <p>Nuel's Foodzone Cafe</p>
-                            <p className="text-sm font-normal text-muted-foreground capitalize">{role} View</p>
+                        <Image src={logo} alt="Nuel's Food Zone Logo" width={28} height={28} className="rounded-md" />
+                        <div className="min-w-0">
+                            <p className="truncate">Nuel's Foodzone Cafe</p>
+                            <p className="text-xs font-normal text-muted-foreground capitalize">{role} View</p>
                         </div>
                     </SheetTitle>
                 </SheetHeader>
-                <div className="p-4 flex-grow">
-                    <ul className="space-y-2">
+                <div className="p-3 flex-grow overflow-y-auto">
+                    <ul className="space-y-1">
                         {navItems.map(item => (
                             <li key={item.id}>
                                 <Button
                                     variant={activeView === item.id ? 'default' : 'ghost'}
-                                    className="w-full justify-start text-base"
+                                    className="w-full justify-start text-sm h-10"
                                     onClick={() => handleItemClick(item.id)}
                                 >
-                                    <item.icon className="mr-3 h-5 w-5" />
+                                    <item.icon className="mr-2 h-4 w-4" />
                                     {item.label}
                                     {item.badge != undefined && item.badge > 0 && (
                                         <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
@@ -120,14 +120,14 @@ const MobileNav = ({
                         ))}
                     </ul>
                 </div>
-                <div className="p-4 border-t mt-auto">
-                    <Button onClick={setTheme} variant="ghost" className="w-full justify-start text-base mb-2">
-                        {theme === 'light' ? <Moon className="mr-3 h-5 w-5" /> : <Sun className="mr-3 h-5 w-5" />}
+                <div className="p-3 border-t mt-auto safe-bottom">
+                    <Button onClick={setTheme} variant="ghost" className="w-full justify-start text-sm h-10 mb-1">
+                        {theme === 'light' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
                         Toggle Theme
                     </Button>
                     <Separator />
-                    <Button onClick={onLogout} variant="ghost" className="w-full justify-start text-base text-red-500 hover:bg-red-500/10 hover:text-red-500 mt-2">
-                        <LogOut className="mr-3 h-5 w-5" />
+                    <Button onClick={onLogout} variant="ghost" className="w-full justify-start text-sm h-10 text-red-500 hover:bg-red-500/10 hover:text-red-500 mt-1">
+                        <LogOut className="mr-2 h-4 w-4" />
                         Logout
                     </Button>
                 </div>
@@ -312,7 +312,7 @@ function CafePage() {
 
     if (!isAuthReady || isAuthLoading) {
         return (
-            <div className="h-screen w-screen bg-background flex flex-col items-center justify-center">
+            <div className="min-h-dvh h-dvh w-screen bg-background flex flex-col items-center justify-center">
                 <LoadingSpinner />
                 <p className="mt-4 text-lg text-muted-foreground">Initializing Backoffice...</p>
             </div>
@@ -321,7 +321,7 @@ function CafePage() {
 
     if (!role) {
         return (
-            <div className="h-screen w-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+            <div className="min-h-dvh h-dvh w-screen bg-background flex flex-col items-center justify-center p-6 text-center">
                 <LoadingSpinner />
                 <p className="mt-4 text-lg font-medium">Routing you to the role selector…</p>
                 <p className="mt-2 max-w-sm text-sm text-muted-foreground">
@@ -336,7 +336,7 @@ function CafePage() {
 
     if (authError) {
         return (
-            <div className="h-screen w-screen bg-background flex items-center justify-center p-4">
+            <div className="min-h-dvh h-dvh w-screen bg-background flex items-center justify-center p-4">
                 <Alert variant="destructive" className="max-w-md">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Application Error</AlertTitle>
@@ -366,7 +366,7 @@ function CafePage() {
     };
 
     const MainContent = () => (
-        <div className="flex h-screen bg-secondary/40 dark:bg-background font-body text-foreground">
+        <div className="flex h-dvh min-h-dvh bg-secondary/40 dark:bg-background font-body text-foreground">
             <Sidebar
                 activeView={activeView}
                 setActiveView={setActiveView}
@@ -391,7 +391,7 @@ function CafePage() {
     );
 
     const MobileContent = () => (
-        <div className="h-screen flex flex-col bg-secondary/40 dark:bg-background font-body text-foreground">
+        <div className="h-dvh min-h-dvh flex flex-col bg-secondary/40 dark:bg-background font-body text-foreground safe-bottom">
             <MobileNav
                 activeView={activeView}
                 setActiveView={setActiveView}
@@ -421,7 +421,7 @@ function CafePage() {
 
 export default function CafePageWrapper() {
     return (
-        <Suspense fallback={<div className="h-screen w-screen bg-background flex flex-col items-center justify-center"><LoadingSpinner /><p className="mt-4 text-lg text-muted-foreground">Loading...</p></div>}>
+        <Suspense fallback={<div className="min-h-dvh h-dvh w-screen bg-background flex flex-col items-center justify-center"><LoadingSpinner /><p className="mt-4 text-lg text-muted-foreground">Loading...</p></div>}>
             <CafePage />
         </Suspense>
     )

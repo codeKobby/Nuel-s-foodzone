@@ -205,9 +205,9 @@ const ReconciliationView: React.FC<{
         if (Math.abs(discrepancy) < 0.01) {
             return { color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800', icon: CheckCircle, text: 'Balanced' };
         } else if (discrepancy > 0) {
-            return { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', icon: AlertTriangle, text: `Surplus: ${formatCurrency(discrepancy)}` };
+            return { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', icon: AlertTriangle, text: `+${formatCurrency(Math.abs(discrepancy))}` };
         } else {
-            return { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800', icon: AlertTriangle, text: `Deficit: ${formatCurrency(Math.abs(discrepancy))}` };
+            return { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800', icon: AlertTriangle, text: `-${formatCurrency(Math.abs(discrepancy))}` };
         }
     };
 
@@ -703,8 +703,11 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                     if (isTodayOrder) {
                         todayOrders.push(order);
 
+                        const reward = order.rewardDiscount || 0;
+                        const orderNetTotal = (order.total || 0) - reward;
+
                         if (order.status === "Completed") {
-                            totalSales += order.total;
+                            totalSales += orderNetTotal;
                             order.items.forEach(item => {
                                 totalItemsSold += item.quantity;
                                 itemStats[item.name] = {
@@ -726,16 +729,14 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                     }
 
                     if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
+                        let cashPaid = 0;
+                        let momoPaid = 0;
                         order.paymentHistory.forEach(payment => {
                             const paymentDate = payment.timestamp?.toDate();
                             if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
                                 const paymentAmount = payment.amount || 0;
-
-                                if (payment.method === 'cash') {
-                                    cashSales += paymentAmount;
-                                } else if (payment.method === 'momo' || payment.method === 'card') {
-                                    momoSales += paymentAmount;
-                                }
+                                if (payment.method === 'cash') cashPaid += paymentAmount;
+                                else if (payment.method === 'momo' || payment.method === 'card') momoPaid += paymentAmount;
 
                                 if (!isTodayOrder) {
                                     settledUnpaidOrdersValue += paymentAmount;
@@ -752,6 +753,12 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                 }
                             }
                         });
+                        if (isTodayOrder) {
+                            const reward = order.rewardDiscount || 0;
+                            const orderNetTotal = (order.total || 0) - reward;
+                            cashSales += Math.min(orderNetTotal, cashPaid);
+                            momoSales += Math.min(orderNetTotal, momoPaid);
+                        }
                     } else {
                         const paymentDate = order.lastPaymentTimestamp?.toDate();
                         if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
@@ -759,14 +766,18 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                             const amountPaidTowardsOrder = order.amountPaid - order.changeGiven;
 
                             if (order.paymentBreakdown) {
+                                const reward = order.rewardDiscount || 0;
+                                const orderNetTotal = (order.total || 0) - reward;
                                 if (order.paymentBreakdown.cash) {
-                                    cashSales += order.paymentBreakdown.cash;
+                                    cashSales += Math.min(orderNetTotal, order.paymentBreakdown.cash);
                                 }
                                 if (order.paymentBreakdown.momo) {
-                                    momoSales += order.paymentBreakdown.momo;
+                                    momoSales += Math.min(orderNetTotal, order.paymentBreakdown.momo);
                                 }
                             } else {
-                                const revenueAmount = Math.min(amountPaidTowardsOrder, order.total);
+                                const reward = order.rewardDiscount || 0;
+                                const orderNetTotal = (order.total || 0) - reward;
+                                const revenueAmount = Math.min(amountPaidTowardsOrder, orderNetTotal);
 
                                 if (order.paymentMethod === 'cash') {
                                     cashSales += revenueAmount;
@@ -913,19 +924,19 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
     return (
         <ScrollArea className="h-full">
-            <div className="p-4 md:p-6 bg-background">
-                <div className="flex justify-between items-center mb-4">
-                    <h1 className="text-2xl md:text-3xl font-bold">Accounting</h1>
-                    <Button onClick={handleStartEndDay} disabled={isTodayClosedOut}>
-                        <FileSignature className="mr-2 h-4 w-4" />
-                        {isTodayClosedOut ? 'Day Already Closed' : 'Start End-of-Day'}
+            <div className="px-3 py-2 md:p-4 bg-background">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
+                    <h1 className="text-lg md:text-xl font-bold">Accounting</h1>
+                    <Button onClick={handleStartEndDay} disabled={isTodayClosedOut} size="sm" className="h-8 text-xs md:text-sm">
+                        <FileSignature className="mr-1.5 h-3.5 w-3.5" />
+                        {isTodayClosedOut ? 'Day Closed' : 'End-of-Day'}
                     </Button>
                 </div>
             </div>
-            <Tabs defaultValue="summary" className="flex-1 flex flex-col overflow-hidden px-4 md:px-6">
-                <TabsList className="grid w-full grid-cols-2 mx-auto max-w-sm">
-                    <TabsTrigger value="summary">Financial Summary</TabsTrigger>
-                    <TabsTrigger value="history">History</TabsTrigger>
+            <Tabs defaultValue="summary" className="flex-1 flex flex-col overflow-hidden px-3 md:px-4">
+                <TabsList className="grid w-full grid-cols-2 mx-auto max-w-xs h-8">
+                    <TabsTrigger value="summary" className="text-xs">Summary</TabsTrigger>
+                    <TabsTrigger value="history" className="text-xs">History</TabsTrigger>
                 </TabsList>
                 <TabsContent value="summary" className="flex-1 overflow-hidden mt-4">
                     {loading ? <LoadingSpinner /> : error ? (
@@ -935,16 +946,16 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                             <AlertDescription>{error}</AlertDescription>
                         </Alert>
                     ) : stats ? (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                <div className="lg:col-span-2 space-y-6">
+                        <div className="space-y-4 md:space-y-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
+                                <div className="lg:col-span-2 space-y-3 md:space-y-4">
                                     <Card>
-                                        <CardHeader>
-                                            <CardTitle>Financial Summary</CardTitle>
-                                            <CardDescription>Daily financial data for {format(new Date(), "EEEE, MMMM dd, yyyy")}</CardDescription>
+                                        <CardHeader className="p-3 md:p-4">
+                                            <CardTitle className="text-base md:text-lg">Financial Summary</CardTitle>
+                                            <CardDescription className="text-xs">{format(new Date(), "EEEE, MMM dd, yyyy")}</CardDescription>
                                         </CardHeader>
-                                        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <StatCard icon={<DollarSign className="text-muted-foreground" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold from completed orders`} />
+                                        <CardContent className="grid grid-cols-2 gap-2 md:gap-3 p-3 md:p-4 pt-0">
+                                            <StatCard icon={<DollarSign className="text-muted-foreground h-4 w-4" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalItemsSold} items sold`} />
                                             <Card>
                                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                                     <CardTitle className="text-sm font-medium">Cash Sales</CardTitle>

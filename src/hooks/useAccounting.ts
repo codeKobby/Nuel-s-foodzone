@@ -86,8 +86,11 @@ export const useAccounting = () => {
               if (isTodayOrder) {
                 todayOrders.push(order);
 
+                const reward = order.rewardDiscount || 0;
+                const orderNetTotal = (order.total || 0) - reward;
+
                 if (order.status === "Completed") {
-                  totalSales += order.total;
+                  totalSales += orderNetTotal;
                   order.items.forEach((item) => {
                     totalItemsSold += item.quantity;
                     itemStats[item.name] = {
@@ -130,14 +133,13 @@ export const useAccounting = () => {
                     ) {
                       momoPaid += paymentAmount;
                     }
-                    if (!isTodayOrder) {
-                      settledUnpaidOrdersValue += paymentAmount;
-                    }
                   }
                 });
                 if (isTodayOrder) {
-                  cashSales += Math.min(order.total, cashPaid);
-                  momoSales += Math.min(order.total, momoPaid);
+                  const reward = order.rewardDiscount || 0;
+                  const orderNetTotal = (order.total || 0) - reward;
+                  cashSales += Math.min(orderNetTotal, cashPaid);
+                  momoSales += Math.min(orderNetTotal, momoPaid);
                 }
               } else {
                 const paymentDate = order.lastPaymentTimestamp?.toDate(); // Fallback for old orders
@@ -152,15 +154,17 @@ export const useAccounting = () => {
 
                   // Only add to momo/cash sales if order was created today
                   if (isTodayOrder && order.paymentBreakdown) {
+                    const reward = order.rewardDiscount || 0;
+                    const orderNetTotal = (order.total || 0) - reward;
                     if (order.paymentBreakdown.cash) {
                       cashSales += Math.min(
-                        order.total,
+                        orderNetTotal,
                         order.paymentBreakdown.cash
                       );
                     }
                     if (order.paymentBreakdown.momo) {
                       momoSales += Math.min(
-                        order.total,
+                        orderNetTotal,
                         order.paymentBreakdown.momo
                       );
                     }
