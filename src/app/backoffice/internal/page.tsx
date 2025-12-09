@@ -349,15 +349,15 @@ function CafePage() {
     const ViewContainer = () => {
         if (activeView === 'pos') {
             return (
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                     {renderActiveView()}
                 </div>
             );
         }
         return (
-            <div className="flex-1 overflow-y-auto px-4 py-4 md:px-8">
-                <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/40">
-                    <div className="flex-1 overflow-y-auto rounded-2xl bg-background/70 p-2 md:p-4">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 md:px-6 md:py-4 lg:px-8">
+                <div className="flex h-full flex-col overflow-hidden rounded-xl md:rounded-2xl border border-border/60 bg-card/40">
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden rounded-xl md:rounded-2xl bg-background/70 p-3 md:p-4 lg:p-6">
                         {renderActiveView()}
                     </div>
                 </div>
@@ -366,7 +366,7 @@ function CafePage() {
     };
 
     const MainContent = () => (
-        <div className="flex h-dvh min-h-dvh bg-secondary/40 dark:bg-background font-body text-foreground">
+        <div className="flex h-dvh min-h-dvh max-h-dvh bg-secondary/40 dark:bg-background font-body text-foreground overflow-hidden">
             <Sidebar
                 activeView={activeView}
                 setActiveView={setActiveView}
@@ -377,7 +377,7 @@ function CafePage() {
                 role={role}
                 onLogout={handleLogout}
             />
-            <main className="flex-1 flex flex-col overflow-hidden">
+            <main className="flex-1 flex flex-col overflow-hidden min-w-0">
                 <BackofficeHeader
                     role={role}
                     theme={theme}
@@ -391,7 +391,7 @@ function CafePage() {
     );
 
     const MobileContent = () => (
-        <div className="h-dvh min-h-dvh flex flex-col bg-secondary/40 dark:bg-background font-body text-foreground safe-bottom">
+        <div className="h-dvh min-h-dvh max-h-dvh flex flex-col bg-secondary/40 dark:bg-background font-body text-foreground overflow-hidden safe-bottom">
             <MobileNav
                 activeView={activeView}
                 setActiveView={setActiveView}
@@ -402,7 +402,7 @@ function CafePage() {
                 role={role}
                 onLogout={handleLogout}
             />
-            <main className="flex-1 flex flex-col overflow-hidden">
+            <main className="flex-1 flex flex-col overflow-hidden min-h-0">
                 <BackofficeHeader
                     role={role}
                     theme={theme}

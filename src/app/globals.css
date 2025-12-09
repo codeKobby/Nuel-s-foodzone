@@ -135,3 +135,91 @@
 .dark .markdown-content th {
   @apply bg-secondary;
 }
+
+/* Enhanced overflow handling utilities */
+.overflow-wrap-anywhere {
+  overflow-wrap: anywhere;
+}
+
+/* Improved responsive grid utilities */
+.responsive-grid {
+  @apply grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+}
+
+/* Better card hover states */
+.interactive-card {
+  @apply transition-all duration-200 hover:shadow-md hover:border-primary/30 active:scale-[0.98];
+}
+
+/* Consistent section padding */
+.section-padding {
+  @apply px-3 py-3 md:px-4 md:py-4 lg:px-6 lg:py-5;
+}
+
+/* Improved focus states for accessibility */
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+}
+
+/* Sticky header pattern */
+.sticky-header {
+  @apply sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60;
+}
+
+/* Flex container with proper overflow */
+.flex-container {
+  @apply flex flex-col h-full overflow-hidden;
+}
+
+/* Scrollable content area */
+.scroll-content {
+  @apply flex-1 overflow-y-auto overflow-x-hidden;
+}
+
+/* Fixed bottom action bar for mobile */
+.mobile-action-bar {
+  @apply fixed bottom-0 left-0 right-0 z-50 bg-card border-t p-3 safe-bottom;
+}
+
+/* Touch-friendly button sizes */
+.touch-target {
+  @apply min-h-[44px] min-w-[44px];
+}
+
+/* Responsive text utilities */
+.text-responsive {
+  @apply text-sm md:text-base;
+}
+
+.text-responsive-lg {
+  @apply text-base md:text-lg lg:text-xl;
+}
+
+.text-responsive-xl {
+  @apply text-lg md:text-xl lg:text-2xl;
+}
+
+/* Card grid with responsive gaps */
+.card-grid {
+  @apply grid gap-2 sm:gap-3 md:gap-4;
+}
+
+/* Improved table scrolling on mobile */
+.table-scroll {
+  @apply overflow-x-auto -mx-3 px-3 md:mx-0 md:px-0;
+}
+
+/* Better modal sizing */
+.modal-responsive {
+  @apply w-[95vw] max-w-lg sm:max-w-xl md:max-w-2xl;
+}
+
+/* Consistent badge sizing */
+.badge-sm {
+  @apply text-[10px] px-1.5 py-0.5;
+}
+
+/* Loading overlay */
+.loading-overlay {
+  @apply absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-50;
+}

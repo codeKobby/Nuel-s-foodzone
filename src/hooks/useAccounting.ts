@@ -54,6 +54,8 @@ export const useAccounting = () => {
             let totalPardonedAmount = 0,
               changeOwedForPeriod = 0;
             let settledUnpaidOrdersValue = 0,
+              settledUnpaidCash = 0,
+              settledUnpaidMomo = 0,
               previousDaysChangeGiven = 0;
             let totalRewardDiscount = 0;
 
@@ -127,11 +129,21 @@ export const useAccounting = () => {
                     const paymentAmount = payment.amount || 0;
                     if (payment.method === "cash") {
                       cashPaid += paymentAmount;
+                      // Track collections from previous days by payment method
+                      if (!isTodayOrder) {
+                        settledUnpaidCash += paymentAmount;
+                        settledUnpaidOrdersValue += paymentAmount;
+                      }
                     } else if (
                       payment.method === "momo" ||
                       payment.method === "card"
                     ) {
                       momoPaid += paymentAmount;
+                      // Track collections from previous days by payment method
+                      if (!isTodayOrder) {
+                        settledUnpaidMomo += paymentAmount;
+                        settledUnpaidOrdersValue += paymentAmount;
+                      }
                     }
                   }
                 });
@@ -170,8 +182,28 @@ export const useAccounting = () => {
                     }
                   }
 
+                  // Track settlements from previous days by payment method
                   if (!isTodayOrder) {
                     settledUnpaidOrdersValue += amountPaidTowardsOrder;
+                    // Determine method for this payment (best-effort for legacy orders)
+                    if (order.paymentBreakdown) {
+                      if (order.paymentBreakdown.cash) {
+                        settledUnpaidCash += order.paymentBreakdown.cash;
+                      }
+                      if (order.paymentBreakdown.momo) {
+                        settledUnpaidMomo += order.paymentBreakdown.momo;
+                      }
+                    } else if (order.paymentMethod === "cash") {
+                      settledUnpaidCash += amountPaidTowardsOrder;
+                    } else if (
+                      order.paymentMethod === "momo" ||
+                      order.paymentMethod === "card"
+                    ) {
+                      settledUnpaidMomo += amountPaidTowardsOrder;
+                    } else {
+                      // If unknown, assume cash for safety
+                      settledUnpaidCash += amountPaidTowardsOrder;
+                    }
                   }
                 }
               }
@@ -210,17 +242,22 @@ export const useAccounting = () => {
             const allTimeUnpaidOrdersValue =
               previousUnpaidOrdersValue + todayUnpaidOrdersValue;
 
+            // expectedCash includes only cash collections from previous days
             const expectedCash =
               cashSales -
               miscCashExpenses +
-              settledUnpaidOrdersValue -
+              settledUnpaidCash -
               previousDaysChangeGiven;
-            const expectedMomo = momoSales - miscMomoExpenses;
+            // expectedMomo includes only momo collections from previous days
+            const expectedMomo =
+              momoSales - miscMomoExpenses + settledUnpaidMomo;
+            // netRevenue: reward discount is already subtracted from orderNetTotal when calculating sales,
+            // so we don't subtract totalRewardDiscount again to avoid double-counting
             const netRevenue =
               cashSales +
-              momoSales -
-              (miscCashExpenses + miscMomoExpenses) -
-              totalRewardDiscount;
+              momoSales +
+              settledUnpaidOrdersValue -
+              (miscCashExpenses + miscMomoExpenses);
 
             setStats({
               totalSales,
@@ -238,6 +275,8 @@ export const useAccounting = () => {
               totalPardonedAmount,
               changeOwedForPeriod,
               settledUnpaidOrdersValue,
+              settledUnpaidCash,
+              settledUnpaidMomo,
               previousDaysChangeGiven,
               totalRewardDiscount,
               orders: todayOrders,
@@ -291,9 +330,17 @@ export const useAccounting = () => {
   const adjustedExpectedCash = useMemo(() => {
     if (!stats) return 0;
     let expected = stats.cashSales;
-    expected += stats.settledUnpaidOrdersValue;
+    expected += stats.settledUnpaidCash; // Only cash collections from previous days
     expected -= stats.miscCashExpenses;
     expected -= stats.previousDaysChangeGiven;
+    return expected;
+  }, [stats]);
+
+  const adjustedExpectedMomo = useMemo(() => {
+    if (!stats) return 0;
+    let expected = stats.momoSales;
+    expected += stats.settledUnpaidMomo; // Only momo collections from previous days
+    expected -= stats.miscMomoExpenses;
     return expected;
   }, [stats]);
 
@@ -304,5 +351,6 @@ export const useAccounting = () => {
     error,
     isTodayClosedOut,
     adjustedExpectedCash,
+    adjustedExpectedMomo,
   };
 };

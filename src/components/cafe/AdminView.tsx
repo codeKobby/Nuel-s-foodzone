@@ -279,16 +279,16 @@ const AdminView: React.FC = () => {
     const isDrinkCategory = (category: string) => ['Drinks', 'Breakfast Drinks'].includes(category);
 
     return (
-        <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
-            <div className="flex-1 p-4 md:p-6 overflow-y-auto">
-                <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
-                    <h2 className="text-2xl md:text-3xl font-bold">Admin Panel</h2>
+        <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background overflow-hidden">
+            <div className="flex-1 p-3 md:p-4 lg:p-6 overflow-y-auto overflow-x-hidden">
+                <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 md:mb-6 gap-3 md:gap-4">
+                    <h2 className="text-xl md:text-2xl lg:text-3xl font-bold truncate">Admin Panel</h2>
                     <div className="flex gap-2">
-                        <div className="relative flex-grow">
+                        <div className="relative flex-grow min-w-0">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search menu..."
-                                className="pl-10"
+                                className="pl-10 h-9"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -297,13 +297,13 @@ const AdminView: React.FC = () => {
                             <>
                                 <Sheet open={isMenuSheetOpen} onOpenChange={(open) => { setIsMenuSheetOpen(open); if (!open) clearForm(); }}>
                                     <SheetTrigger asChild>
-                                        <Button size="icon" className="flex-shrink-0" title="Add item" aria-label="Add item"><PlusCircle /></Button>
+                                        <Button size="icon" className="flex-shrink-0 h-9 w-9" title="Add item" aria-label="Add item"><PlusCircle className="h-5 w-5" /></Button>
                                     </SheetTrigger>
-                                    <SheetContent side="bottom" className="h-[85vh]">
-                                        <SheetHeader>
-                                            <SheetTitle className="text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</SheetTitle>
+                                    <SheetContent side="bottom" className="h-[85vh] overflow-hidden flex flex-col">
+                                        <SheetHeader className="flex-shrink-0">
+                                            <SheetTitle className="text-xl md:text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</SheetTitle>
                                         </SheetHeader>
-                                        <div className="p-4 overflow-y-auto">
+                                        <div className="p-4 overflow-y-auto flex-1">
                                             <AdminForm
                                                 editingItem={editingItem}
                                                 formState={formState}
@@ -316,13 +316,13 @@ const AdminView: React.FC = () => {
                                 </Sheet>
                                 <Sheet open={isSecuritySheetOpen} onOpenChange={setIsSecuritySheetOpen}>
                                     <SheetTrigger asChild>
-                                        <Button size="icon" variant="outline" className="flex-shrink-0" title="Security settings" aria-label="Open security settings"><ShieldCheck /></Button>
+                                        <Button size="icon" variant="outline" className="flex-shrink-0 h-9 w-9" title="Security settings" aria-label="Open security settings"><ShieldCheck className="h-5 w-5" /></Button>
                                     </SheetTrigger>
-                                    <SheetContent side="bottom" className="h-auto">
-                                        <SheetHeader>
-                                            <SheetTitle className="text-2xl">Security</SheetTitle>
+                                    <SheetContent side="bottom" className="h-auto max-h-[85vh] overflow-hidden flex flex-col">
+                                        <SheetHeader className="flex-shrink-0">
+                                            <SheetTitle className="text-xl md:text-2xl">Security</SheetTitle>
                                         </SheetHeader>
-                                        <div className="p-4 overflow-y-auto">
+                                        <div className="p-4 overflow-y-auto flex-1">
                                             <SecuritySettings />
                                         </div>
                                     </SheetContent>
@@ -335,18 +335,18 @@ const AdminView: React.FC = () => {
                 {loading && <LoadingSpinner />}
                 {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
                 {!loading && !error && (
-                    <div className="space-y-6">
+                    <div className="space-y-4 md:space-y-6">
                         {groupedMenu.map(({ category, items }) => (
                             <Card key={category}>
-                                <CardHeader className="p-4 md:p-6">
-                                    <CardTitle>{category}</CardTitle>
+                                <CardHeader className="p-3 md:p-4 lg:p-6">
+                                    <CardTitle className="text-base md:text-lg">{category}</CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-2 p-4 md:p-6 pt-0">
+                                <CardContent className="space-y-2 p-3 md:p-4 lg:p-6 pt-0">
                                     {items.map(item => (
-                                        <div key={item.id} className="bg-secondary p-3 rounded-lg flex justify-between items-center">
-                                            <div>
-                                                <p className="font-semibold text-sm">{item.name}</p>
-                                                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                        <div key={item.id} className="bg-secondary p-2 md:p-3 rounded-lg flex justify-between items-center gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-semibold text-sm truncate">{item.name}</p>
+                                                <div className="text-xs md:text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
                                                     <span>{formatCurrency(item.price)}</span>
                                                     {isDrinkCategory(category) && (
                                                         <>
@@ -361,9 +361,9 @@ const AdminView: React.FC = () => {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="flex space-x-1">
-                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(item)} title="Edit item" aria-label="Edit item"><Edit className="h-4 w-4 text-blue-500" /></Button>
-                                                <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(item)} title="Delete item" aria-label="Delete item"><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                            <div className="flex space-x-1 flex-shrink-0">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(item)} title="Edit item" aria-label="Edit item"><Edit className="h-4 w-4 text-blue-500" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowDeleteConfirm(item)} title="Delete item" aria-label="Delete item"><Trash2 className="h-4 w-4 text-red-500" /></Button>
                                             </div>
                                         </div>
                                     ))}
@@ -375,17 +375,17 @@ const AdminView: React.FC = () => {
             </div>
 
             {!isMobile && (
-                <Card className="w-full md:w-80 lg:w-96 rounded-none border-t md:border-t-0 md:border-l flex flex-col">
-                    <Tabs defaultValue="menu" className="w-full flex flex-col flex-grow">
-                        <TabsList className="grid w-full grid-cols-2">
+                <Card className="w-full md:w-72 lg:w-80 xl:w-96 rounded-none border-t md:border-t-0 md:border-l flex flex-col flex-shrink-0 overflow-hidden">
+                    <Tabs defaultValue="menu" className="w-full flex flex-col flex-grow overflow-hidden">
+                        <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
                             <TabsTrigger value="menu">Menu</TabsTrigger>
                             <TabsTrigger value="security">Security</TabsTrigger>
                         </TabsList>
-                        <TabsContent value="menu" className="flex-grow">
-                            <CardHeader>
-                                <CardTitle className="text-xl md:text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</CardTitle>
+                        <TabsContent value="menu" className="flex-grow overflow-y-auto data-[state=inactive]:hidden">
+                            <CardHeader className="p-4 lg:p-6">
+                                <CardTitle className="text-lg lg:text-xl xl:text-2xl">{editingItem ? 'Edit Item' : 'Add New Item'}</CardTitle>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="p-4 lg:p-6 pt-0">
                                 <AdminForm
                                     editingItem={editingItem}
                                     formState={formState}
@@ -395,18 +395,18 @@ const AdminView: React.FC = () => {
                                 />
                                 <div className="mt-4 pt-4 border-t">
                                     <Button variant="outline" className="w-full" onClick={handleSyncInitialMenu} disabled={isSyncing}>
-                                        {isSyncing ? <><RefreshCw className="mr-2 animate-spin" /> Syncing...</> : <><RefreshCw className="mr-2" />Sync Initial Menu</>}
+                                        {isSyncing ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Syncing...</> : <><RefreshCw className="mr-2 h-4 w-4" />Sync Initial Menu</>}
                                     </Button>
                                     <p className="text-xs text-muted-foreground mt-2">Adds any missing default menu items to your database. This will not overwrite any changes you have made.</p>
                                 </div>
                             </CardContent>
                         </TabsContent>
-                        <TabsContent value="security" className="flex-grow">
-                            <CardHeader>
-                                <CardTitle className="text-xl md:text-2xl flex items-center"><ShieldCheck className="mr-2" /> Security Settings</CardTitle>
+                        <TabsContent value="security" className="flex-grow overflow-y-auto data-[state=inactive]:hidden">
+                            <CardHeader className="p-4 lg:p-6">
+                                <CardTitle className="text-lg lg:text-xl xl:text-2xl flex items-center"><ShieldCheck className="mr-2 h-5 w-5" /> Security Settings</CardTitle>
                                 <CardDescription>Update your account password.</CardDescription>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="p-4 lg:p-6 pt-0">
                                 <SecuritySettings />
                             </CardContent>
                         </TabsContent>

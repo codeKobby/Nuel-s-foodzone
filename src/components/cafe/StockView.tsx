@@ -253,14 +253,14 @@ const StockItemCard: React.FC<{ item: MenuItem, onUpdate: (itemId: string, newSt
 
 const StatsCard: React.FC<{ icon: React.ElementType, label: string, value: number | string, color?: string, alert?: boolean }> = ({ icon: Icon, label, value, color = "text-primary", alert }) => (
   <Card className={alert ? 'border-2' : ''}>
-    <CardContent className="p-4">
-      <div className="flex items-center gap-3">
-        <div className={`p-2.5 rounded-lg bg-secondary ${color}`}>
-          <Icon className="h-5 w-5" />
+    <CardContent className="p-3 md:p-4">
+      <div className="flex items-center gap-2 md:gap-3">
+        <div className={`p-2 md:p-2.5 rounded-lg bg-secondary ${color}`}>
+          <Icon className="h-4 w-4 md:h-5 md:w-5" />
         </div>
-        <div>
-          <p className="text-2xl font-bold">{value}</p>
-          <p className="text-sm text-muted-foreground">{label}</p>
+        <div className="min-w-0">
+          <p className="text-lg md:text-2xl font-bold">{value}</p>
+          <p className="text-xs md:text-sm text-muted-foreground truncate">{label}</p>
         </div>
       </div>
     </CardContent>
@@ -421,55 +421,55 @@ const StockView = () => {
   }, [drinkItems, searchQuery, filterView]);
 
   return (
-    <div className="bg-background p-4 md:p-6 h-full overflow-y-auto">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="bg-background h-full overflow-y-auto overflow-x-hidden">
+      <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex flex-col lg:flex-row justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Fridge Stock Monitor</h1>
-            <div className="flex items-center gap-4 flex-wrap">
-              <p className="text-muted-foreground">
+        <div className="flex flex-col lg:flex-row justify-between gap-3 lg:gap-4">
+          <div className="min-w-0">
+            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold mb-1 md:mb-2 truncate">Fridge Stock Monitor</h1>
+            <div className="flex items-center gap-2 md:gap-4 flex-wrap">
+              <p className="text-xs md:text-sm text-muted-foreground">
                 Real-time drink inventory tracking
               </p>
               <div className="flex items-center gap-2">
                 {connectionStatus.isConnected ? (
                   <>
-                    <Wifi className="h-4 w-4 text-green-500" />
-                    <span className="text-xs text-green-600 dark:text-green-400">
+                    <Wifi className="h-3 w-3 md:h-4 md:w-4 text-green-500" />
+                    <span className="text-[10px] md:text-xs text-green-600 dark:text-green-400">
                       Live • {connectionStatus.lastSync.toLocaleTimeString()}
                     </span>
                   </>
                 ) : (
                   <>
-                    <WifiOff className="h-4 w-4 text-red-500" />
-                    <span className="text-xs text-red-600">Offline</span>
+                    <WifiOff className="h-3 w-3 md:h-4 md:w-4 text-red-500" />
+                    <span className="text-[10px] md:text-xs text-red-600">Offline</span>
                   </>
                 )}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
+          <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+            <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg border bg-card">
               {notificationsEnabled ? (
-                <Bell className="h-4 w-4 text-primary" />
+                <Bell className="h-3 w-3 md:h-4 md:w-4 text-primary" />
               ) : (
-                <BellOff className="h-4 w-4 text-muted-foreground" />
+                <BellOff className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
               )}
-              <span className="text-sm font-medium">Alerts</span>
+              <span className="text-xs md:text-sm font-medium hidden sm:inline">Alerts</span>
               <Switch 
                 checked={notificationsEnabled}
                 onCheckedChange={toggleNotifications}
               />
             </div>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
+            <Button variant="outline" size="sm" className="h-8 md:h-9" onClick={() => window.location.reload()}>
+              <RefreshCw className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+              <span className="hidden md:inline">Refresh</span>
             </Button>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
           <StatsCard
             icon={Package}
             label="Total Drinks"

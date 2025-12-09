@@ -106,38 +106,38 @@ const CustomerCard = ({ reward, onAddBags, onRedeemDiscount, updatingCustomerId,
 
     return (
         <Card className="hover:shadow-md transition-shadow duration-200">
-            <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
+            <CardContent className="p-4 md:p-6">
+                <div className="flex items-start justify-between mb-3 md:mb-4">
+                    <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                            <User className="h-5 w-5 text-primary" />
-                            <h3 className="font-semibold text-lg">{reward.customerTag}</h3>
+                            <User className="h-4 w-4 md:h-5 md:w-5 text-primary flex-shrink-0" />
+                            <h3 className="font-semibold text-base md:text-lg truncate">{reward.customerTag}</h3>
                             {completedRewards > 0 && (
-                                <Badge variant="secondary" className="ml-2">
+                                <Badge variant="secondary" className="ml-1 flex-shrink-0 text-xs">
                                     <Trophy className="h-3 w-3 mr-1" />
-                                    {completedRewards}x Rewards
+                                    {completedRewards}x
                                 </Badge>
                             )}
                         </div>
                         {reward.phone && (
-                            <p className="text-sm text-muted-foreground mb-2">{reward.phone}</p>
+                            <p className="text-xs md:text-sm text-muted-foreground mb-2 truncate">{reward.phone}</p>
                         )}
-                        <div className="flex items-center gap-4 mb-3">
-                            <div className="flex items-center gap-1.5">
-                                <Package className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm font-medium">{reward.bagCount} bags returned</span>
+                        <div className="flex items-center gap-2 md:gap-4 mb-2 md:mb-3 flex-wrap">
+                            <div className="flex items-center gap-1 md:gap-1.5">
+                                <Package className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
+                                <span className="text-xs md:text-sm font-medium">{reward.bagCount} bags</span>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                                <Clock className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">
-                                    Joined {reward.joinedDate ? reward.joinedDate.toDate().toLocaleDateString() : ''}
+                            <div className="flex items-center gap-1 md:gap-1.5">
+                                <Clock className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
+                                <span className="text-xs md:text-sm text-muted-foreground">
+                                    {reward.joinedDate ? reward.joinedDate.toDate().toLocaleDateString() : ''}
                                 </span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-3 md:mb-4">
                     <RewardProgressBar bagCount={reward.bagCount} />
                 </div>
 
@@ -253,17 +253,17 @@ const StatsCards = ({ rewards }: { rewards: CustomerReward[] }) => {
     ];
 
     return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">
             {stats.map((stat, index) => (
                 <Card key={index}>
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-full bg-secondary ${stat.color}`}>
-                                <stat.icon className="h-4 w-4" />
+                    <CardContent className="p-3 md:p-4">
+                        <div className="flex items-center gap-2 md:gap-3">
+                            <div className={`p-1.5 md:p-2 rounded-full bg-secondary ${stat.color} flex-shrink-0`}>
+                                <stat.icon className="h-3 w-3 md:h-4 md:w-4" />
                             </div>
-                            <div>
-                                <p className="text-2xl font-bold">{stat.value}</p>
-                                <p className="text-xs text-muted-foreground">{stat.label}</p>
+                            <div className="min-w-0">
+                                <p className="text-lg md:text-2xl font-bold truncate">{stat.value}</p>
+                                <p className="text-[10px] md:text-xs text-muted-foreground truncate">{stat.label}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -404,25 +404,26 @@ const RewardsView = () => {
     const eligibleCustomersCount = useMemo(() => rewards.filter(r => Math.floor(r.bagCount / 5) > 0).length, [rewards]);
 
     return (
-        <div className="bg-background p-4 md:p-6">
+        <div className="h-full overflow-y-auto overflow-x-hidden bg-background p-3 md:p-4 lg:p-6">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold">Customer Rewards</h1>
-                        <p className="text-muted-foreground">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4 mb-4 md:mb-6">
+                    <div className="min-w-0">
+                        <h1 className="text-xl md:text-2xl lg:text-3xl font-bold truncate">Customer Rewards</h1>
+                        <p className="text-sm md:text-base text-muted-foreground">
                             Track bag returns • 5 bags = {formatCurrency(10)} discount
                         </p>
                     </div>
 
                     <Sheet open={isAddSheetOpen} onOpenChange={setIsAddSheetOpen}>
                         <SheetTrigger asChild>
-                            <Button>
+                            <Button className="flex-shrink-0">
                                 <UserPlus className="h-4 w-4 mr-2" />
-                                Add Customer
+                                <span className="hidden sm:inline">Add Customer</span>
+                                <span className="sm:hidden">Add</span>
                             </Button>
                         </SheetTrigger>
-                        <SheetContent side="right" className="w-full sm:max-w-md">
+                        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
                             <SheetHeader>
                                 <SheetTitle>Add New Customer</SheetTitle>
                             </SheetHeader>
@@ -446,22 +447,22 @@ const RewardsView = () => {
                 <StatsCards rewards={rewards} />
 
                 {/* Search and Filters */}
-                <Card className="mb-6">
-                    <CardContent className="p-6">
-                        <div className="flex flex-col lg:flex-row gap-4">
-                            <div className="flex-1 relative">
+                <Card className="mb-4 md:mb-6">
+                    <CardContent className="p-3 md:p-4 lg:p-6">
+                        <div className="flex flex-col lg:flex-row gap-3 md:gap-4">
+                            <div className="flex-1 relative min-w-0">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                    placeholder="Search by name or phone number..."
+                                    placeholder="Search by name or phone..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-10"
+                                    className="pl-10 h-9"
                                 />
                             </div>
-                            <Tabs value={activeTab} onValueChange={setActiveTab}>
-                                <TabsList>
-                                    <TabsTrigger value="all">All Customers</TabsTrigger>
-                                    <TabsTrigger value="eligible">
+                            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-shrink-0">
+                                <TabsList className="h-9">
+                                    <TabsTrigger value="all" className="text-xs md:text-sm">All</TabsTrigger>
+                                    <TabsTrigger value="eligible" className="text-xs md:text-sm">
                                         Eligible ({eligibleCustomersCount})
                                     </TabsTrigger>
                                 </TabsList>

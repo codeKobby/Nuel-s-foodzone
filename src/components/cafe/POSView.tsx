@@ -200,22 +200,22 @@ const POSView: React.FC<{ setActiveView: (view: string) => void }> = ({ setActiv
     return (
         <div className="flex h-full overflow-hidden bg-background">
             {/* Left Pane (Menu) */}
-            <div className="flex-1 flex flex-col overflow-hidden relative">
+            <div className="flex-1 flex flex-col overflow-hidden relative min-w-0">
                 {/* Header & Search (Compact Sticky) */}
-                <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10 border-b px-3 py-2 md:px-4 md:py-3">
-                    <header className="mb-1.5 flex justify-between items-center">
-                        <div className="min-w-0">
+                <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10 border-b px-3 py-2 md:px-4 md:py-3 flex-shrink-0">
+                    <header className="mb-1.5 flex justify-between items-center gap-2">
+                        <div className="min-w-0 flex-1">
                             <h1 className="text-base md:text-lg font-bold leading-none truncate">{editingOrder ? 'Editing Order' : 'Menu'}</h1>
                             {editingOrder && <p className="text-[10px] text-muted-foreground truncate">ID: {editingOrder.simplifiedId}</p>}
                         </div>
                         {editingOrder && (
-                            <Button variant="destructive" size="sm" className="h-7 text-xs ml-2 flex-shrink-0" onClick={handleClearOrder}>Cancel</Button>
+                            <Button variant="destructive" size="sm" className="h-7 text-xs flex-shrink-0" onClick={handleClearOrder}>Cancel</Button>
                         )}
                     </header>
 
                     <div className="space-y-1.5">
                         <div className="flex gap-1.5">
-                            <div className="relative flex-grow">
+                            <div className="relative flex-grow min-w-0">
                                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
                                 <Input
                                     type="text"
@@ -223,7 +223,7 @@ const POSView: React.FC<{ setActiveView: (view: string) => void }> = ({ setActiv
                                     value={searchQuery}
                                     onClick={(e) => e.currentTarget.select()}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full h-8 text-sm bg-secondary/50 border-transparent focus:bg-background focus:border-primary rounded-md pl-8"
+                                    className="w-full h-8 text-sm bg-secondary/50 border-transparent focus:bg-background focus:border-primary rounded-md pl-8 pr-8"
                                 />
                                 {searchQuery && (
                                     <Button
@@ -245,14 +245,14 @@ const POSView: React.FC<{ setActiveView: (view: string) => void }> = ({ setActiv
                                 <PlusCircle size={14} className="md:mr-1.5" /> <span className="hidden md:inline text-xs">Custom</span>
                             </Button>
                         </div>
-                        <div className="flex space-x-1.5 overflow-x-auto pb-1 no-scrollbar -mx-3 px-3">
+                        <div className="flex space-x-1.5 overflow-x-auto pb-1 no-scrollbar -mx-3 px-3 scroll-container">
                             {categories.map(category => (
                                 <Button
                                     key={category}
                                     onClick={() => setActiveCategory(category)}
                                     variant={activeCategory === category ? 'default' : 'secondary'}
                                     size="sm"
-                                    className="flex-shrink-0 rounded-full px-3 h-6 text-[10px] md:text-xs"
+                                    className="flex-shrink-0 rounded-full px-3 h-6 text-[10px] md:text-xs whitespace-nowrap"
                                 >
                                     {category}
                                 </Button>
@@ -262,19 +262,19 @@ const POSView: React.FC<{ setActiveView: (view: string) => void }> = ({ setActiv
                 </div>
 
                 {/* Menu Grid */}
-                <div className="flex-1 overflow-y-auto p-2 md:p-4">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 md:p-4 min-h-0">
                     {loading && <div className="mt-8"><LoadingSpinner /></div>}
                     {error && <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
 
                     {!loading && !error && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5 md:gap-2 pb-16 md:pb-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-1.5 md:gap-2 pb-20 md:pb-4">
                             {filteredItems.map(item => (
                                 <button
                                     key={item.id}
                                     onClick={() => handleAddToOrder(item)}
-                                    className="flex flex-col justify-between p-2 md:p-3 h-20 md:h-24 bg-card border rounded-lg transition-all text-left shadow-sm hover:shadow-md active:scale-[0.98] hover:border-primary hover:ring-1 hover:ring-primary/50"
+                                    className="flex flex-col justify-between p-2 md:p-3 h-[72px] md:h-24 bg-card border rounded-lg transition-all text-left shadow-sm hover:shadow-md active:scale-[0.98] hover:border-primary hover:ring-1 hover:ring-primary/50 overflow-hidden"
                                 >
-                                    <span className="font-semibold text-xs md:text-sm leading-tight line-clamp-2 text-foreground">{item.name}</span>
+                                    <span className="font-semibold text-[11px] md:text-sm leading-tight line-clamp-2 text-foreground break-words">{item.name}</span>
                                     <span className="font-mono text-primary text-xs md:text-sm font-semibold">{formatCurrency(item.price)}</span>
                                 </button>
                             ))}
@@ -284,11 +284,11 @@ const POSView: React.FC<{ setActiveView: (view: string) => void }> = ({ setActiv
             </div>
 
             {/* Right Pane (Cart) */}
-            <div className="hidden md:flex w-[300px] lg:w-[350px] xl:w-[400px] border-l bg-background flex-col h-full">
-                <div className="p-3 border-b">
+            <div className="hidden md:flex w-[280px] lg:w-[320px] xl:w-[380px] border-l bg-background flex-col h-full flex-shrink-0">
+                <div className="p-3 border-b flex-shrink-0">
                     <h2 className="text-base font-bold">Current Order</h2>
                 </div>
-                <div className="flex-grow flex flex-col overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                     <OrderCart
                         currentOrder={currentOrder}
                         total={total}
@@ -305,7 +305,7 @@ const POSView: React.FC<{ setActiveView: (view: string) => void }> = ({ setActiv
             <div className="md:hidden">
                 <Sheet open={isCartSheetOpen} onOpenChange={setIsCartSheetOpen}>
                     <SheetTrigger asChild>
-                        <div className="fixed bottom-0 left-0 right-0 bg-primary text-primary-foreground px-3 py-2.5 flex justify-between items-center z-50 cursor-pointer shadow-[0_-2px_8px_rgba(0,0,0,0.15)] safe-bottom">
+                        <div className="fixed bottom-0 left-0 right-0 bg-primary text-primary-foreground px-3 py-2.5 flex justify-between items-center z-50 cursor-pointer shadow-[0_-2px_8px_rgba(0,0,0,0.15)] safe-bottom touch-target">
                             <span className="font-medium text-sm flex items-center gap-1.5">
                                 View Order
                                 <span className="bg-primary-foreground/20 px-2 py-0.5 rounded-full text-xs">
@@ -315,11 +315,11 @@ const POSView: React.FC<{ setActiveView: (view: string) => void }> = ({ setActiv
                             <span className="font-bold text-base">{formatCurrency(total)}</span>
                         </div>
                     </SheetTrigger>
-                    <SheetContent side="bottom" className="flex flex-col h-[85dvh] max-h-[85dvh] rounded-t-2xl">
+                    <SheetContent side="bottom" className="flex flex-col h-[85dvh] max-h-[85dvh] rounded-t-2xl overflow-hidden">
                         <SheetHeader className="p-3 border-b flex-shrink-0">
                             <SheetTitle className="text-lg">{editingOrder ? 'Editing Order' : 'Current Order'}</SheetTitle>
                         </SheetHeader>
-                        <div className="flex-grow overflow-y-auto min-h-0">
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
                             <OrderCart
                                 currentOrder={currentOrder}
                                 total={total}

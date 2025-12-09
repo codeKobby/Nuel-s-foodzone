@@ -75,7 +75,7 @@ const StatCard: React.FC<{
   badge?: React.ReactNode;
 }> = ({ icon, title, value, description, onClick, variant = 'default', badge }) => {
   const getCardClasses = () => {
-    const baseClasses = onClick ? 'cursor-pointer hover:shadow-md transition-all' : '';
+    const baseClasses = onClick ? 'cursor-pointer hover:shadow-md transition-all active:scale-[0.98]' : '';
     switch (variant) {
       case 'warning': return `${baseClasses} border-amber-200 bg-amber-50 dark:bg-amber-900/20`;
       case 'success': return `${baseClasses} border-green-200 bg-green-50 dark:bg-green-900/20`;
@@ -86,16 +86,16 @@ const StatCard: React.FC<{
 
   return (
     <Card onClick={onClick} className={getCardClasses()}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className="flex items-center gap-2">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-4">
+        <CardTitle className="text-[11px] md:text-sm font-medium truncate pr-2">{title}</CardTitle>
+        <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
           {badge}
           {icon}
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+      <CardContent className="p-3 md:p-4 pt-0">
+        <div className="text-lg md:text-2xl font-bold truncate">{value}</div>
+        {description && <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5 md:mt-1 truncate">{description}</p>}
       </CardContent>
     </Card>
   );
@@ -199,24 +199,60 @@ const DashboardView: React.FC = () => {
             let newSalesRevenue = 0;
             let collections = 0;
             let totalPardonedAmount = 0;
+            let totalRewardDiscount = 0;
 
             allOrders.forEach(o => {
-              const paymentDate = o.lastPaymentTimestamp?.toDate();
-              if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
-                const paymentAmount = o.lastPaymentAmount || 0;
-                const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
-                if (isOrderFromPeriod) {
-                  newSalesRevenue += paymentAmount;
-                } else {
-                  collections += paymentAmount;
-                }
+              const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
 
-                if (o.paymentMethod === 'cash') cashSales += paymentAmount;
-                if (o.paymentMethod === 'momo') momoSales += paymentAmount;
+              // Track pardoned amounts and reward discounts for orders in period
+              if (isOrderFromPeriod) {
+                totalPardonedAmount += (o.pardonedAmount || 0);
+                totalRewardDiscount += (o.rewardDiscount || 0);
               }
 
-              if (o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate) {
-                totalPardonedAmount += (o.pardonedAmount || 0);
+              // Use paymentHistory if available (matches AccountingView logic)
+              if (o.paymentHistory && Array.isArray(o.paymentHistory)) {
+                o.paymentHistory.forEach((payment) => {
+                  const paymentDate = payment.timestamp?.toDate();
+                  if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                    const paymentAmount = payment.amount || 0;
+
+                    if (isOrderFromPeriod) {
+                      newSalesRevenue += paymentAmount;
+                    } else {
+                      collections += paymentAmount;
+                    }
+
+                    // Track by payment method
+                    if (payment.method === 'cash') {
+                      cashSales += paymentAmount;
+                    } else if (payment.method === 'momo' || payment.method === 'card') {
+                      momoSales += paymentAmount;
+                    }
+                  }
+                });
+              } else {
+                // Fallback to lastPaymentTimestamp for legacy orders
+                const paymentDate = o.lastPaymentTimestamp?.toDate();
+                if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                  const paymentAmount = o.lastPaymentAmount || 0;
+
+                  if (isOrderFromPeriod) {
+                    newSalesRevenue += paymentAmount;
+                  } else {
+                    collections += paymentAmount;
+                  }
+
+                  // Use paymentBreakdown if available, otherwise fallback to paymentMethod
+                  if (o.paymentBreakdown) {
+                    if (o.paymentBreakdown.cash) cashSales += o.paymentBreakdown.cash;
+                    if (o.paymentBreakdown.momo) momoSales += o.paymentBreakdown.momo;
+                  } else if (o.paymentMethod === 'cash') {
+                    cashSales += paymentAmount;
+                  } else if (o.paymentMethod === 'momo' || o.paymentMethod === 'card') {
+                    momoSales += paymentAmount;
+                  }
+                }
               }
             });
 
@@ -237,18 +273,39 @@ const DashboardView: React.FC = () => {
             }
 
             allOrders.forEach(o => {
-              const paymentDate = o.lastPaymentTimestamp?.toDate();
-              if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
-                const day = format(paymentDate, 'MMM d');
-                if (salesDataMap[day]) {
-                  const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
-                  const paymentAmount = o.lastPaymentAmount || 0;
-                  if (isOrderFromPeriod) {
-                    salesDataMap[day].newSales += paymentAmount;
-                  } else {
-                    salesDataMap[day].collections += paymentAmount;
+              const isOrderFromPeriod = o.timestamp.toDate() >= startDate && o.timestamp.toDate() <= endDate;
+
+              // Use paymentHistory if available (matches AccountingView logic)
+              if (o.paymentHistory && Array.isArray(o.paymentHistory)) {
+                o.paymentHistory.forEach((payment) => {
+                  const paymentDate = payment.timestamp?.toDate();
+                  if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                    const day = format(paymentDate, 'MMM d');
+                    if (salesDataMap[day]) {
+                      const paymentAmount = payment.amount || 0;
+                      if (isOrderFromPeriod) {
+                        salesDataMap[day].newSales += paymentAmount;
+                      } else {
+                        salesDataMap[day].collections += paymentAmount;
+                      }
+                      if (o.cashierName) salesDataMap[day].cashierNames.add(o.cashierName);
+                    }
                   }
-                  if (o.cashierName) salesDataMap[day].cashierNames.add(o.cashierName);
+                });
+              } else {
+                // Fallback to lastPaymentTimestamp for legacy orders
+                const paymentDate = o.lastPaymentTimestamp?.toDate();
+                if (paymentDate && paymentDate >= startDate && paymentDate <= endDate) {
+                  const day = format(paymentDate, 'MMM d');
+                  if (salesDataMap[day]) {
+                    const paymentAmount = o.lastPaymentAmount || 0;
+                    if (isOrderFromPeriod) {
+                      salesDataMap[day].newSales += paymentAmount;
+                    } else {
+                      salesDataMap[day].collections += paymentAmount;
+                    }
+                    if (o.cashierName) salesDataMap[day].cashierNames.add(o.cashierName);
+                  }
                 }
               }
             });
@@ -545,49 +602,51 @@ const DashboardView: React.FC = () => {
   );
 
   if (loading || !stats) {
-    return <div className="p-6 h-full flex items-center justify-center"><LoadingSpinner /></div>;
+    return <div className="p-4 md:p-6 h-full flex items-center justify-center"><LoadingSpinner /></div>;
   }
 
   if (error) {
-    return <div className="p-6"><Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert></div>;
+    return <div className="p-4 md:p-6"><Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert></div>;
   }
 
   return (
-    <div className="p-4 md:p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold">Manager's Dashboard</h2>
-          <p className="text-sm text-muted-foreground">Business performance overview</p>
+    <div className="p-3 md:p-4 lg:p-6 h-full bg-secondary/50 dark:bg-background overflow-y-auto overflow-x-hidden">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 md:mb-6 gap-3 md:gap-4">
+        <div className="min-w-0">
+          <h2 className="text-xl md:text-2xl lg:text-3xl font-bold truncate">Manager's Dashboard</h2>
+          <p className="text-xs md:text-sm text-muted-foreground">Business performance overview</p>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-          <div className="flex items-center gap-1">
-            <Button variant={activeDatePreset === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setDateRange('today')}>Today</Button>
-            <Button variant={activeDatePreset === 'week' ? 'default' : 'outline'} size="sm" onClick={() => setDateRange('week')}>This Week</Button>
-            <Button variant={activeDatePreset === 'month' ? 'default' : 'outline'} size="sm" onClick={() => setDateRange('month')}>This Month</Button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1 -mb-1">
+            <Button variant={activeDatePreset === 'today' ? 'default' : 'outline'} size="sm" className="text-xs flex-shrink-0" onClick={() => setDateRange('today')}>Today</Button>
+            <Button variant={activeDatePreset === 'week' ? 'default' : 'outline'} size="sm" className="text-xs flex-shrink-0" onClick={() => setDateRange('week')}>This Week</Button>
+            <Button variant={activeDatePreset === 'month' ? 'default' : 'outline'} size="sm" className="text-xs flex-shrink-0" onClick={() => setDateRange('month')}>This Month</Button>
           </div>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("w-full sm:w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground", activeDatePreset === 'custom' && 'border-primary')}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {date?.from ? (date.to ? <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</> : format(date.from, "LLL dd, y")) : <span>Pick a date</span>}
+              <Button variant="outline" size="sm" className={cn("w-full sm:w-[220px] lg:w-[260px] justify-start text-left font-normal text-xs md:text-sm", !date && "text-muted-foreground", activeDatePreset === 'custom' && 'border-primary')}>
+                <CalendarIcon className="mr-2 h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                <span className="truncate">
+                  {date?.from ? (date.to ? <>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</> : format(date.from, "LLL dd, y")) : <span>Pick a date</span>}
+                </span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
               <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={(newDate) => { setDate(newDate); setActiveDatePreset('custom'); }} numberOfMonths={2} />
             </PopoverContent>
           </Popover>
-          <Button onClick={handleRunAnalysis} className="w-full sm:w-auto"><Sparkles className="mr-2 h-4 w-4" />Analyze</Button>
+          <Button onClick={handleRunAnalysis} size="sm" className="w-full sm:w-auto text-xs md:text-sm"><Sparkles className="mr-2 h-3 w-3 md:h-4 md:w-4" />Analyze</Button>
         </div>
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-2">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="items">Item Performance</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-2 h-9">
+          <TabsTrigger value="overview" className="text-xs md:text-sm">Overview</TabsTrigger>
+          <TabsTrigger value="items" className="text-xs md:text-sm">Item Performance</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6 space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <TabsContent value="overview" className="mt-4 md:mt-6 space-y-4 md:space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
             <StatCard icon={<DollarSign className="text-green-500" />} title="Total Sales" value={formatCurrency(stats.totalSales)} description={`${stats.totalOrders} orders in period`} />
             <StatCard icon={<TrendingUp className="text-blue-500" />} title="Net Revenue" value={formatCurrency(stats.totalNetRevenue)} description={`+${formatCurrency(stats.previousDayCollections)} from collections`} />
             <StatCard icon={<MinusCircle className="text-orange-500" />} title="Expenses" value={formatCurrency(stats.totalMiscExpenses)} description="Misc. cash/momo outs" />

@@ -25,12 +25,12 @@ const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: s
                 <button
                     onClick={() => setActiveView(item.id)}
                     aria-label={item.label}
-                    className={`w-14 h-14 flex items-center justify-center rounded-xl transition-all duration-300 group ${activeView === item.id
-                            ? 'bg-primary text-primary-foreground shadow-lg scale-110'
+                    className={`w-10 h-10 lg:w-14 lg:h-14 flex items-center justify-center rounded-lg lg:rounded-xl transition-all duration-300 group ${activeView === item.id
+                            ? 'bg-primary text-primary-foreground shadow-lg scale-105 lg:scale-110'
                             : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
                         }`}
                 >
-                    <item.icon size={24} />
+                    <item.icon size={20} className="lg:w-6 lg:h-6" />
                 </button>
             </TooltipTrigger>
             <TooltipContent side="right">
@@ -38,7 +38,7 @@ const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: s
             </TooltipContent>
         </Tooltip>
         {item.badge != undefined && item.badge > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse border-2 border-card">
+            <span className="absolute -top-0.5 -right-0.5 lg:-top-1 lg:-right-1 bg-red-500 text-white text-[10px] lg:text-xs font-bold rounded-full h-4 w-4 lg:h-5 lg:w-5 flex items-center justify-center animate-pulse border-2 border-card">
                 {item.badge}
             </span>
         )}
@@ -66,12 +66,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
 
     return (
         <TooltipProvider>
-            <nav className="hidden md:flex w-20 bg-card border-r border-border flex-col items-center justify-between py-6 z-20">
-                <div className="flex flex-col items-center gap-10">
+            <nav className="hidden md:flex w-16 lg:w-20 bg-card border-r border-border flex-col items-center justify-between py-4 lg:py-6 z-20 flex-shrink-0">
+                <div className="flex flex-col items-center gap-6 lg:gap-10">
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <div className='mx-auto text-center'>
-                                <Image src={logo} alt="Nuel's Food Zone Logo" width={48} height={48} className="rounded-md" />
+                                <Image src={logo} alt="Nuel's Food Zone Logo" width={40} height={40} className="rounded-md lg:w-12 lg:h-12" />
                             </div>
                         </TooltipTrigger>
                         <TooltipContent side="right">
@@ -79,7 +79,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
                         </TooltipContent>
                     </Tooltip>
 
-                    <ul className="space-y-4">
+                    <ul className="space-y-2 lg:space-y-4">
                         {navItems.map(item => (
                             <NavItem key={item.id} item={item} activeView={activeView} setActiveView={setActiveView} />
                         ))}
@@ -88,19 +88,19 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, theme, set
                 <div className="flex flex-col items-center gap-2">
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <button onClick={setTheme} aria-label="Toggle theme" className="w-14 h-14 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-primary">
-                                {theme === 'light' ? <Moon size={24} /> : <Sun size={24} />}
+                            <button onClick={setTheme} aria-label="Toggle theme" className="w-10 h-10 lg:w-14 lg:h-14 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-primary transition-colors">
+                                {theme === 'light' ? <Moon size={20} className="lg:w-6 lg:h-6" /> : <Sun size={20} className="lg:w-6 lg:h-6" />}
                             </button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
                             <p>Toggle {theme === 'light' ? 'Dark' : 'Light'} Mode</p>
                         </TooltipContent>
                     </Tooltip>
-                    <Separator className="w-10" />
+                    <Separator className="w-8 lg:w-10" />
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <button onClick={onLogout} aria-label="Logout" className="w-14 h-14 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-500/10">
-                                <LogOut size={24} />
+                            <button onClick={onLogout} aria-label="Logout" className="w-10 h-10 lg:w-14 lg:h-14 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-500/10 transition-colors">
+                                <LogOut size={20} className="lg:w-6 lg:h-6" />
                             </button>
                         </TooltipTrigger>
                         <TooltipContent side="right">

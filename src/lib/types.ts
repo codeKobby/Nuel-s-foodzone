@@ -85,6 +85,7 @@ export interface ReconciliationReport {
   timestamp: Timestamp;
   period: string; // e.g., '2024-08-15'
   totalSales: number; // Based on completed orders created in the period
+  totalItemsSold: number; // Total items sold in the period
 
   // Revenue based on actual money counted
   expectedCash: number;
@@ -94,6 +95,28 @@ export interface ReconciliationReport {
   countedCash: number;
   countedMomo: number;
   totalCountedRevenue: number;
+
+  // Payment method breakdown for the day
+  cashSales: number;
+  momoSales: number;
+
+  // Expenses
+  miscCashExpenses: number;
+  miscMomoExpenses: number;
+  miscExpenseDetails?: {
+    purpose: string;
+    amount: number;
+    source: "cash" | "momo";
+  }[];
+
+  // Collections from previous days (tracked separately by payment method)
+  collectionsFromPreviousDays: number;
+  settledUnpaidCash: number;
+  settledUnpaidMomo: number;
+
+  // Discounts and adjustments
+  totalRewardDiscount: number;
+  totalPardonedAmount: number;
 
   // Discrepancy analysis
   totalDiscrepancy: number; // totalCountedRevenue - totalExpectedRevenue
@@ -105,6 +128,7 @@ export interface ReconciliationReport {
   // Change tracking
   changeOwedForPeriod: number;
   changeOwedSetAside: boolean;
+  previousDaysChangeGiven: number;
 
   // Cashier info
   cashierId: string;
@@ -268,13 +292,6 @@ export interface PeriodStats {
   orders: Order[];
   activityOrders: Order[];
   itemStats: Record<string, { count: number; totalValue: number }>;
-}
-
-export interface MiscExpense {
-  id: string;
-  description: string;
-  amount: number;
-  source: "cash" | "momo";
-  timestamp: Timestamp;
-  authorizedBy: string;
+  settledUnpaidCash: number;
+  settledUnpaidMomo: number;
 }

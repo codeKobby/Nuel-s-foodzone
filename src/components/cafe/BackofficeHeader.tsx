@@ -86,29 +86,29 @@ const BackofficeHeader: React.FC<BackofficeHeaderProps> = ({
   };
 
   return (
-    <header className="hidden md:flex flex-col gap-2 border-b bg-card/70 px-4 py-2 text-foreground backdrop-blur md:flex-row md:items-center md:justify-between md:px-6 md:py-3">
-      <div className="space-y-0.5">
+    <header className="hidden md:flex flex-col gap-1 lg:gap-2 border-b bg-card/70 px-3 py-2 text-foreground backdrop-blur md:flex-row md:items-center md:justify-between lg:px-6 lg:py-3 flex-shrink-0">
+      <div className="space-y-0.5 min-w-0">
         <p className="text-[10px] uppercase tracking-[0.3em] text-primary">Backoffice</p>
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg md:text-xl font-semibold">{role === 'manager' ? 'Manager Console' : 'Cashier Console'}</h1>
-          <span className="rounded-full bg-muted/50 px-2 py-0.5 text-[10px] capitalize text-muted-foreground hidden sm:inline-block">{role} view</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <h1 className="text-base lg:text-xl font-semibold truncate">{role === 'manager' ? 'Manager Console' : 'Cashier Console'}</h1>
+          <span className="rounded-full bg-muted/50 px-2 py-0.5 text-[10px] capitalize text-muted-foreground hidden lg:inline-block flex-shrink-0">{role} view</span>
         </div>
-        <p className="text-xs text-muted-foreground hidden lg:block">Stay in sync with live orders, inventory, and online activity.</p>
+        <p className="text-xs text-muted-foreground hidden xl:block">Stay in sync with live orders, inventory, and online activity.</p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs">
+      <div className="flex flex-wrap items-center gap-1.5 lg:gap-2 text-xs flex-shrink-0">
         <span
-          className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium ${isOnline ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'
+          className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${isOnline ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'
             }`}
         >
           {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
-          <span className="hidden sm:inline">{isOnline ? 'Online' : 'Offline'}</span>
+          <span className="hidden lg:inline">{isOnline ? 'Online' : 'Offline'}</span>
         </span>
-        <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-[10px] px-2 hidden lg:flex" onClick={onToggleTheme}>
+        <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-[10px] px-2 hidden xl:flex" onClick={onToggleTheme}>
           {theme === 'light' ? <Moon size={12} /> : <Sun size={12} />}
           Theme
         </Button>
-        <div className="hidden xl:flex items-center gap-2 text-[10px] text-muted-foreground">
+        <div className="hidden 2xl:flex items-center gap-2 text-[10px] text-muted-foreground">
           <span>Pending {pendingOrdersCount}</span>
           <span className="text-muted-foreground/60">•</span>
           <span>Low stock {lowStockCount}</span>

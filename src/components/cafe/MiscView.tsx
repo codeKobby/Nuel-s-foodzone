@@ -139,14 +139,14 @@ const MiscView: React.FC = () => {
 
 
     return (
-        <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background">
-            <div className="flex-1 p-6 overflow-y-auto">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-3xl font-bold">Miscellaneous Expenses</h2>
+        <div className="flex h-full flex-col md:flex-row bg-secondary/50 dark:bg-background overflow-hidden">
+            <div className="flex-1 p-3 md:p-4 lg:p-6 overflow-y-auto overflow-x-hidden">
+                <div className="flex justify-between items-center gap-2 mb-4 md:mb-6">
+                    <h2 className="text-xl md:text-2xl lg:text-3xl font-bold truncate">Miscellaneous Expenses</h2>
                     {isMobile && (
                         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                             <SheetTrigger asChild>
-                                <Button size="icon" title="Add miscellaneous expense" aria-label="Add miscellaneous expense"><PlusCircle /></Button>
+                                <Button size="icon" className="h-9 w-9 flex-shrink-0" title="Add miscellaneous expense" aria-label="Add miscellaneous expense"><PlusCircle className="h-5 w-5" /></Button>
                             </SheetTrigger>
                             <SheetContent side="bottom" className="h-auto">
                                 <SheetHeader>
