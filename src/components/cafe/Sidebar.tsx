@@ -26,8 +26,8 @@ const NavItem = ({ item, activeView, setActiveView }: { item: any, activeView: s
                     onClick={() => setActiveView(item.id)}
                     aria-label={item.label}
                     className={`w-10 h-10 lg:w-14 lg:h-14 flex items-center justify-center rounded-lg lg:rounded-xl transition-all duration-300 group ${activeView === item.id
-                            ? 'bg-primary text-primary-foreground shadow-lg scale-105 lg:scale-110'
-                            : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                        ? 'bg-primary text-primary-foreground shadow-lg scale-105 lg:scale-110'
+                        : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
                         }`}
                 >
                     <item.icon size={20} className="lg:w-6 lg:h-6" />

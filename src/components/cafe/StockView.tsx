@@ -4,8 +4,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { collection, onSnapshot, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { 
-  Search, RefreshCw, Wifi, WifiOff, AlertTriangle, Package, 
+import {
+  Search, RefreshCw, Wifi, WifiOff, AlertTriangle, Package,
   CheckCircle2, Edit3, Bell, BellOff, AlertCircle
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +33,7 @@ const requestNotificationPermission = async () => {
 
 // Send browser notification
 const sendNotification = (title: string, body: string) => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
     new Notification(title, {
       body,
       // You can add an icon if you have one in your public folder
@@ -46,26 +46,24 @@ const StockLevelIndicator: React.FC<{ stock: number }> = ({ stock }) => {
   const isOutOfStock = stock === 0;
   const isLowStock = stock > 0 && stock <= LOW_STOCK_THRESHOLD;
   const percentage = Math.min((stock / 20) * 100, 100); // Visual scale for progress bar
-  
+
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">Current stock</span>
-        <span className={`font-semibold ${
-          isOutOfStock ? 'text-red-600' : 
-          isLowStock ? 'text-yellow-600' : 
-          'text-green-600'
-        }`}>
+        <span className={`font-semibold ${isOutOfStock ? 'text-red-600' :
+            isLowStock ? 'text-yellow-600' :
+              'text-green-600'
+          }`}>
           {stock} {stock === 1 ? 'unit' : 'units'}
         </span>
       </div>
-      <Progress 
-        value={percentage} 
-        className={`h-2 ${
-          isOutOfStock ? '[&>div]:bg-red-500' : 
-          isLowStock ? '[&>div]:bg-yellow-500' : 
-          '[&>div]:bg-green-500'
-        }`}
+      <Progress
+        value={percentage}
+        className={`h-2 ${isOutOfStock ? '[&>div]:bg-red-500' :
+            isLowStock ? '[&>div]:bg-yellow-500' :
+              '[&>div]:bg-green-500'
+          }`}
       />
     </div>
   );
@@ -78,7 +76,7 @@ const UpdateStockDialog: React.FC<{ item: MenuItem, onSave: (itemId: string, new
   const handleSave = async () => {
     const stockValue = parseInt(newStock);
     if (isNaN(stockValue) || stockValue < 0) return;
-    
+
     setIsSaving(true);
     await onSave(item.id, stockValue);
     setIsSaving(false);
@@ -99,7 +97,7 @@ const UpdateStockDialog: React.FC<{ item: MenuItem, onSave: (itemId: string, new
           Update the current stock count for {item.name} based on your fridge count
         </DialogDescription>
       </DialogHeader>
-      
+
       <div className="space-y-4 py-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -142,8 +140,8 @@ const UpdateStockDialog: React.FC<{ item: MenuItem, onSave: (itemId: string, new
         {newStock && (
           <Alert className={
             parseInt(newStock) === 0 ? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800' :
-            parseInt(newStock) <= LOW_STOCK_THRESHOLD ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800' :
-            'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800'
+              parseInt(newStock) <= LOW_STOCK_THRESHOLD ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800' :
+                'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800'
           }>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -164,13 +162,13 @@ const UpdateStockDialog: React.FC<{ item: MenuItem, onSave: (itemId: string, new
           </Alert>
         )}
       </div>
-      
+
       <DialogFooter>
         <Button variant="outline" onClick={onClose} disabled={isSaving}>
           Cancel
         </Button>
-        <Button 
-          onClick={handleSave} 
+        <Button
+          onClick={handleSave}
           disabled={!newStock || isSaving}
         >
           {isSaving ? <LoadingSpinner /> : 'Update Stock'}
@@ -188,11 +186,10 @@ const StockItemCard: React.FC<{ item: MenuItem, onUpdate: (itemId: string, newSt
 
   return (
     <>
-      <Card className={`transition-all hover:shadow-md ${
-        isOutOfStock ? 'border-red-300 bg-red-50/50 dark:border-red-700 dark:bg-red-950/30' :
-        isLowStock ? 'border-yellow-300 bg-yellow-50/50 dark:border-yellow-700 dark:bg-yellow-950/30' :
-        'hover:border-primary/50'
-      } ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}>
+      <Card className={`transition-all hover:shadow-md ${isOutOfStock ? 'border-red-300 bg-red-50/50 dark:border-red-700 dark:bg-red-950/30' :
+          isLowStock ? 'border-yellow-300 bg-yellow-50/50 dark:border-yellow-700 dark:bg-yellow-950/30' :
+            'hover:border-primary/50'
+        } ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}>
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1 min-w-0">
@@ -200,17 +197,17 @@ const StockItemCard: React.FC<{ item: MenuItem, onUpdate: (itemId: string, newSt
               <div className="flex items-center gap-2 flex-wrap">
                 {isOutOfStock ? (
                   <Badge variant="destructive" className="text-xs font-medium">
-                    <AlertTriangle className="h-3 w-3 mr-1"/>
+                    <AlertTriangle className="h-3 w-3 mr-1" />
                     Out of Stock
                   </Badge>
                 ) : isLowStock ? (
                   <Badge className="text-xs font-medium bg-yellow-500 hover:bg-yellow-600">
-                    <AlertCircle className="h-3 w-3 mr-1"/>
+                    <AlertCircle className="h-3 w-3 mr-1" />
                     Low Stock
                   </Badge>
                 ) : (
                   <Badge variant="secondary" className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                    <CheckCircle2 className="h-3 w-3 mr-1"/>
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
                     In Stock
                   </Badge>
                 )}
@@ -221,13 +218,13 @@ const StockItemCard: React.FC<{ item: MenuItem, onUpdate: (itemId: string, newSt
           <StockLevelIndicator stock={stockLevel} />
 
           <div className="mt-4">
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               variant={isLowStock || isOutOfStock ? "default" : "outline"}
               className="w-full"
               onClick={() => setIsDialogOpen(true)}
             >
-              <Edit3 className="h-3.5 w-3.5 mr-2"/>
+              <Edit3 className="h-3.5 w-3.5 mr-2" />
               Update Count
             </Button>
           </div>
@@ -288,19 +285,19 @@ const StockView = () => {
 
     const q = query(collection(db, "menuItems"), orderBy('name'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem));
-        setMenuItems(items);
-        setConnectionStatus({ isConnected: true, lastSync: new Date() });
-        setLoading(false);
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem));
+      setMenuItems(items);
+      setConnectionStatus({ isConnected: true, lastSync: new Date() });
+      setLoading(false);
     }, (error) => {
-        console.error("Error fetching stock:", error);
-        toast({
-            title: "Connection Error",
-            description: "Could not sync stock data from the database.",
-            type: "error"
-        });
-        setConnectionStatus(prev => ({ ...prev, isConnected: false }));
-        setLoading(false);
+      console.error("Error fetching stock:", error);
+      toast({
+        title: "Connection Error",
+        description: "Could not sync stock data from the database.",
+        type: "error"
+      });
+      setConnectionStatus(prev => ({ ...prev, isConnected: false }));
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -308,44 +305,44 @@ const StockView = () => {
 
   const handleStockUpdate = async (itemId: string, newStock: number) => {
     setUpdatingItemId(itemId);
-    
+
     const item = menuItems.find(i => i.id === itemId);
     if (!item) {
-        setUpdatingItemId(null);
-        return;
+      setUpdatingItemId(null);
+      return;
     }
     const oldStock = item.stock || 0;
-    
-    try {
-        await updateDoc(doc(db, "menuItems", itemId), { stock: newStock });
-        toast({
-            title: "Stock Updated",
-            description: `${item.name} stock is now ${newStock}.`,
-            type: 'success'
-        });
 
-        if (notificationsEnabled) {
-          if (newStock === 0 && oldStock > 0) {
-            sendNotification(
-              '🔴 Out of Stock Alert',
-              `${item.name} is now out of stock in the fridge!`
-            );
-          } else if (newStock <= LOW_STOCK_THRESHOLD && newStock > 0 && oldStock > LOW_STOCK_THRESHOLD) {
-            sendNotification(
-              '🟡 Low Stock Alert',
-              `${item.name} is running low (${newStock} left). Time to restock!'`
-            );
-          }
+    try {
+      await updateDoc(doc(db, "menuItems", itemId), { stock: newStock });
+      toast({
+        title: "Stock Updated",
+        description: `${item.name} stock is now ${newStock}.`,
+        type: 'success'
+      });
+
+      if (notificationsEnabled) {
+        if (newStock === 0 && oldStock > 0) {
+          sendNotification(
+            '🔴 Out of Stock Alert',
+            `${item.name} is now out of stock in the fridge!`
+          );
+        } else if (newStock <= LOW_STOCK_THRESHOLD && newStock > 0 && oldStock > LOW_STOCK_THRESHOLD) {
+          sendNotification(
+            '🟡 Low Stock Alert',
+            `${item.name} is running low (${newStock} left). Time to restock!'`
+          );
         }
+      }
     } catch (error) {
-        console.error("Error updating stock:", error);
-        toast({
-            title: "Update Failed",
-            description: `Could not update stock for ${item.name}.`,
-            type: "error"
-        });
+      console.error("Error updating stock:", error);
+      toast({
+        title: "Update Failed",
+        description: `Could not update stock for ${item.name}.`,
+        type: "error"
+      });
     } finally {
-        setUpdatingItemId(null);
+      setUpdatingItemId(null);
     }
   };
 
@@ -402,7 +399,7 @@ const StockView = () => {
     );
 
     if (filterView === 'low') {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         (item.stock ?? 0) > 0 && (item.stock ?? 0) <= LOW_STOCK_THRESHOLD
       );
     } else if (filterView === 'out') {
@@ -456,7 +453,7 @@ const StockView = () => {
                 <BellOff className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
               )}
               <span className="text-xs md:text-sm font-medium hidden sm:inline">Alerts</span>
-              <Switch 
+              <Switch
                 checked={notificationsEnabled}
                 onCheckedChange={toggleNotifications}
               />
@@ -563,7 +560,7 @@ const StockView = () => {
               <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <h3 className="font-semibold mb-2">No drinks found</h3>
               <p className="text-muted-foreground">
-                {searchQuery 
+                {searchQuery
                   ? "No drinks match your search"
                   : "No drinks match the selected filter"
                 }

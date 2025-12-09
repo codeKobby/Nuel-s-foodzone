@@ -351,10 +351,10 @@ const RewardsView = () => {
             setUpdatingCustomerId(null);
         }
     };
-    
+
     const handleRedeemDiscount = async (customerId: string, discountAmount: number) => {
         const bagsToRedeem = 5; // Fixed at 5 bags for a 10 GHS discount.
-    
+
         try {
             await runTransaction(db, async (transaction) => {
                 const customerRef = doc(db, 'rewards', customerId);
@@ -363,18 +363,18 @@ const RewardsView = () => {
                     throw new Error("Customer not found");
                 }
                 const currentData = customerDoc.data() as CustomerReward;
-                
+
                 if (currentData.bagCount < bagsToRedeem) {
                     throw new Error("Not enough bags to redeem this discount.");
                 }
-    
+
                 transaction.update(customerRef, {
                     bagCount: currentData.bagCount - bagsToRedeem,
                     totalRedeemed: (currentData.totalRedeemed || 0) + discountAmount,
                     updatedAt: serverTimestamp()
                 });
             });
-             toast({ title: 'Discount Marked as Redeemed', description: 'The customer\'s bag count has been updated.' });
+            toast({ title: 'Discount Marked as Redeemed', description: 'The customer\'s bag count has been updated.' });
         } catch (e) {
             console.error(e);
             toast({ type: 'error', title: 'Redemption Failed', description: e instanceof Error ? e.message : 'An unknown error occurred.' });
@@ -400,7 +400,7 @@ const RewardsView = () => {
             return b.bagCount - a.bagCount;
         });
     }, [rewards, searchQuery, activeTab]);
-    
+
     const eligibleCustomersCount = useMemo(() => rewards.filter(r => Math.floor(r.bagCount / 5) > 0).length, [rewards]);
 
     return (

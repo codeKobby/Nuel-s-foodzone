@@ -168,11 +168,11 @@ const HistoryView: React.FC = () => {
                                                             {/* Financial Breakdown */}
                                                             <div className="space-y-3">
                                                                 <h4 className="font-semibold flex items-center gap-2 text-sm"><Scale className="h-4 w-4 text-teal-500" />Financial Breakdown</h4>
-                                                                
+
                                                                 {/* Cash Breakdown */}
                                                                 <div className="p-3 rounded-lg bg-gradient-to-br from-emerald-500/5 to-green-500/5 border border-emerald-500/20 space-y-2">
                                                                     <p className="font-medium text-sm flex items-center gap-2"><Banknote className="h-4 w-4 text-emerald-500" />Cash Breakdown</p>
-                                                                    
+
                                                                     {/* Show how expected is calculated */}
                                                                     <div className="space-y-1 text-xs border-b border-emerald-500/20 pb-2 mb-2">
                                                                         <div className="flex justify-between">
@@ -198,7 +198,7 @@ const HistoryView: React.FC = () => {
                                                                             </div>
                                                                         )}
                                                                     </div>
-                                                                    
+
                                                                     <div className="flex justify-between text-xs font-medium">
                                                                         <span className="text-muted-foreground">= Expected Cash:</span>
                                                                         <span className="text-foreground font-semibold">{formatCurrency(report.expectedCash)}</span>
@@ -221,11 +221,11 @@ const HistoryView: React.FC = () => {
                                                                         </span>
                                                                     </div>
                                                                 </div>
-                                                                
+
                                                                 {/* MoMo Breakdown */}
                                                                 <div className="p-3 rounded-lg bg-gradient-to-br from-violet-500/5 to-purple-500/5 border border-violet-500/20 space-y-2">
                                                                     <p className="font-medium text-sm flex items-center gap-2"><Smartphone className="h-4 w-4 text-violet-500" />MoMo Breakdown</p>
-                                                                    
+
                                                                     {/* Show how expected is calculated */}
                                                                     <div className="space-y-1 text-xs border-b border-violet-500/20 pb-2 mb-2">
                                                                         <div className="flex justify-between">
@@ -245,7 +245,7 @@ const HistoryView: React.FC = () => {
                                                                             </div>
                                                                         )}
                                                                     </div>
-                                                                    
+
                                                                     <div className="flex justify-between text-xs font-medium">
                                                                         <span className="text-muted-foreground">= Expected MoMo:</span>
                                                                         <span className="text-foreground font-semibold">{formatCurrency(report.expectedMomo)}</span>

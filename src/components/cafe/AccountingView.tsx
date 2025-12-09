@@ -1202,585 +1202,585 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                                                 }}
                                                             >
                                                                 {formatCurrency(stats.cashSales)}
-                                                        </button>
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground space-y-0.5">
-                                                        <div className="flex justify-between">
-                                                            <span>Today's sales:</span>
-                                                            <span className="font-medium">{formatCurrency(stats.cashSales - stats.settledUnpaidCash)}</span>
-                                                        </div>
-                                                        {stats.settledUnpaidCash > 0 && (
-                                                            <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                                                                <span>+ Collections:</span>
-                                                                <span className="font-medium">{formatCurrency(stats.settledUnpaidCash)}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-
-                                            <Card>
-                                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3">
-                                                    <CardTitle className="text-xs md:text-sm font-medium">Momo/Card Sales</CardTitle>
-                                                    <CreditCard className="text-muted-foreground h-4 w-4 flex-shrink-0" />
-                                                </CardHeader>
-                                                <CardContent className="p-3 pt-0">
-                                                    <div className="text-lg md:text-2xl font-bold">
-                                                        <button
-                                                            className="underline font-semibold"
-                                                            onClick={() => {
-                                                                const ordersList: any[] = [];
-                                                                (stats.orders || []).forEach((order: any) => {
-                                                                    if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
-                                                                        const amt = order.paymentHistory.reduce((sum: number, p: any) => {
-                                                                            if (p.method === 'momo' || p.method === 'card') return sum + (p.amount || 0);
-                                                                            return sum;
-                                                                        }, 0);
-                                                                        if (amt > 0) ordersList.push({ order, amount: amt, method: 'momo' });
-                                                                    } else if (order.paymentBreakdown && order.paymentBreakdown.momo) {
-                                                                        const amt = order.paymentBreakdown.momo || 0;
-                                                                        if (amt > 0) ordersList.push({ order, amount: amt, method: 'momo' });
-                                                                    } else if (order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
-                                                                        const amt = Math.max(0, (order.amountPaid || 0) - (order.changeGiven || 0));
-                                                                        if (amt > 0) ordersList.push({ order, amount: amt, method: order.paymentMethod });
-                                                                    }
-                                                                });
-                                                                setSelectedSalesOrders(ordersList);
-                                                                setShowMomoModal(true);
-                                                            }}
-                                                        >
-                                                            {formatCurrency(stats.momoSales)}
-                                                        </button>
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground space-y-0.5">
-                                                        <div className="flex justify-between">
-                                                            <span>Today's sales:</span>
-                                                            <span className="font-medium">{formatCurrency(stats.momoSales - stats.settledUnpaidMomo)}</span>
-                                                        </div>
-                                                        {stats.settledUnpaidMomo > 0 && (
-                                                            <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                                                                <span>+ Collections:</span>
-                                                                <span className="font-medium">{formatCurrency(stats.settledUnpaidMomo)}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                            <StatCard
-                                                icon={<Hourglass className="text-muted-foreground" />}
-                                                title="Unpaid Orders (All Time)"
-                                                value={formatCurrency(stats.allTimeUnpaidOrdersValue)}
-                                                description={
-                                                    <span>
-                                                        <strong className="text-base font-semibold text-foreground">Today: {formatCurrency(stats.todayUnpaidOrdersValue)}</strong>
-                                                        {' | '}
-                                                        Previous: {formatCurrency(stats.previousUnpaidOrdersValue)}
-                                                    </span>
-                                                }
-                                                onClick={() => setShowUnpaidModal(true)}
-                                            />
-                                            <StatCard
-                                                icon={<MinusCircle className="text-muted-foreground" />}
-                                                title="Total Misc. Expenses"
-                                                value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)}
-                                                description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`}
-                                                onClick={() => setShowExpensesModal(true)}
-                                            />
-                                            <StatCard
-                                                icon={<Gift className="text-muted-foreground" />}
-                                                title="Reward Discounts"
-                                                value={formatCurrency(stats.totalRewardDiscount)}
-                                                description="Total discounts from rewards"
-                                                onClick={() => setShowRewardsModal(true)}
-                                            />
-                                            <StatCard
-                                                icon={<Ban className="text-muted-foreground" />}
-                                                title="Pardoned Deficits"
-                                                value={formatCurrency(stats.totalPardonedAmount)}
-                                                description="Unplanned discounts given today"
-                                                onClick={() => setShowPardonedModal(true)}
-                                            />
-                                            <StatCard
-                                                icon={<ArrowRightLeft className="text-muted-foreground" />}
-                                                title="Change Owed"
-                                                value={formatCurrency(stats.changeOwedForPeriod)}
-                                                description="Total change owed to customers today"
-                                                onClick={() => setShowChangeOwedModal(true)}
-                                            />
-                                            <StatCard
-                                                icon={<Coins className="text-muted-foreground" />}
-                                                title="Previous Change Given"
-                                                value={formatCurrency(stats.previousDaysChangeGiven)}
-                                                description="Change for old orders given today"
-                                                onClick={() => setShowPrevChangeModal(true)}
-                                            />
-                                        </CardContent>
-                                        <CardFooter>
-                                            <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                                                <div className="flex justify-between items-baseline">
-                                                    <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Total Revenue</Label>
-                                                    <p className="text-3xl font-bold">{formatCurrency(stats.cashSales + stats.momoSales)}</p>
-                                                </div>
-
-                                                <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 text-sm space-y-1">
-                                                    <div className="flex justify-between items-center text-green-700 dark:text-green-300">
-                                                        <span className="font-bold">Today's Sales Only:</span>
-                                                        <span className="font-bold">{formatCurrency((stats.cashSales - stats.settledUnpaidCash) + (stats.momoSales - stats.settledUnpaidMomo) - (stats.miscCashExpenses + stats.miscMomoExpenses))}</span>
-                                                    </div>
-                                                    {stats.settledUnpaidOrdersValue > 0 && (
-                                                        <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
-                                                            <span>+ Collections from previous:</span>
-                                                            <button
-                                                                onClick={() => setShowCollectionsModal(true)}
-                                                                className="font-semibold underline"
-                                                                title="View orders contributing to collections"
-                                                            >
-                                                                {formatCurrency(stats.settledUnpaidOrdersValue)}
                                                             </button>
                                                         </div>
-                                                    )}
-                                                    {(stats.miscCashExpenses + stats.miscMomoExpenses) > 0 && (
-                                                        <div className="flex justify-between items-center text-rose-600 dark:text-rose-400 text-xs">
-                                                            <span>Expenses deducted:</span>
-                                                            <span>-{formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)}</span>
+                                                        <div className="text-xs text-muted-foreground space-y-0.5">
+                                                            <div className="flex justify-between">
+                                                                <span>Today's sales:</span>
+                                                                <span className="font-medium">{formatCurrency(stats.cashSales - stats.settledUnpaidCash)}</span>
+                                                            </div>
+                                                            {stats.settledUnpaidCash > 0 && (
+                                                                <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                                                                    <span>+ Collections:</span>
+                                                                    <span className="font-medium">{formatCurrency(stats.settledUnpaidCash)}</span>
+                                                                </div>
+                                                            )}
                                                         </div>
+                                                    </CardContent>
+                                                </Card>
+
+                                                <Card>
+                                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3">
+                                                        <CardTitle className="text-xs md:text-sm font-medium">Momo/Card Sales</CardTitle>
+                                                        <CreditCard className="text-muted-foreground h-4 w-4 flex-shrink-0" />
+                                                    </CardHeader>
+                                                    <CardContent className="p-3 pt-0">
+                                                        <div className="text-lg md:text-2xl font-bold">
+                                                            <button
+                                                                className="underline font-semibold"
+                                                                onClick={() => {
+                                                                    const ordersList: any[] = [];
+                                                                    (stats.orders || []).forEach((order: any) => {
+                                                                        if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
+                                                                            const amt = order.paymentHistory.reduce((sum: number, p: any) => {
+                                                                                if (p.method === 'momo' || p.method === 'card') return sum + (p.amount || 0);
+                                                                                return sum;
+                                                                            }, 0);
+                                                                            if (amt > 0) ordersList.push({ order, amount: amt, method: 'momo' });
+                                                                        } else if (order.paymentBreakdown && order.paymentBreakdown.momo) {
+                                                                            const amt = order.paymentBreakdown.momo || 0;
+                                                                            if (amt > 0) ordersList.push({ order, amount: amt, method: 'momo' });
+                                                                        } else if (order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
+                                                                            const amt = Math.max(0, (order.amountPaid || 0) - (order.changeGiven || 0));
+                                                                            if (amt > 0) ordersList.push({ order, amount: amt, method: order.paymentMethod });
+                                                                        }
+                                                                    });
+                                                                    setSelectedSalesOrders(ordersList);
+                                                                    setShowMomoModal(true);
+                                                                }}
+                                                            >
+                                                                {formatCurrency(stats.momoSales)}
+                                                            </button>
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground space-y-0.5">
+                                                            <div className="flex justify-between">
+                                                                <span>Today's sales:</span>
+                                                                <span className="font-medium">{formatCurrency(stats.momoSales - stats.settledUnpaidMomo)}</span>
+                                                            </div>
+                                                            {stats.settledUnpaidMomo > 0 && (
+                                                                <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                                                                    <span>+ Collections:</span>
+                                                                    <span className="font-medium">{formatCurrency(stats.settledUnpaidMomo)}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                                <StatCard
+                                                    icon={<Hourglass className="text-muted-foreground" />}
+                                                    title="Unpaid Orders (All Time)"
+                                                    value={formatCurrency(stats.allTimeUnpaidOrdersValue)}
+                                                    description={
+                                                        <span>
+                                                            <strong className="text-base font-semibold text-foreground">Today: {formatCurrency(stats.todayUnpaidOrdersValue)}</strong>
+                                                            {' | '}
+                                                            Previous: {formatCurrency(stats.previousUnpaidOrdersValue)}
+                                                        </span>
+                                                    }
+                                                    onClick={() => setShowUnpaidModal(true)}
+                                                />
+                                                <StatCard
+                                                    icon={<MinusCircle className="text-muted-foreground" />}
+                                                    title="Total Misc. Expenses"
+                                                    value={formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)}
+                                                    description={`Cash: ${formatCurrency(stats.miscCashExpenses)} | Momo: ${formatCurrency(stats.miscMomoExpenses)}`}
+                                                    onClick={() => setShowExpensesModal(true)}
+                                                />
+                                                <StatCard
+                                                    icon={<Gift className="text-muted-foreground" />}
+                                                    title="Reward Discounts"
+                                                    value={formatCurrency(stats.totalRewardDiscount)}
+                                                    description="Total discounts from rewards"
+                                                    onClick={() => setShowRewardsModal(true)}
+                                                />
+                                                <StatCard
+                                                    icon={<Ban className="text-muted-foreground" />}
+                                                    title="Pardoned Deficits"
+                                                    value={formatCurrency(stats.totalPardonedAmount)}
+                                                    description="Unplanned discounts given today"
+                                                    onClick={() => setShowPardonedModal(true)}
+                                                />
+                                                <StatCard
+                                                    icon={<ArrowRightLeft className="text-muted-foreground" />}
+                                                    title="Change Owed"
+                                                    value={formatCurrency(stats.changeOwedForPeriod)}
+                                                    description="Total change owed to customers today"
+                                                    onClick={() => setShowChangeOwedModal(true)}
+                                                />
+                                                <StatCard
+                                                    icon={<Coins className="text-muted-foreground" />}
+                                                    title="Previous Change Given"
+                                                    value={formatCurrency(stats.previousDaysChangeGiven)}
+                                                    description="Change for old orders given today"
+                                                    onClick={() => setShowPrevChangeModal(true)}
+                                                />
+                                            </CardContent>
+                                            <CardFooter>
+                                                <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                                                    <div className="flex justify-between items-baseline">
+                                                        <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Total Revenue</Label>
+                                                        <p className="text-3xl font-bold">{formatCurrency(stats.cashSales + stats.momoSales)}</p>
+                                                    </div>
+
+                                                    <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 text-sm space-y-1">
+                                                        <div className="flex justify-between items-center text-green-700 dark:text-green-300">
+                                                            <span className="font-bold">Today's Sales Only:</span>
+                                                            <span className="font-bold">{formatCurrency((stats.cashSales - stats.settledUnpaidCash) + (stats.momoSales - stats.settledUnpaidMomo) - (stats.miscCashExpenses + stats.miscMomoExpenses))}</span>
+                                                        </div>
+                                                        {stats.settledUnpaidOrdersValue > 0 && (
+                                                            <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
+                                                                <span>+ Collections from previous:</span>
+                                                                <button
+                                                                    onClick={() => setShowCollectionsModal(true)}
+                                                                    className="font-semibold underline"
+                                                                    title="View orders contributing to collections"
+                                                                >
+                                                                    {formatCurrency(stats.settledUnpaidOrdersValue)}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {(stats.miscCashExpenses + stats.miscMomoExpenses) > 0 && (
+                                                            <div className="flex justify-between items-center text-rose-600 dark:text-rose-400 text-xs">
+                                                                <span>Expenses deducted:</span>
+                                                                <span>-{formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </CardFooter>
+                                        </Card>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <Card className="flex-1 flex flex-col">
+                                            <CardHeader>
+                                                <CardTitle>Item Sales (Completed Orders)</CardTitle>
+                                                <CardDescription>Total count and value of each item sold today.</CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="flex-1 overflow-y-auto">
+                                                <div className="space-y-2">
+                                                    {sortedItemStats.length > 0 ? (
+                                                        sortedItemStats.map(([name, itemStat]) => (
+                                                            <div key={name} className="flex justify-between items-center p-3 rounded-lg bg-secondary">
+                                                                <div>
+                                                                    <p className="font-semibold">{name}</p>
+                                                                    <p className="text-sm text-muted-foreground">{itemStat.count} sold</p>
+                                                                </div>
+                                                                <Badge variant="destructive">{formatCurrency(itemStat.totalValue)}</Badge>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <div className="h-full flex items-center justify-center text-muted-foreground">
+                                                            <p>No items sold today.</p>
+                                                        </div>
+                                                    )}
+
+                                                    {showCollectionsModal && (
+                                                        <Dialog open={showCollectionsModal} onOpenChange={setShowCollectionsModal}>
+                                                            <DialogContent className="max-w-3xl max-h-[80vh]">
+                                                                <DialogHeader>
+                                                                    <DialogTitle>Collections From Previous Orders</DialogTitle>
+                                                                    <DialogDescription>Payments received today for orders placed on previous days.</DialogDescription>
+                                                                </DialogHeader>
+                                                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                                                    {previousCollections.length === 0 ? (
+                                                                        <p className="text-muted-foreground">No collections recorded.</p>
+                                                                    ) : (
+                                                                        previousCollections.map((c, idx) => (
+                                                                            <div key={`${c.orderId}-${idx}`} className="p-3 border rounded-lg bg-card">
+                                                                                <div className="flex justify-between items-start">
+                                                                                    <div>
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="font-semibold">{c.simplifiedId || c.orderId}</span>
+                                                                                            {c.tag && <Badge variant="outline" className="text-xs">{c.tag}</Badge>}
+                                                                                            <Badge className="text-xs">{c.method?.toUpperCase()}</Badge>
+                                                                                        </div>
+                                                                                        <p className="text-sm text-muted-foreground mt-1">{c.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                                                        <p className="text-xs text-muted-foreground mt-1">{c.timestamp ? format(new Date(c.timestamp), 'hh:mm a') : ''}</p>
+                                                                                    </div>
+                                                                                    <div className="font-bold">{formatCurrency(c.amount)}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))
+                                                                    )}
+                                                                </div>
+                                                                <DialogFooter>
+                                                                    <Button variant="ghost" onClick={() => setShowCollectionsModal(false)}>Close</Button>
+                                                                </DialogFooter>
+                                                            </DialogContent>
+                                                        </Dialog>
                                                     )}
                                                 </div>
-                                            </div>
-                                        </CardFooter>
-                                    </Card>
-                                </div>
-                                <div className="flex flex-col">
-                                    <Card className="flex-1 flex flex-col">
-                                        <CardHeader>
-                                            <CardTitle>Item Sales (Completed Orders)</CardTitle>
-                                            <CardDescription>Total count and value of each item sold today.</CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="flex-1 overflow-y-auto">
-                                            <div className="space-y-2">
-                                                {sortedItemStats.length > 0 ? (
-                                                    sortedItemStats.map(([name, itemStat]) => (
-                                                        <div key={name} className="flex justify-between items-center p-3 rounded-lg bg-secondary">
-                                                            <div>
-                                                                <p className="font-semibold">{name}</p>
-                                                                <p className="text-sm text-muted-foreground">{itemStat.count} sold</p>
-                                                            </div>
-                                                            <Badge variant="destructive">{formatCurrency(itemStat.totalValue)}</Badge>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    <div className="h-full flex items-center justify-center text-muted-foreground">
-                                                        <p>No items sold today.</p>
-                                                    </div>
-                                                )}
-
-                                                {showCollectionsModal && (
-                                                    <Dialog open={showCollectionsModal} onOpenChange={setShowCollectionsModal}>
-                                                        <DialogContent className="max-w-3xl max-h-[80vh]">
-                                                            <DialogHeader>
-                                                                <DialogTitle>Collections From Previous Orders</DialogTitle>
-                                                                <DialogDescription>Payments received today for orders placed on previous days.</DialogDescription>
-                                                            </DialogHeader>
-                                                            <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
-                                                                {previousCollections.length === 0 ? (
-                                                                    <p className="text-muted-foreground">No collections recorded.</p>
-                                                                ) : (
-                                                                    previousCollections.map((c, idx) => (
-                                                                        <div key={`${c.orderId}-${idx}`} className="p-3 border rounded-lg bg-card">
-                                                                            <div className="flex justify-between items-start">
-                                                                                <div>
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <span className="font-semibold">{c.simplifiedId || c.orderId}</span>
-                                                                                        {c.tag && <Badge variant="outline" className="text-xs">{c.tag}</Badge>}
-                                                                                        <Badge className="text-xs">{c.method?.toUpperCase()}</Badge>
-                                                                                    </div>
-                                                                                    <p className="text-sm text-muted-foreground mt-1">{c.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
-                                                                                    <p className="text-xs text-muted-foreground mt-1">{c.timestamp ? format(new Date(c.timestamp), 'hh:mm a') : ''}</p>
-                                                                                </div>
-                                                                                <div className="font-bold">{formatCurrency(c.amount)}</div>
-                                                                            </div>
-                                                                        </div>
-                                                                    ))
-                                                                )}
-                                                            </div>
-                                                            <DialogFooter>
-                                                                <Button variant="ghost" onClick={() => setShowCollectionsModal(false)}>Close</Button>
-                                                            </DialogFooter>
-                                                        </DialogContent>
-                                                    </Dialog>
-                                                )}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ) : (
-                        <p className="p-6 text-muted-foreground">No data for today.</p>
-                    )}
-                    {showCashModal && (
-                        <Dialog open={showCashModal} onOpenChange={setShowCashModal}>
-                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                                <DialogHeader>
-                                    <DialogTitle>Cash Sales - Orders</DialogTitle>
-                                    <DialogDescription>Orders contributing to today's cash sales.</DialogDescription>
-                                </DialogHeader>
-                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
-                                    {selectedSalesOrders.length === 0 ? (
-                                        <p className="text-muted-foreground">No cash sales found.</p>
-                                    ) : (
-                                        selectedSalesOrders.map((c: any, idx: number) => (
-                                            <div key={`${c.order.id}-${idx}`} className="p-3 border rounded-lg bg-card">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-semibold">{c.order.simplifiedId}</span>
-                                                            {c.order.tag && <Badge variant="outline" className="text-xs">{c.order.tag}</Badge>}
-                                                            <Badge className="text-xs">{c.method?.toUpperCase()}</Badge>
+                        ) : (
+                            <p className="p-6 text-muted-foreground">No data for today.</p>
+                        )}
+                        {showCashModal && (
+                            <Dialog open={showCashModal} onOpenChange={setShowCashModal}>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Cash Sales - Orders</DialogTitle>
+                                        <DialogDescription>Orders contributing to today's cash sales.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                        {selectedSalesOrders.length === 0 ? (
+                                            <p className="text-muted-foreground">No cash sales found.</p>
+                                        ) : (
+                                            selectedSalesOrders.map((c: any, idx: number) => (
+                                                <div key={`${c.order.id}-${idx}`} className="p-3 border rounded-lg bg-card">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold">{c.order.simplifiedId}</span>
+                                                                {c.order.tag && <Badge variant="outline" className="text-xs">{c.order.tag}</Badge>}
+                                                                <Badge className="text-xs">{c.method?.toUpperCase()}</Badge>
+                                                            </div>
+                                                            <p className="text-sm text-muted-foreground mt-1">{c.order.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                            <p className="text-xs text-muted-foreground mt-1">{c.order.timestamp ? format(c.order.timestamp.toDate(), 'hh:mm a') : ''}</p>
                                                         </div>
-                                                        <p className="text-sm text-muted-foreground mt-1">{c.order.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">{c.order.timestamp ? format(c.order.timestamp.toDate(), 'hh:mm a') : ''}</p>
+                                                        <div className="font-bold">{formatCurrency(c.amount)}</div>
                                                     </div>
-                                                    <div className="font-bold">{formatCurrency(c.amount)}</div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="ghost" onClick={() => setShowCashModal(false)}>Close</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    )}
+                                            ))
+                                        )}
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="ghost" onClick={() => setShowCashModal(false)}>Close</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
 
-                    {showMomoModal && (
-                        <Dialog open={showMomoModal} onOpenChange={setShowMomoModal}>
-                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                                <DialogHeader>
-                                    <DialogTitle>MoMo/Card Sales - Orders</DialogTitle>
-                                    <DialogDescription>Orders contributing to today's momo/card sales.</DialogDescription>
-                                </DialogHeader>
-                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
-                                    {selectedSalesOrders.length === 0 ? (
-                                        <p className="text-muted-foreground">No momo/card sales found.</p>
-                                    ) : (
-                                        selectedSalesOrders.map((c: any, idx: number) => (
-                                            <div key={`${c.order.id}-${idx}`} className="p-3 border rounded-lg bg-card">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-semibold">{c.order.simplifiedId}</span>
-                                                            {c.order.tag && <Badge variant="outline" className="text-xs">{c.order.tag}</Badge>}
-                                                            <Badge className="text-xs">{(c.method || '').toUpperCase()}</Badge>
+                        {showMomoModal && (
+                            <Dialog open={showMomoModal} onOpenChange={setShowMomoModal}>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>MoMo/Card Sales - Orders</DialogTitle>
+                                        <DialogDescription>Orders contributing to today's momo/card sales.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                        {selectedSalesOrders.length === 0 ? (
+                                            <p className="text-muted-foreground">No momo/card sales found.</p>
+                                        ) : (
+                                            selectedSalesOrders.map((c: any, idx: number) => (
+                                                <div key={`${c.order.id}-${idx}`} className="p-3 border rounded-lg bg-card">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold">{c.order.simplifiedId}</span>
+                                                                {c.order.tag && <Badge variant="outline" className="text-xs">{c.order.tag}</Badge>}
+                                                                <Badge className="text-xs">{(c.method || '').toUpperCase()}</Badge>
+                                                            </div>
+                                                            <p className="text-sm text-muted-foreground mt-1">{c.order.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                            <p className="text-xs text-muted-foreground mt-1">{c.order.timestamp ? format(c.order.timestamp.toDate(), 'hh:mm a') : ''}</p>
                                                         </div>
-                                                        <p className="text-sm text-muted-foreground mt-1">{c.order.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">{c.order.timestamp ? format(c.order.timestamp.toDate(), 'hh:mm a') : ''}</p>
+                                                        <div className="font-bold">{formatCurrency(c.amount)}</div>
                                                     </div>
-                                                    <div className="font-bold">{formatCurrency(c.amount)}</div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="ghost" onClick={() => setShowMomoModal(false)}>Close</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    )}
+                                            ))
+                                        )}
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="ghost" onClick={() => setShowMomoModal(false)}>Close</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
 
-                    {/* Total Sales Modal */}
-                    {showTotalSalesModal && stats && (
-                        <Dialog open={showTotalSalesModal} onOpenChange={setShowTotalSalesModal}>
-                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                                <DialogHeader>
-                                    <DialogTitle>Total Sales - All Orders</DialogTitle>
-                                    <DialogDescription>All completed orders contributing to today's sales.</DialogDescription>
-                                </DialogHeader>
-                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
-                                    {stats.orders.filter((o: Order) => o.status === 'Completed').length === 0 ? (
-                                        <p className="text-muted-foreground">No completed orders found.</p>
-                                    ) : (
-                                        stats.orders.filter((o: Order) => o.status === 'Completed').map((order: Order) => (
-                                            <div key={order.id} className="p-3 border rounded-lg bg-card">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-semibold">{order.simplifiedId}</span>
-                                                            {order.tag && <Badge variant="outline" className="text-xs">{order.tag}</Badge>}
-                                                            <Badge className="text-xs">{(order.paymentMethod || 'N/A').toUpperCase()}</Badge>
+                        {/* Total Sales Modal */}
+                        {showTotalSalesModal && stats && (
+                            <Dialog open={showTotalSalesModal} onOpenChange={setShowTotalSalesModal}>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Total Sales - All Orders</DialogTitle>
+                                        <DialogDescription>All completed orders contributing to today's sales.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                        {stats.orders.filter((o: Order) => o.status === 'Completed').length === 0 ? (
+                                            <p className="text-muted-foreground">No completed orders found.</p>
+                                        ) : (
+                                            stats.orders.filter((o: Order) => o.status === 'Completed').map((order: Order) => (
+                                                <div key={order.id} className="p-3 border rounded-lg bg-card">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold">{order.simplifiedId}</span>
+                                                                {order.tag && <Badge variant="outline" className="text-xs">{order.tag}</Badge>}
+                                                                <Badge className="text-xs">{(order.paymentMethod || 'N/A').toUpperCase()}</Badge>
+                                                            </div>
+                                                            <p className="text-sm text-muted-foreground mt-1">{order.items?.map((it) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                            <p className="text-xs text-muted-foreground mt-1">{order.timestamp ? format(order.timestamp.toDate(), 'hh:mm a') : ''}</p>
                                                         </div>
-                                                        <p className="text-sm text-muted-foreground mt-1">{order.items?.map((it) => `${it.quantity}x ${it.name}`).join(', ')}</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">{order.timestamp ? format(order.timestamp.toDate(), 'hh:mm a') : ''}</p>
+                                                        <div className="font-bold">{formatCurrency(order.total)}</div>
                                                     </div>
-                                                    <div className="font-bold">{formatCurrency(order.total)}</div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="ghost" onClick={() => setShowTotalSalesModal(false)}>Close</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    )}
+                                            ))
+                                        )}
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="ghost" onClick={() => setShowTotalSalesModal(false)}>Close</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
 
-                    {/* Unpaid Orders Modal */}
-                    {showUnpaidModal && (
-                        <Dialog open={showUnpaidModal} onOpenChange={setShowUnpaidModal}>
-                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                                <DialogHeader>
-                                    <DialogTitle>Unpaid Orders</DialogTitle>
-                                    <DialogDescription>Orders with outstanding balances.</DialogDescription>
-                                </DialogHeader>
-                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
-                                    {allUnpaidOrders.length === 0 ? (
-                                        <p className="text-muted-foreground">No unpaid orders found.</p>
-                                    ) : (
-                                        allUnpaidOrders.map((order: Order) => (
-                                            <div key={order.id} className="p-3 border rounded-lg bg-card">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-semibold">{order.simplifiedId}</span>
-                                                            {order.tag && <Badge variant="outline" className="text-xs">{order.tag}</Badge>}
-                                                            <Badge variant="destructive" className="text-xs">UNPAID</Badge>
+                        {/* Unpaid Orders Modal */}
+                        {showUnpaidModal && (
+                            <Dialog open={showUnpaidModal} onOpenChange={setShowUnpaidModal}>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Unpaid Orders</DialogTitle>
+                                        <DialogDescription>Orders with outstanding balances.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                        {allUnpaidOrders.length === 0 ? (
+                                            <p className="text-muted-foreground">No unpaid orders found.</p>
+                                        ) : (
+                                            allUnpaidOrders.map((order: Order) => (
+                                                <div key={order.id} className="p-3 border rounded-lg bg-card">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold">{order.simplifiedId}</span>
+                                                                {order.tag && <Badge variant="outline" className="text-xs">{order.tag}</Badge>}
+                                                                <Badge variant="destructive" className="text-xs">UNPAID</Badge>
+                                                            </div>
+                                                            <p className="text-sm text-muted-foreground mt-1">{order.items?.map((it) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                            <p className="text-xs text-muted-foreground mt-1">{order.timestamp ? format(order.timestamp.toDate(), 'MMM dd, hh:mm a') : ''}</p>
                                                         </div>
-                                                        <p className="text-sm text-muted-foreground mt-1">{order.items?.map((it) => `${it.quantity}x ${it.name}`).join(', ')}</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">{order.timestamp ? format(order.timestamp.toDate(), 'MMM dd, hh:mm a') : ''}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="font-bold text-destructive">{formatCurrency(order.total - (order.amountPaid || 0))}</div>
-                                                        <div className="text-xs text-muted-foreground">of {formatCurrency(order.total)}</div>
+                                                        <div className="text-right">
+                                                            <div className="font-bold text-destructive">{formatCurrency(order.total - (order.amountPaid || 0))}</div>
+                                                            <div className="text-xs text-muted-foreground">of {formatCurrency(order.total)}</div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="ghost" onClick={() => setShowUnpaidModal(false)}>Close</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    )}
+                                            ))
+                                        )}
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="ghost" onClick={() => setShowUnpaidModal(false)}>Close</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
 
-                    {/* Misc Expenses Modal */}
-                    {showExpensesModal && (
-                        <Dialog open={showExpensesModal} onOpenChange={setShowExpensesModal}>
-                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                                <DialogHeader>
-                                    <DialogTitle>Miscellaneous Expenses</DialogTitle>
-                                    <DialogDescription>All expenses recorded today.</DialogDescription>
-                                </DialogHeader>
-                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
-                                    {miscExpenses.length === 0 ? (
-                                        <p className="text-muted-foreground">No expenses recorded today.</p>
-                                    ) : (
-                                        miscExpenses.map((expense: MiscExpense) => (
-                                            <div key={expense.id} className="p-3 border rounded-lg bg-card">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-semibold">{expense.purpose}</span>
-                                                            <Badge variant={expense.source === 'cash' ? 'default' : 'secondary'} className="text-xs">
-                                                                {expense.source.toUpperCase()}
-                                                            </Badge>
+                        {/* Misc Expenses Modal */}
+                        {showExpensesModal && (
+                            <Dialog open={showExpensesModal} onOpenChange={setShowExpensesModal}>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Miscellaneous Expenses</DialogTitle>
+                                        <DialogDescription>All expenses recorded today.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                        {miscExpenses.length === 0 ? (
+                                            <p className="text-muted-foreground">No expenses recorded today.</p>
+                                        ) : (
+                                            miscExpenses.map((expense: MiscExpense) => (
+                                                <div key={expense.id} className="p-3 border rounded-lg bg-card">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold">{expense.purpose}</span>
+                                                                <Badge variant={expense.source === 'cash' ? 'default' : 'secondary'} className="text-xs">
+                                                                    {expense.source.toUpperCase()}
+                                                                </Badge>
+                                                            </div>
+                                                            <p className="text-xs text-muted-foreground mt-1">
+                                                                by {expense.cashierName} • {expense.timestamp ? format(expense.timestamp.toDate(), 'hh:mm a') : ''}
+                                                            </p>
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground mt-1">
-                                                            by {expense.cashierName} • {expense.timestamp ? format(expense.timestamp.toDate(), 'hh:mm a') : ''}
-                                                        </p>
+                                                        <div className="font-bold text-destructive">-{formatCurrency(expense.amount)}</div>
                                                     </div>
-                                                    <div className="font-bold text-destructive">-{formatCurrency(expense.amount)}</div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="ghost" onClick={() => setShowExpensesModal(false)}>Close</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    )}
+                                            ))
+                                        )}
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="ghost" onClick={() => setShowExpensesModal(false)}>Close</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
 
-                    {/* Rewards Discounts Modal */}
-                    {showRewardsModal && stats && (
-                        <Dialog open={showRewardsModal} onOpenChange={setShowRewardsModal}>
-                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                                <DialogHeader>
-                                    <DialogTitle>Reward Discounts</DialogTitle>
-                                    <DialogDescription>Orders with reward discounts applied today.</DialogDescription>
-                                </DialogHeader>
-                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
-                                    {stats.orders.filter((o: Order) => (o.rewardDiscount || 0) > 0).length === 0 ? (
-                                        <p className="text-muted-foreground">No reward discounts applied today.</p>
-                                    ) : (
-                                        stats.orders.filter((o: Order) => (o.rewardDiscount || 0) > 0).map((order: Order) => (
-                                            <div key={order.id} className="p-3 border rounded-lg bg-card">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-semibold">{order.simplifiedId}</span>
-                                                            {order.tag && <Badge variant="outline" className="text-xs">{order.tag}</Badge>}
-                                                            <Badge className="text-xs bg-pink-500">REWARD</Badge>
+                        {/* Rewards Discounts Modal */}
+                        {showRewardsModal && stats && (
+                            <Dialog open={showRewardsModal} onOpenChange={setShowRewardsModal}>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Reward Discounts</DialogTitle>
+                                        <DialogDescription>Orders with reward discounts applied today.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                        {stats.orders.filter((o: Order) => (o.rewardDiscount || 0) > 0).length === 0 ? (
+                                            <p className="text-muted-foreground">No reward discounts applied today.</p>
+                                        ) : (
+                                            stats.orders.filter((o: Order) => (o.rewardDiscount || 0) > 0).map((order: Order) => (
+                                                <div key={order.id} className="p-3 border rounded-lg bg-card">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold">{order.simplifiedId}</span>
+                                                                {order.tag && <Badge variant="outline" className="text-xs">{order.tag}</Badge>}
+                                                                <Badge className="text-xs bg-pink-500">REWARD</Badge>
+                                                            </div>
+                                                            <p className="text-sm text-muted-foreground mt-1">{order.items?.map((it) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                            <p className="text-xs text-muted-foreground mt-1">{order.timestamp ? format(order.timestamp.toDate(), 'hh:mm a') : ''}</p>
                                                         </div>
-                                                        <p className="text-sm text-muted-foreground mt-1">{order.items?.map((it) => `${it.quantity}x ${it.name}`).join(', ')}</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">{order.timestamp ? format(order.timestamp.toDate(), 'hh:mm a') : ''}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="font-bold text-pink-600">-{formatCurrency(order.rewardDiscount || 0)}</div>
-                                                        <div className="text-xs text-muted-foreground">Order total: {formatCurrency(order.total)}</div>
+                                                        <div className="text-right">
+                                                            <div className="font-bold text-pink-600">-{formatCurrency(order.rewardDiscount || 0)}</div>
+                                                            <div className="text-xs text-muted-foreground">Order total: {formatCurrency(order.total)}</div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="ghost" onClick={() => setShowRewardsModal(false)}>Close</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    )}
+                                            ))
+                                        )}
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="ghost" onClick={() => setShowRewardsModal(false)}>Close</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
 
-                    {/* Pardoned Deficits Modal */}
-                    {showPardonedModal && stats && (
-                        <Dialog open={showPardonedModal} onOpenChange={setShowPardonedModal}>
-                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                                <DialogHeader>
-                                    <DialogTitle>Pardoned Deficits</DialogTitle>
-                                    <DialogDescription>Orders with pardoned amounts today.</DialogDescription>
-                                </DialogHeader>
-                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
-                                    {stats.orders.filter((o: Order) => (o.pardonedAmount || 0) > 0).length === 0 ? (
-                                        <p className="text-muted-foreground">No pardoned amounts today.</p>
-                                    ) : (
-                                        stats.orders.filter((o: Order) => (o.pardonedAmount || 0) > 0).map((order: Order) => (
-                                            <div key={order.id} className="p-3 border rounded-lg bg-card">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-semibold">{order.simplifiedId}</span>
-                                                            {order.tag && <Badge variant="outline" className="text-xs">{order.tag}</Badge>}
-                                                            <Badge variant="destructive" className="text-xs">PARDONED</Badge>
+                        {/* Pardoned Deficits Modal */}
+                        {showPardonedModal && stats && (
+                            <Dialog open={showPardonedModal} onOpenChange={setShowPardonedModal}>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Pardoned Deficits</DialogTitle>
+                                        <DialogDescription>Orders with pardoned amounts today.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                        {stats.orders.filter((o: Order) => (o.pardonedAmount || 0) > 0).length === 0 ? (
+                                            <p className="text-muted-foreground">No pardoned amounts today.</p>
+                                        ) : (
+                                            stats.orders.filter((o: Order) => (o.pardonedAmount || 0) > 0).map((order: Order) => (
+                                                <div key={order.id} className="p-3 border rounded-lg bg-card">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold">{order.simplifiedId}</span>
+                                                                {order.tag && <Badge variant="outline" className="text-xs">{order.tag}</Badge>}
+                                                                <Badge variant="destructive" className="text-xs">PARDONED</Badge>
+                                                            </div>
+                                                            <p className="text-sm text-muted-foreground mt-1">{order.items?.map((it) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                            <p className="text-xs text-muted-foreground mt-1">{order.timestamp ? format(order.timestamp.toDate(), 'hh:mm a') : ''}</p>
                                                         </div>
-                                                        <p className="text-sm text-muted-foreground mt-1">{order.items?.map((it) => `${it.quantity}x ${it.name}`).join(', ')}</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">{order.timestamp ? format(order.timestamp.toDate(), 'hh:mm a') : ''}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="font-bold text-amber-600">-{formatCurrency(order.pardonedAmount || 0)}</div>
-                                                        <div className="text-xs text-muted-foreground">Order total: {formatCurrency(order.total)}</div>
+                                                        <div className="text-right">
+                                                            <div className="font-bold text-amber-600">-{formatCurrency(order.pardonedAmount || 0)}</div>
+                                                            <div className="text-xs text-muted-foreground">Order total: {formatCurrency(order.total)}</div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="ghost" onClick={() => setShowPardonedModal(false)}>Close</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    )}
+                                            ))
+                                        )}
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="ghost" onClick={() => setShowPardonedModal(false)}>Close</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
 
-                    {/* Change Owed Modal */}
-                    {showChangeOwedModal && stats && (
-                        <Dialog open={showChangeOwedModal} onOpenChange={setShowChangeOwedModal}>
-                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                                <DialogHeader>
-                                    <DialogTitle>Change Owed to Customers</DialogTitle>
-                                    <DialogDescription>Orders where change is still owed to customers.</DialogDescription>
-                                </DialogHeader>
-                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
-                                    {stats.orders.filter((o: Order) => o.changeGiven > 0 && o.paymentStatus === 'Paid').length === 0 ? (
-                                        <p className="text-muted-foreground">No change transactions today.</p>
-                                    ) : (
-                                        stats.orders.filter((o: Order) => o.changeGiven > 0 && o.paymentStatus === 'Paid').map((order: Order) => (
-                                            <div key={order.id} className="p-3 border rounded-lg bg-card">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-semibold">{order.simplifiedId}</span>
-                                                            {order.tag && <Badge variant="outline" className="text-xs">{order.tag}</Badge>}
-                                                            <Badge variant="secondary" className="text-xs">CHANGE GIVEN</Badge>
+                        {/* Change Owed Modal */}
+                        {showChangeOwedModal && stats && (
+                            <Dialog open={showChangeOwedModal} onOpenChange={setShowChangeOwedModal}>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Change Owed to Customers</DialogTitle>
+                                        <DialogDescription>Orders where change is still owed to customers.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                        {stats.orders.filter((o: Order) => o.changeGiven > 0 && o.paymentStatus === 'Paid').length === 0 ? (
+                                            <p className="text-muted-foreground">No change transactions today.</p>
+                                        ) : (
+                                            stats.orders.filter((o: Order) => o.changeGiven > 0 && o.paymentStatus === 'Paid').map((order: Order) => (
+                                                <div key={order.id} className="p-3 border rounded-lg bg-card">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold">{order.simplifiedId}</span>
+                                                                {order.tag && <Badge variant="outline" className="text-xs">{order.tag}</Badge>}
+                                                                <Badge variant="secondary" className="text-xs">CHANGE GIVEN</Badge>
+                                                            </div>
+                                                            <p className="text-sm text-muted-foreground mt-1">{order.items?.map((it) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                            <p className="text-xs text-muted-foreground mt-1">{order.timestamp ? format(order.timestamp.toDate(), 'hh:mm a') : ''}</p>
                                                         </div>
-                                                        <p className="text-sm text-muted-foreground mt-1">{order.items?.map((it) => `${it.quantity}x ${it.name}`).join(', ')}</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">{order.timestamp ? format(order.timestamp.toDate(), 'hh:mm a') : ''}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="font-bold text-orange-600">{formatCurrency(order.changeGiven || 0)}</div>
-                                                        <div className="text-xs text-muted-foreground">Paid: {formatCurrency(order.amountPaid || 0)}</div>
+                                                        <div className="text-right">
+                                                            <div className="font-bold text-orange-600">{formatCurrency(order.changeGiven || 0)}</div>
+                                                            <div className="text-xs text-muted-foreground">Paid: {formatCurrency(order.amountPaid || 0)}</div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="ghost" onClick={() => setShowChangeOwedModal(false)}>Close</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    )}
+                                            ))
+                                        )}
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="ghost" onClick={() => setShowChangeOwedModal(false)}>Close</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
 
-                    {/* Previous Change Given Modal */}
-                    {showPrevChangeModal && stats && (
-                        <Dialog open={showPrevChangeModal} onOpenChange={setShowPrevChangeModal}>
-                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                                <DialogHeader>
-                                    <DialogTitle>Previous Change Given</DialogTitle>
-                                    <DialogDescription>Change given today for orders from previous days.</DialogDescription>
-                                </DialogHeader>
-                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
-                                    {previousCollections.filter((c: any) => c.isChangeGiven).length === 0 ? (
-                                        <p className="text-muted-foreground">No previous change given today.</p>
-                                    ) : (
-                                        previousCollections.filter((c: any) => c.isChangeGiven).map((c: any, idx: number) => (
-                                            <div key={`${c.orderId}-${idx}`} className="p-3 border rounded-lg bg-card">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-semibold">{c.simplifiedId || c.orderId}</span>
-                                                            {c.tag && <Badge variant="outline" className="text-xs">{c.tag}</Badge>}
+                        {/* Previous Change Given Modal */}
+                        {showPrevChangeModal && stats && (
+                            <Dialog open={showPrevChangeModal} onOpenChange={setShowPrevChangeModal}>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                    <DialogHeader>
+                                        <DialogTitle>Previous Change Given</DialogTitle>
+                                        <DialogDescription>Change given today for orders from previous days.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                        {previousCollections.filter((c: any) => c.isChangeGiven).length === 0 ? (
+                                            <p className="text-muted-foreground">No previous change given today.</p>
+                                        ) : (
+                                            previousCollections.filter((c: any) => c.isChangeGiven).map((c: any, idx: number) => (
+                                                <div key={`${c.orderId}-${idx}`} className="p-3 border rounded-lg bg-card">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold">{c.simplifiedId || c.orderId}</span>
+                                                                {c.tag && <Badge variant="outline" className="text-xs">{c.tag}</Badge>}
+                                                            </div>
+                                                            <p className="text-sm text-muted-foreground mt-1">{c.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
+                                                            <p className="text-xs text-muted-foreground mt-1">Order from: {c.orderDate || 'N/A'}</p>
                                                         </div>
-                                                        <p className="text-sm text-muted-foreground mt-1">{c.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')}</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">Order from: {c.orderDate || 'N/A'}</p>
+                                                        <div className="font-bold text-blue-600">{formatCurrency(c.amount || 0)}</div>
                                                     </div>
-                                                    <div className="font-bold text-blue-600">{formatCurrency(c.amount || 0)}</div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="ghost" onClick={() => setShowPrevChangeModal(false)}>Close</Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    )}
-                </TabsContent>
-                <TabsContent value="history" className="flex-1 overflow-hidden mt-4">
-                    <ScrollArea className="h-full">
-                        <HistoryView />
-                    </ScrollArea>
-                </TabsContent>
-            </Tabs>
-            {stats && showUnpaidOrdersWarning && (
-                <AlertDialog open onOpenChange={setShowUnpaidOrdersWarning}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader><AlertDialogTitle>Unpaid Orders Found</AlertDialogTitle><AlertDialogDescription>There are unpaid orders from today totaling {formatCurrency(stats.todayUnpaidOrdersValue)}. It's recommended to resolve these before closing the day.</AlertDialogDescription></AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <Button variant="secondary" onClick={() => { setShowUnpaidOrdersWarning(false); setShowReconciliation(true); }}>Proceed Anyway</Button>
-                            <AlertDialogAction onClick={() => { setShowUnpaidOrdersWarning(false); setActiveView('orders'); }}><ShoppingCart className="mr-2 h-4 w-4" />Go to Orders</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            )}
-        </ScrollArea>
+                                            ))
+                                        )}
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="ghost" onClick={() => setShowPrevChangeModal(false)}>Close</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
+                    </TabsContent>
+                    <TabsContent value="history" className="flex-1 overflow-hidden mt-4">
+                        <ScrollArea className="h-full">
+                            <HistoryView />
+                        </ScrollArea>
+                    </TabsContent>
+                </Tabs>
+                {stats && showUnpaidOrdersWarning && (
+                    <AlertDialog open onOpenChange={setShowUnpaidOrdersWarning}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader><AlertDialogTitle>Unpaid Orders Found</AlertDialogTitle><AlertDialogDescription>There are unpaid orders from today totaling {formatCurrency(stats.todayUnpaidOrdersValue)}. It's recommended to resolve these before closing the day.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <Button variant="secondary" onClick={() => { setShowUnpaidOrdersWarning(false); setShowReconciliation(true); }}>Proceed Anyway</Button>
+                                <AlertDialogAction onClick={() => { setShowUnpaidOrdersWarning(false); setActiveView('orders'); }}><ShoppingCart className="mr-2 h-4 w-4" />Go to Orders</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                )}
+            </ScrollArea>
         </div>
     );
 };
