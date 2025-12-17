@@ -65,51 +65,51 @@ const RewardContent = ({ totalToPay, onApplyReward, onBack }: { totalToPay: numb
     };
 
     return (
-     <>
-        <DialogHeader>
-          <DialogTitle>Apply Customer Reward</DialogTitle>
-          <DialogDescription>Search for a customer or select from the eligible list.</DialogDescription>
-        </DialogHeader>
-        <div className="py-4 space-y-4">
-            <div className="relative">
-                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                    placeholder="Search eligible customer..." 
-                    value={rewardSearch} 
-                    onChange={(e) => setRewardSearch(e.target.value)} 
-                    autoFocus
-                    className="pl-10"
-                />
-            </div>
-            <ScrollArea className="h-60 border rounded-md">
-                {isLoading ? (
-                    <div className="flex justify-center items-center h-full"><LoadingSpinner/></div>
-                ) : filteredCustomers.length > 0 ? (
-                    filteredCustomers.map(customer => {
-                        const discount = Math.floor(customer.bagCount / 5) * 10;
-                        return (
-                            <div key={customer.id} className="p-3 border-b flex justify-between items-center hover:bg-secondary">
-                                <div>
-                                    <p className="font-semibold">{customer.customerTag}</p>
-                                    <p className="text-sm text-muted-foreground">Bags: {customer.bagCount} | Discount: {formatCurrency(discount)}</p>
+        <>
+            <DialogHeader>
+                <DialogTitle>Apply Customer Reward</DialogTitle>
+                <DialogDescription>Search for a customer or select from the eligible list.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+                <div className="relative">
+                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search eligible customer..."
+                        value={rewardSearch}
+                        onChange={(e) => setRewardSearch(e.target.value)}
+                        autoFocus
+                        className="pl-10"
+                    />
+                </div>
+                <ScrollArea className="h-60 border rounded-md">
+                    {isLoading ? (
+                        <div className="flex justify-center items-center h-full"><LoadingSpinner /></div>
+                    ) : filteredCustomers.length > 0 ? (
+                        filteredCustomers.map(customer => {
+                            const discount = Math.floor(customer.bagCount / 5) * 10;
+                            return (
+                                <div key={customer.id} className="p-3 border-b flex justify-between items-center hover:bg-secondary">
+                                    <div>
+                                        <p className="font-semibold">{customer.customerTag}</p>
+                                        <p className="text-sm text-muted-foreground">Bags: {customer.bagCount} | Discount: {formatCurrency(discount)}</p>
+                                    </div>
+                                    <Button size="sm" onClick={() => handleSelectRewardCustomer(customer)} disabled={discount <= 0}>
+                                        Apply
+                                    </Button>
                                 </div>
-                                <Button size="sm" onClick={() => handleSelectRewardCustomer(customer)} disabled={discount <= 0}>
-                                    Apply
-                                </Button>
-                            </div>
-                        )
-                    })
-                ) : (
-                    <p className="p-4 text-center text-muted-foreground">
-                        {rewardSearch.trim() ? 'No customers match your search.' : 'No customers are currently eligible for a reward.'}
-                    </p>
-                )}
-            </ScrollArea>
-        </div>
-        <DialogFooter>
-            <Button variant="secondary" onClick={onBack}>Back to Payment</Button>
-        </DialogFooter>
-     </>
+                            )
+                        })
+                    ) : (
+                        <p className="p-4 text-center text-muted-foreground">
+                            {rewardSearch.trim() ? 'No customers match your search.' : 'No customers are currently eligible for a reward.'}
+                        </p>
+                    )}
+                </ScrollArea>
+            </div>
+            <DialogFooter>
+                <Button variant="secondary" onClick={onBack}>Back to Payment</Button>
+            </DialogFooter>
+        </>
     );
 };
 
@@ -137,7 +137,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             return acc;
         }, 0);
     }, [orders]);
-    
+
     const finalTotal = Math.max(0, totalToPay - (reward?.discount ?? 0));
 
     const amountPaidNum = parseFloat(amountPaidInput) || 0;
@@ -157,10 +157,10 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         : 0;
     const hasOutstandingChange = changeStillDue > 0.009;
     const exceedsChangeDue = change > 0 && normalizedChangeInput - change > 0.009;
-    
+
     const isAmountPaidEntered = amountPaidInput.trim() !== '';
     const showDeficitOptions = isAmountPaidEntered && deficit > 0;
-    
+
     const handleApplyReward = (appliedReward: RewardApplication) => {
         setReward(appliedReward);
         setIsApplyingReward(false);
@@ -168,38 +168,38 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 
     const processCombinedPayment = async ({ pardonDeficit = false }) => {
         if (!isAmountPaidEntered) {
-             setError("Please enter an amount paid.");
-             return;
+            setError("Please enter an amount paid.");
+            return;
         }
 
         setIsProcessing(true);
         setError(null);
-        
+
         try {
             const batch = writeBatch(db);
             const now = serverTimestamp();
             let paymentToApply = amountPaidNum;
-            
-            // This will hold the total payments applied to each order
-            const paymentDistribution: Record<string, {cash: number, momo: number}> = {};
 
-            const sortedOrders = [...orders].sort((a,b) => a.balanceDue - b.balanceDue);
+            // This will hold the total payments applied to each order
+            const paymentDistribution: Record<string, { cash: number, momo: number }> = {};
+
+            const sortedOrders = [...orders].sort((a, b) => a.balanceDue - b.balanceDue);
 
             for (const order of sortedOrders) {
                 if (order.balanceDue <= 0 || paymentToApply <= 0) continue;
 
                 let remainingBalance = order.balanceDue;
                 const paymentForThisOrder = Math.min(paymentToApply, remainingBalance);
-                
+
                 const cashForThisOrder = paymentMethod === 'cash' ? paymentForThisOrder : 0;
                 const momoForThisOrder = paymentMethod === 'momo' ? paymentForThisOrder : 0;
-                
+
                 paymentDistribution[order.id] = { cash: cashForThisOrder, momo: momoForThisOrder };
                 paymentToApply -= paymentForThisOrder;
             }
 
-            for(const order of sortedOrders) {
-                if(!paymentDistribution[order.id]) continue;
+            for (const order of sortedOrders) {
+                if (!paymentDistribution[order.id]) continue;
 
                 const orderRef = doc(db, "orders", order.id);
                 const orderData = (await getDoc(orderRef)).data() as Order;
@@ -207,7 +207,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 const cashApplied = paymentDistribution[order.id].cash;
                 const momoApplied = paymentDistribution[order.id].momo;
                 const totalApplied = cashApplied + momoApplied;
-                
+
                 const newAmountPaid = orderData.amountPaid + totalApplied;
                 let newBalanceDue = orderData.balanceDue - totalApplied;
 
@@ -216,11 +216,11 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     cash: existingBreakdown.cash + cashApplied,
                     momo: existingBreakdown.momo + momoApplied,
                 };
-                
+
                 let finalPaymentMethod: 'cash' | 'momo' | 'split' = 'split';
-                if(newBreakdown.cash > 0 && newBreakdown.momo === 0) finalPaymentMethod = 'cash';
-                if(newBreakdown.momo > 0 && newBreakdown.cash === 0) finalPaymentMethod = 'momo';
-                
+                if (newBreakdown.cash > 0 && newBreakdown.momo === 0) finalPaymentMethod = 'cash';
+                if (newBreakdown.momo > 0 && newBreakdown.cash === 0) finalPaymentMethod = 'momo';
+
                 const updateData: any = {
                     amountPaid: newAmountPaid,
                     lastPaymentTimestamp: now,
@@ -228,25 +228,40 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     paymentMethod: finalPaymentMethod,
                     paymentBreakdown: newBreakdown
                 };
-                
+
+                const existingHistory = Array.isArray((orderData as any).paymentHistory)
+                    ? (orderData as any).paymentHistory
+                    : [];
+                const newHistoryEntries: any[] = [];
+                if (cashApplied > 0) {
+                    newHistoryEntries.push({ amount: cashApplied, method: 'cash', timestamp: now });
+                }
+                if (momoApplied > 0) {
+                    // Treat card as momo for now (momo/card are displayed together).
+                    newHistoryEntries.push({ amount: momoApplied, method: 'momo', timestamp: now });
+                }
+                if (newHistoryEntries.length > 0) {
+                    updateData.paymentHistory = [...existingHistory, ...newHistoryEntries];
+                }
+
                 if (newBalanceDue <= 0.01) {
                     updateData.paymentStatus = 'Paid';
                 } else {
                     updateData.paymentStatus = 'Partially Paid';
                 }
-    
+
                 updateData.balanceDue = newBalanceDue;
                 batch.update(orderRef, updateData);
             }
-            
+
             const lastOrder = sortedOrders.find(o => paymentDistribution[o.id]);
             if (lastOrder) {
                 const lastOrderRef = doc(db, "orders", lastOrder.id);
                 let finalUpdate: any = {};
-    
+
                 if (change > 0) {
                     const newChangeStillDue = Math.max(0, Number((change - changeGivenAmount).toFixed(2)));
-                    finalUpdate.balanceDue = -(change - changeGivenAmount); 
+                    finalUpdate.balanceDue = -(change - changeGivenAmount);
                     finalUpdate.changeGiven = (lastOrder.changeGiven || 0) + changeGivenAmount;
                     finalUpdate.paymentStatus = newChangeStillDue < 0.01 ? 'Paid' : 'Partially Paid';
                     finalUpdate.settledOn = newChangeStillDue < 0.01 ? now : null;
@@ -257,7 +272,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     finalUpdate.balanceDue = 0;
                     finalUpdate.paymentStatus = 'Paid';
                 }
-    
+
                 if (reward) {
                     const rewardRef = doc(db, 'rewards', reward.customer.id);
                     batch.update(rewardRef, {
@@ -265,16 +280,16 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                         totalRedeemed: (reward.customer.totalRedeemed || 0) + reward.discount,
                         updatedAt: serverTimestamp()
                     });
-    
+
                     finalUpdate.rewardDiscount = (lastOrder.rewardDiscount || 0) + reward.discount;
                     finalUpdate.rewardCustomerTag = reward.customer.customerTag;
                 }
-                
+
                 if (Object.keys(finalUpdate).length > 0) {
                     batch.update(lastOrderRef, finalUpdate);
                 }
             }
-    
+
             await batch.commit();
             onOrderPlaced();
         } catch (e) {
@@ -284,7 +299,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             setIsProcessing(false);
         }
     };
-    
+
     const MainPaymentContent = () => (
         <>
             <DialogHeader>
@@ -294,41 +309,41 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 
             <ScrollArea className="h-40 my-2 border rounded-md p-3 pr-4">
                 <div className="space-y-2">
-                {orders.map(order => (
-                    <div key={order.id} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
-                       <div>
-                            <p className="font-semibold">{order.simplifiedId}</p>
-                            <p className="text-xs text-muted-foreground">{order.tag || 'No Tag'}</p>
-                       </div>
-                       <Badge variant={order.balanceDue > 0 ? "secondary" : "default"}>
-                            {formatCurrency(order.balanceDue > 0 ? order.balanceDue : order.total)}
-                       </Badge>
-                    </div>
-                ))}
+                    {orders.map(order => (
+                        <div key={order.id} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
+                            <div>
+                                <p className="font-semibold">{order.simplifiedId}</p>
+                                <p className="text-xs text-muted-foreground">{order.tag || 'No Tag'}</p>
+                            </div>
+                            <Badge variant={order.balanceDue > 0 ? "secondary" : "default"}>
+                                {formatCurrency(order.balanceDue > 0 ? order.balanceDue : order.total)}
+                            </Badge>
+                        </div>
+                    ))}
                 </div>
             </ScrollArea>
-            
+
             <div className="text-center py-2 space-y-1">
                 {reward && <p className="text-sm text-muted-foreground line-through">{formatCurrency(totalToPay)}</p>}
                 <p className="text-4xl font-bold text-primary">{formatCurrency(finalTotal)}</p>
                 {reward && <Badge variant="secondary"><Gift className="h-3 w-3 mr-1.5" />{formatCurrency(reward.discount)} discount applied</Badge>}
             </div>
-            
+
             <div className="space-y-4 pt-2 p-4 border rounded-lg">
                 <div>
                     <Label>Payment Method</Label>
                     <div className="grid grid-cols-2 gap-2 mt-1">
-                        <Button onClick={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'outline'} className="h-12"><Coins className="mr-2"/>Cash</Button>
-                        <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'outline'} className="h-12"><CreditCard className="mr-2"/>Momo</Button>
+                        <Button onClick={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'outline'} className="h-12"><Coins className="mr-2" />Cash</Button>
+                        <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'outline'} className="h-12"><CreditCard className="mr-2" />Momo</Button>
                     </div>
                 </div>
                 <div>
                     <Label htmlFor="amountPaid">Amount Paid ({paymentMethod})</Label>
-                    <Input id="amountPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="0.00" autoFocus className="mt-1 h-12 text-lg"/>
+                    <Input id="amountPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="0.00" autoFocus className="mt-1 h-12 text-lg" />
                 </div>
-                        
+
                 {change > 0 && (
-                        <div className="text-center">
+                    <div className="text-center">
                         <p className="font-semibold text-red-500">Change Due: {formatCurrency(change)}</p>
                         <div className="mt-2">
                             <Label htmlFor="changeGiven">Amount Given as Change</Label>
@@ -352,12 +367,12 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 {showDeficitOptions && (
                     <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>
                 )}
-                 {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+                {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
             </div>
 
             <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
                 <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
-                  <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
+                    <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
                 </Button>
                 {showDeficitOptions ? (
                     <div className="grid grid-cols-2 gap-2">
@@ -376,11 +391,11 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
             </DialogFooter>
         </>
     );
-    
+
     return (
         <Dialog open onOpenChange={onClose}>
             <DialogContent className="sm:max-w-lg">
-                 {isApplyingReward ? <RewardContent totalToPay={totalToPay} onApplyReward={handleApplyReward} onBack={() => setIsApplyingReward(false)} /> : <MainPaymentContent />}
+                {isApplyingReward ? <RewardContent totalToPay={totalToPay} onApplyReward={handleApplyReward} onBack={() => setIsApplyingReward(false)} /> : <MainPaymentContent />}
             </DialogContent>
         </Dialog>
     );

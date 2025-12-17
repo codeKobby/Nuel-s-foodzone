@@ -54,6 +54,13 @@ export interface Order {
   lastPaymentTimestamp?: Timestamp;
   lastPaymentAmount?: number;
   settledOn?: Timestamp;
+  // If an order ended the day owing change (balanceDue < 0), the cashier can decide
+  // at End-of-Day whether that change is physically set aside (reserved) or left in
+  // the drawer to be treated as usable cash. This flag is used to decide whether
+  // paying the change on a later day should reduce that day's expected cash.
+  changeSetAside?: boolean;
+  changeSetAsidePeriod?: string; // YYYY-MM-DD when the set-aside choice was made
+  changeSetAsideAt?: Timestamp;
   notes?: string;
   cashierId: string;
   cashierName: string;
@@ -129,6 +136,11 @@ export interface ReconciliationReport {
   changeOwedForPeriod: number;
   changeOwedSetAside: boolean;
   previousDaysChangeGiven: number;
+  // Optional split of previous-day change given (for accurate cross-day logic)
+  // - From sales: reduces expected cash for the day
+  // - From set aside: paid from reserved change and should not affect expected cash
+  previousDaysChangeGivenFromSales?: number;
+  previousDaysChangeGivenFromSetAside?: number;
 
   // Cashier info
   cashierId: string;
@@ -288,6 +300,8 @@ export interface PeriodStats {
   changeOwedForPeriod: number;
   settledUnpaidOrdersValue: number;
   previousDaysChangeGiven: number;
+  previousDaysChangeGivenFromSales: number;
+  previousDaysChangeGivenFromSetAside: number;
   totalRewardDiscount: number;
   orders: Order[];
   activityOrders: Order[];

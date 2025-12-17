@@ -86,6 +86,6 @@ Node.js `v25.2.0` introduced a regression that throws `SecurityError: Cannot ini
 ### Recommended fix
 
 - **Upgrade** to `Node.js v25.2.1` (or newer) or **downgrade** to the stable `v24.x` LTS line. Both versions revert the breaking behavior.
-- Until you change Node versions, the dev script sets `NODE_OPTIONS="--no-experimental-webstorage"` so that the experimental WebStorage API stays disabled during `npm run dev`.
+- The dev script runs `next dev` directly (no custom `NODE_OPTIONS`).
 
 If you intentionally need Node-side persistence, run Next.js with `node --localstorage-file=./localStorage.json node_modules/.bin/next dev -p 9002`, but this is rarely necessary.

@@ -56,7 +56,9 @@ export const useAccounting = () => {
             let settledUnpaidOrdersValue = 0,
               settledUnpaidCash = 0,
               settledUnpaidMomo = 0,
-              previousDaysChangeGiven = 0;
+              previousDaysChangeGiven = 0,
+              previousDaysChangeGivenFromSales = 0,
+              previousDaysChangeGivenFromSetAside = 0;
             let totalRewardDiscount = 0;
 
             const todayOrders: Order[] = [];
@@ -161,8 +163,16 @@ export const useAccounting = () => {
                   paymentDate <= todayEnd
                 ) {
                   hasPaymentActivityToday = true;
-                  const amountPaidTowardsOrder =
-                    order.amountPaid - order.changeGiven;
+                  // Avoid double-counting: amountPaid is cumulative over the life of the order.
+                  // For legacy orders without paymentHistory, rely on lastPaymentAmount which
+                  // represents what was paid on the most recent payment.
+                  const amountPaidTowardsOrder = order.lastPaymentAmount || 0;
+
+                  // If we can't determine the last payment amount, do not guess using cumulative totals.
+                  if (amountPaidTowardsOrder <= 0) {
+                    // Still treat as activity (timestamp moved), but don't add to revenue buckets.
+                    // This prevents overstating sales/collections.
+                  }
 
                   // Only add to momo/cash sales if order was created today
                   if (isTodayOrder && order.paymentBreakdown) {
@@ -184,25 +194,38 @@ export const useAccounting = () => {
 
                   // Track settlements from previous days by payment method
                   if (!isTodayOrder) {
-                    settledUnpaidOrdersValue += amountPaidTowardsOrder;
+                    if (amountPaidTowardsOrder > 0) {
+                      settledUnpaidOrdersValue += amountPaidTowardsOrder;
+                    }
                     // Determine method for this payment (best-effort for legacy orders)
-                    if (order.paymentBreakdown) {
-                      if (order.paymentBreakdown.cash) {
-                        settledUnpaidCash += order.paymentBreakdown.cash;
+                    if (amountPaidTowardsOrder > 0) {
+                      if (order.paymentMethod === "cash") {
+                        settledUnpaidCash += amountPaidTowardsOrder;
+                      } else if (
+                        order.paymentMethod === "momo" ||
+                        order.paymentMethod === "card"
+                      ) {
+                        settledUnpaidMomo += amountPaidTowardsOrder;
+                      } else {
+                        // If method is 'split'/'Unpaid' for a legacy order, infer the method when possible.
+                        const breakdownCash = order.paymentBreakdown?.cash || 0;
+                        const breakdownMomo = order.paymentBreakdown?.momo || 0;
+                        if (
+                          order.paymentBreakdown &&
+                          Math.abs(breakdownCash - amountPaidTowardsOrder) <
+                            0.01 &&
+                          breakdownMomo > 0
+                        ) {
+                          settledUnpaidCash += amountPaidTowardsOrder;
+                        } else if (
+                          order.paymentBreakdown &&
+                          Math.abs(breakdownMomo - amountPaidTowardsOrder) <
+                            0.01 &&
+                          breakdownCash > 0
+                        ) {
+                          settledUnpaidMomo += amountPaidTowardsOrder;
+                        }
                       }
-                      if (order.paymentBreakdown.momo) {
-                        settledUnpaidMomo += order.paymentBreakdown.momo;
-                      }
-                    } else if (order.paymentMethod === "cash") {
-                      settledUnpaidCash += amountPaidTowardsOrder;
-                    } else if (
-                      order.paymentMethod === "momo" ||
-                      order.paymentMethod === "card"
-                    ) {
-                      settledUnpaidMomo += amountPaidTowardsOrder;
-                    } else {
-                      // If unknown, assume cash for safety
-                      settledUnpaidCash += amountPaidTowardsOrder;
                     }
                   }
                 }
@@ -216,8 +239,16 @@ export const useAccounting = () => {
                 !isTodayOrder
               ) {
                 if (order.changeGiven > (order.pardonedAmount || 0)) {
-                  previousDaysChangeGiven +=
-                    order.changeGiven - (order.pardonedAmount || 0);
+                  const delta = order.changeGiven - (order.pardonedAmount || 0);
+                  previousDaysChangeGiven += delta;
+
+                  // If the original change was set aside on the day it was generated,
+                  // settling it on a later day should NOT reduce that day's expected cash.
+                  if (order.changeSetAside) {
+                    previousDaysChangeGivenFromSetAside += delta;
+                  } else {
+                    previousDaysChangeGivenFromSales += delta;
+                  }
                 }
               }
 
@@ -247,7 +278,7 @@ export const useAccounting = () => {
               cashSales -
               miscCashExpenses +
               settledUnpaidCash -
-              previousDaysChangeGiven;
+              previousDaysChangeGivenFromSales;
             // expectedMomo includes only momo collections from previous days
             const expectedMomo =
               momoSales - miscMomoExpenses + settledUnpaidMomo;
@@ -278,6 +309,8 @@ export const useAccounting = () => {
               settledUnpaidCash,
               settledUnpaidMomo,
               previousDaysChangeGiven,
+              previousDaysChangeGivenFromSales,
+              previousDaysChangeGivenFromSetAside,
               totalRewardDiscount,
               orders: todayOrders,
               activityOrders,
@@ -332,7 +365,7 @@ export const useAccounting = () => {
     let expected = stats.cashSales;
     expected += stats.settledUnpaidCash; // Only cash collections from previous days
     expected -= stats.miscCashExpenses;
-    expected -= stats.previousDaysChangeGiven;
+    expected -= stats.previousDaysChangeGivenFromSales;
     return expected;
   }, [stats]);
 

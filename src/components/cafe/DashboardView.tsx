@@ -243,13 +243,25 @@ const DashboardView: React.FC = () => {
                     collections += paymentAmount;
                   }
 
-                  // Use paymentBreakdown if available, otherwise fallback to paymentMethod
-                  if (o.paymentBreakdown) {
-                    if (o.paymentBreakdown.cash) cashSales += o.paymentBreakdown.cash;
-                    if (o.paymentBreakdown.momo) momoSales += o.paymentBreakdown.momo;
-                  } else if (o.paymentMethod === 'cash') {
+                  // Attribute ONLY the last payment amount for this period.
+                  // Do not use cumulative paymentBreakdown (it causes double-counting).
+                  let method = o.paymentMethod;
+                  const breakdownCash = o.paymentBreakdown?.cash || 0;
+                  const breakdownMomo = o.paymentBreakdown?.momo || 0;
+
+                  // Heuristic for legacy split orders: if lastPaymentAmount matches one side of the breakdown,
+                  // treat that as the method used for the last payment.
+                  if ((method === 'split' || method === 'Unpaid') && o.paymentBreakdown && paymentAmount > 0) {
+                    if (Math.abs(breakdownCash - paymentAmount) < 0.01 && breakdownMomo > 0) {
+                      method = 'cash';
+                    } else if (Math.abs(breakdownMomo - paymentAmount) < 0.01 && breakdownCash > 0) {
+                      method = 'momo';
+                    }
+                  }
+
+                  if (method === 'cash') {
                     cashSales += paymentAmount;
-                  } else if (o.paymentMethod === 'momo' || o.paymentMethod === 'card') {
+                  } else if (method === 'momo' || method === 'card') {
                     momoSales += paymentAmount;
                   }
                 }

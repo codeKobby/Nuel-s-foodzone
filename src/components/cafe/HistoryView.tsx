@@ -191,10 +191,16 @@ const HistoryView: React.FC = () => {
                                                                                 <span className="text-rose-600 dark:text-rose-400">({formatCurrency(report.miscCashExpenses || 0)})</span>
                                                                             </div>
                                                                         )}
-                                                                        {(report.previousDaysChangeGiven || 0) > 0 && (
+                                                                        {((report.previousDaysChangeGivenFromSales ?? report.previousDaysChangeGiven ?? 0) > 0) && (
                                                                             <div className="flex justify-between">
-                                                                                <span className="text-muted-foreground">- Previous Change Given:</span>
-                                                                                <span className="text-amber-600 dark:text-amber-400">({formatCurrency(report.previousDaysChangeGiven || 0)})</span>
+                                                                                <span className="text-muted-foreground">- Previous Change Given (From Sales):</span>
+                                                                                <span className="text-amber-600 dark:text-amber-400">({formatCurrency(report.previousDaysChangeGivenFromSales ?? report.previousDaysChangeGiven ?? 0)})</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {(report.previousDaysChangeGivenFromSetAside || 0) > 0 && (
+                                                                            <div className="flex justify-between">
+                                                                                <span className="text-muted-foreground">Previous Change Paid (From Set Aside):</span>
+                                                                                <span className="text-muted-foreground">{formatCurrency(report.previousDaysChangeGivenFromSetAside || 0)}</span>
                                                                             </div>
                                                                         )}
                                                                     </div>
@@ -336,7 +342,7 @@ const HistoryView: React.FC = () => {
                                                                 </div>
 
                                                                 {/* Change Tracking */}
-                                                                {(report.changeOwedForPeriod > 0 || (report.previousDaysChangeGiven || 0) > 0) && (
+                                                                {(report.changeOwedForPeriod > 0 || ((report.previousDaysChangeGivenFromSales ?? report.previousDaysChangeGiven ?? 0) > 0) || (report.previousDaysChangeGivenFromSetAside || 0) > 0) && (
                                                                     <div className="p-3 rounded-lg bg-gradient-to-br from-amber-500/5 to-yellow-500/5 border border-amber-500/20 space-y-2">
                                                                         <p className="font-medium text-sm flex items-center gap-2"><ArrowRightLeft className="h-4 w-4 text-amber-500" />Change Tracking</p>
                                                                         {report.changeOwedForPeriod > 0 && (
@@ -345,10 +351,16 @@ const HistoryView: React.FC = () => {
                                                                                 <span className="text-foreground">{formatCurrency(report.changeOwedForPeriod)}</span>
                                                                             </div>
                                                                         )}
-                                                                        {(report.previousDaysChangeGiven || 0) > 0 && (
+                                                                        {((report.previousDaysChangeGivenFromSales ?? report.previousDaysChangeGiven ?? 0) > 0) && (
                                                                             <div className="flex justify-between text-xs">
-                                                                                <span className="text-muted-foreground">Previous Change Given:</span>
-                                                                                <span className="text-foreground">-{formatCurrency(report.previousDaysChangeGiven || 0)}</span>
+                                                                                <span className="text-muted-foreground">Previous Change Given (From Sales):</span>
+                                                                                <span className="text-foreground">-{formatCurrency(report.previousDaysChangeGivenFromSales ?? report.previousDaysChangeGiven ?? 0)}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {(report.previousDaysChangeGivenFromSetAside || 0) > 0 && (
+                                                                            <div className="flex justify-between text-xs">
+                                                                                <span className="text-muted-foreground">Previous Change Paid (From Set Aside):</span>
+                                                                                <span className="text-foreground">{formatCurrency(report.previousDaysChangeGivenFromSetAside || 0)}</span>
                                                                             </div>
                                                                         )}
                                                                         <div className="flex justify-between text-xs">

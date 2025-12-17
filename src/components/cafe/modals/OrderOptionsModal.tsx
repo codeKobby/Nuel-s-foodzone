@@ -305,6 +305,21 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         if (paymentAmounts.totalPaidNow > 0) {
           orderData.lastPaymentTimestamp = serverTimestamp();
           orderData.lastPaymentAmount = paymentAmounts.totalPaidNow;
+
+          const existingHistory = Array.isArray(editingOrder.paymentHistory)
+            ? editingOrder.paymentHistory
+            : [];
+          const newHistoryEntries: any[] = [];
+          if (newCashPayment > 0) {
+            newHistoryEntries.push({ amount: newCashPayment, method: 'cash', timestamp: serverTimestamp() });
+          }
+          if (newMomoPayment > 0) {
+            // Treat card as momo for now (momo/card are displayed together).
+            newHistoryEntries.push({ amount: newMomoPayment, method: 'momo', timestamp: serverTimestamp() });
+          }
+          if (newHistoryEntries.length > 0) {
+            orderData.paymentHistory = [...existingHistory, ...newHistoryEntries];
+          }
         }
 
         await updateDoc(orderRef, orderData);
@@ -374,6 +389,17 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           if (paymentAmounts.totalPaidNow > 0) {
             newOrderWithId.lastPaymentTimestamp = serverTimestamp();
             newOrderWithId.lastPaymentAmount = paymentAmounts.totalPaidNow;
+
+            const newHistoryEntries: any[] = [];
+            if (newCashPayment > 0) {
+              newHistoryEntries.push({ amount: newCashPayment, method: 'cash', timestamp: serverTimestamp() });
+            }
+            if (newMomoPayment > 0) {
+              newHistoryEntries.push({ amount: newMomoPayment, method: 'momo', timestamp: serverTimestamp() });
+            }
+            if (newHistoryEntries.length > 0) {
+              (newOrderWithId as any).paymentHistory = newHistoryEntries;
+            }
           }
 
           transaction.set(newOrderRef, newOrderWithId);

@@ -223,9 +223,9 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
         if (isBalanced) {
             return { color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800', icon: CheckCircle, text: 'Balanced' };
         } else if (totalDiscrepancy > 0) {
-            return { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', icon: AlertTriangleIcon, text: `+${formatCurrency(Math.abs(totalDiscrepancy))}` };
+            return { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', icon: AlertTriangleIcon, text: formatCurrency(totalDiscrepancy) };
         } else {
-            return { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800', icon: AlertTriangleIcon, text: `-${formatCurrency(Math.abs(totalDiscrepancy))}` };
+            return { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800', icon: AlertTriangleIcon, text: formatCurrency(totalDiscrepancy) };
         }
     };
 

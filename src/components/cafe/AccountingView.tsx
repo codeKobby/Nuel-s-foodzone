@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { formatCurrency } from '@/lib/utils';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, onSnapshot, orderBy, writeBatch } from 'firebase/firestore';
 import { format, isToday } from 'date-fns';
 import { AuthContext } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -44,6 +44,8 @@ interface PeriodStats {
     settledUnpaidCash: number;
     settledUnpaidMomo: number;
     previousDaysChangeGiven: number;
+    previousDaysChangeGivenFromSales: number;
+    previousDaysChangeGivenFromSetAside: number;
     totalRewardDiscount: number;
     orders: Order[];
     itemStats: Record<string, { count: number; totalValue: number }>;
@@ -85,6 +87,12 @@ const ReconciliationView: React.FC<{
     const [momoTransactions, setMomoTransactions] = useState<number[]>([]);
     const [momoInput, setMomoInput] = useState('');
 
+    const expectedCashForPeriod = useMemo(() => {
+        // Expected cash is based on sales/collections/expenses (and previous-day change paid from sales).
+        // The change toggle affects how we treat *counted* cash availability, not what revenue is expected.
+        return adjustedExpectedCash;
+    }, [adjustedExpectedCash]);
+
     const totalCountedCash = useMemo(() => {
         return cashDenominations.reduce((total, den) => {
             const quantity = parseInt(String(denominationQuantities[String(den)] || '0')) || 0;
@@ -106,8 +114,8 @@ const ReconciliationView: React.FC<{
     }, [totalCountedCash, stats, deductCustomerChange]);
 
     const cashDiscrepancy = useMemo(() => {
-        return availableCash - adjustedExpectedCash;
-    }, [availableCash, adjustedExpectedCash]);
+        return availableCash - expectedCashForPeriod;
+    }, [availableCash, expectedCashForPeriod]);
 
     const momoDiscrepancy = useMemo(() => {
         if (!stats) return 0;
@@ -145,9 +153,9 @@ const ReconciliationView: React.FC<{
                 totalItemsSold: stats.totalItemsSold,
 
                 // Expected vs Counted
-                expectedCash: adjustedExpectedCash,
+                expectedCash: expectedCashForPeriod,
                 expectedMomo: adjustedExpectedMomo,
-                totalExpectedRevenue: adjustedExpectedCash + adjustedExpectedMomo,
+                totalExpectedRevenue: expectedCashForPeriod + adjustedExpectedMomo,
                 countedCash: totalCountedCash,
                 countedMomo: totalCountedMomo,
                 totalCountedRevenue: totalCountedCash + totalCountedMomo,
@@ -182,12 +190,32 @@ const ReconciliationView: React.FC<{
                 changeOwedForPeriod: stats.changeOwedForPeriod,
                 changeOwedSetAside: deductCustomerChange,
                 previousDaysChangeGiven: stats.previousDaysChangeGiven,
+                previousDaysChangeGivenFromSales: stats.previousDaysChangeGivenFromSales,
+                previousDaysChangeGivenFromSetAside: stats.previousDaysChangeGivenFromSetAside,
 
                 // Cashier info
                 cashierId: session?.uid || 'unknown',
                 cashierName: session?.fullName || session?.username || 'Unknown',
             };
-            await addDoc(collection(db, "reconciliationReports"), reportData);
+
+            // Persist report + per-order change set-aside decision atomically.
+            const batch = writeBatch(db);
+            const reportRef = doc(collection(db, "reconciliationReports"));
+            batch.set(reportRef, reportData);
+
+            const period = reportData.period as string;
+            (stats.orders || [])
+                .filter((o) => (o.balanceDue || 0) < 0)
+                .forEach((o) => {
+                    if (!o.id) return;
+                    batch.update(doc(db, 'orders', o.id), {
+                        changeSetAside: deductCustomerChange,
+                        changeSetAsidePeriod: period,
+                        changeSetAsideAt: serverTimestamp(),
+                    });
+                });
+
+            await batch.commit();
 
             // Clear localStorage unsaved flag
             localStorage.removeItem('unsavedReconciliation');
@@ -241,9 +269,9 @@ const ReconciliationView: React.FC<{
         if (Math.abs(discrepancy) < 0.01) {
             return { color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800', icon: CheckCircle, text: 'Balanced' };
         } else if (discrepancy > 0) {
-            return { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', icon: AlertTriangle, text: `+${formatCurrency(Math.abs(discrepancy))}` };
+            return { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', icon: AlertTriangle, text: formatCurrency(discrepancy) };
         } else {
-            return { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800', icon: AlertTriangle, text: `-${formatCurrency(Math.abs(discrepancy))}` };
+            return { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800', icon: AlertTriangle, text: formatCurrency(discrepancy) };
         }
     };
 
@@ -529,16 +557,17 @@ const ReconciliationView: React.FC<{
                                                     <div className="flex items-center space-x-3">
                                                         <Switch
                                                             id="deduct-change"
-                                                            checked={deductCustomerChange}
-                                                            onCheckedChange={setDeductCustomerChange}
+                                                            // UX: ON means "count as available cash" (do not deduct)
+                                                            checked={!deductCustomerChange}
+                                                            onCheckedChange={(val) => setDeductCustomerChange(!val)}
                                                         />
                                                         <Label htmlFor="deduct-change" className="font-medium">
-                                                            Deduct customer change from available cash?
+                                                            Count customer change as available cash?
                                                         </Label>
                                                     </div>
                                                 </div>
                                                 <p className="text-sm text-muted-foreground mt-3">
-                                                    {deductCustomerChange
+                                                    {!deductCustomerChange
                                                         ? "Change will be set aside and deducted from your available cash."
                                                         : "Change will be counted as part of available cash (pay customers immediately)."
                                                     }
@@ -593,9 +622,20 @@ const ReconciliationView: React.FC<{
                                                         <div className="flex justify-between"><span>Today's Cash Sales:</span><span className="font-medium">{formatCurrency(stats.cashSales)}</span></div>
                                                         <div className="flex justify-between text-red-600"><span>(-) Cash Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscCashExpenses)}</span></div>
                                                         {stats.settledUnpaidCash > 0 && <div className="flex justify-between text-green-600"><span>(+) Collections (Cash):</span><span className="font-medium">+{formatCurrency(stats.settledUnpaidCash)}</span></div>}
-                                                        {stats.previousDaysChangeGiven > 0 && <div className="flex justify-between text-orange-600"><span>(-) Previous Days Change:</span><span className="font-medium">-{formatCurrency(stats.previousDaysChangeGiven)}</span></div>}
+                                                        {stats.previousDaysChangeGivenFromSales > 0 && (
+                                                            <div className="flex justify-between text-orange-600">
+                                                                <span>(-) Previous Days Change (From Sales):</span>
+                                                                <span className="font-medium">-{formatCurrency(stats.previousDaysChangeGivenFromSales)}</span>
+                                                            </div>
+                                                        )}
+                                                        {stats.previousDaysChangeGivenFromSetAside > 0 && (
+                                                            <div className="flex justify-between text-muted-foreground">
+                                                                <span>Previous Change Paid (From Set Aside):</span>
+                                                                <span className="font-medium">{formatCurrency(stats.previousDaysChangeGivenFromSetAside)}</span>
+                                                            </div>
+                                                        )}
                                                         <UiSeparator />
-                                                        <div className="flex justify-between font-bold text-blue-700 text-base"><span>Expected Cash:</span><span>{formatCurrency(adjustedExpectedCash)}</span></div>
+                                                        <div className="flex justify-between font-bold text-blue-700 text-base"><span>Expected Cash:</span><span>{formatCurrency(expectedCashForPeriod)}</span></div>
                                                     </div>
                                                 </div>
                                                 <div className="space-y-3">
@@ -611,7 +651,7 @@ const ReconciliationView: React.FC<{
                                             </div>
                                         </CardContent>
                                         <CardFooter className="bg-primary/10 p-4">
-                                            <div className="w-full flex justify-between items-center"><span className="font-bold text-primary text-lg">Total Expected:</span><span className="font-extrabold text-primary text-xl">{formatCurrency(adjustedExpectedCash + adjustedExpectedMomo)}</span></div>
+                                            <div className="w-full flex justify-between items-center"><span className="font-bold text-primary text-lg">Total Expected:</span><span className="font-extrabold text-primary text-xl">{formatCurrency(expectedCashForPeriod + adjustedExpectedMomo)}</span></div>
                                         </CardFooter>
                                     </Card>
 
@@ -824,6 +864,8 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                 let totalPardonedAmount = 0, changeOwedForPeriod = 0;
                 let settledUnpaidOrdersValue = 0, settledUnpaidCash = 0, settledUnpaidMomo = 0;
                 let previousDaysChangeGiven = 0;
+                let previousDaysChangeGivenFromSales = 0;
+                let previousDaysChangeGivenFromSetAside = 0;
                 let totalRewardDiscount = 0;
                 const collectionsDetails: any[] = [];
                 const unpaidOrdersList: Order[] = [];
@@ -834,6 +876,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                 const allOrders = allOrdersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
 
                 allOrders.forEach(order => {
+                    if (!order.timestamp) return;
                     const orderDate = order.timestamp.toDate();
                     const isTodayOrder = orderDate >= todayStart && orderDate <= todayEnd;
 
@@ -916,53 +959,63 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         const paymentDate = order.lastPaymentTimestamp?.toDate();
                         if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
 
-                            const amountPaidTowardsOrder = order.amountPaid - order.changeGiven;
+                            // Legacy fallback: amountPaid is cumulative; only count what was paid on the latest payment.
+                            const amountPaidTowardsOrder = order.lastPaymentAmount || 0;
 
-                            if (order.paymentBreakdown) {
-                                const reward = order.rewardDiscount || 0;
-                                const orderNetTotal = (order.total || 0) - reward;
-                                if (order.paymentBreakdown.cash) {
-                                    cashSales += Math.min(orderNetTotal, order.paymentBreakdown.cash);
-                                }
-                                if (order.paymentBreakdown.momo) {
-                                    momoSales += Math.min(orderNetTotal, order.paymentBreakdown.momo);
-                                }
-                            } else {
-                                const reward = order.rewardDiscount || 0;
-                                const orderNetTotal = (order.total || 0) - reward;
-                                const revenueAmount = Math.min(amountPaidTowardsOrder, orderNetTotal);
+                            // Only add to momo/cash sales if the order itself was created today.
+                            // For previous-day orders, today's payment should be tracked as a collection instead.
+                            if (isTodayOrder) {
+                                if (order.paymentBreakdown) {
+                                    const reward = order.rewardDiscount || 0;
+                                    const orderNetTotal = (order.total || 0) - reward;
+                                    if (order.paymentBreakdown.cash) {
+                                        cashSales += Math.min(orderNetTotal, order.paymentBreakdown.cash);
+                                    }
+                                    if (order.paymentBreakdown.momo) {
+                                        momoSales += Math.min(orderNetTotal, order.paymentBreakdown.momo);
+                                    }
+                                } else {
+                                    const reward = order.rewardDiscount || 0;
+                                    const orderNetTotal = (order.total || 0) - reward;
+                                    const revenueAmount = Math.min(amountPaidTowardsOrder, orderNetTotal);
 
-                                if (order.paymentMethod === 'cash') {
-                                    cashSales += revenueAmount;
-                                } else if (order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
-                                    momoSales += revenueAmount;
+                                    if (order.paymentMethod === 'cash') {
+                                        cashSales += revenueAmount;
+                                    } else if (order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
+                                        momoSales += revenueAmount;
+                                    }
                                 }
                             }
 
                             if (!isTodayOrder) {
-                                settledUnpaidOrdersValue += amountPaidTowardsOrder;
-                                // Determine method for this payment (best-effort) and track separately
-                                let method = order.paymentMethod || 'cash';
-                                if (order.paymentBreakdown) {
-                                    if ((order.paymentBreakdown.cash || 0) > 0 && (order.paymentBreakdown.momo || 0) > 0) {
-                                        method = 'split';
-                                        settledUnpaidCash += order.paymentBreakdown.cash || 0;
-                                        settledUnpaidMomo += order.paymentBreakdown.momo || 0;
-                                    } else if ((order.paymentBreakdown.momo || 0) > 0) {
-                                        method = 'momo';
-                                        settledUnpaidMomo += amountPaidTowardsOrder;
-                                    } else {
-                                        method = 'cash';
-                                        settledUnpaidCash += amountPaidTowardsOrder;
-                                    }
-                                } else if (method === 'cash') {
-                                    settledUnpaidCash += amountPaidTowardsOrder;
-                                } else if (method === 'momo' || method === 'card') {
-                                    settledUnpaidMomo += amountPaidTowardsOrder;
-                                } else {
-                                    // Default to cash if unknown
-                                    settledUnpaidCash += amountPaidTowardsOrder;
+                                if (amountPaidTowardsOrder > 0) {
+                                    settledUnpaidOrdersValue += amountPaidTowardsOrder;
                                 }
+
+                                // Determine method for THIS payment (best-effort) and track separately.
+                                // IMPORTANT: Do NOT use cumulative paymentBreakdown to attribute today's payment.
+                                let method: any = order.paymentMethod || 'cash';
+                                const breakdownCash = order.paymentBreakdown?.cash || 0;
+                                const breakdownMomo = order.paymentBreakdown?.momo || 0;
+
+                                // Heuristic for legacy split orders: if the lastPaymentAmount matches one side
+                                // of the breakdown, treat that as the method used today.
+                                if ((method === 'split' || method === 'Unpaid') && order.paymentBreakdown && amountPaidTowardsOrder > 0) {
+                                    if (Math.abs(breakdownCash - amountPaidTowardsOrder) < 0.01 && breakdownMomo > 0) {
+                                        method = 'cash';
+                                    } else if (Math.abs(breakdownMomo - amountPaidTowardsOrder) < 0.01 && breakdownCash > 0) {
+                                        method = 'momo';
+                                    }
+                                }
+
+                                if (amountPaidTowardsOrder > 0) {
+                                    if (method === 'cash') {
+                                        settledUnpaidCash += amountPaidTowardsOrder;
+                                    } else if (method === 'momo' || method === 'card') {
+                                        settledUnpaidMomo += amountPaidTowardsOrder;
+                                    }
+                                }
+
                                 collectionsDetails.push({
                                     orderId: order.id,
                                     simplifiedId: order.simplifiedId,
@@ -979,7 +1032,13 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                     const settledDate = order.settledOn?.toDate();
                     if (settledDate && settledDate >= todayStart && settledDate <= todayEnd && !isTodayOrder) {
                         if (order.changeGiven > (order.pardonedAmount || 0)) {
-                            previousDaysChangeGiven += (order.changeGiven - (order.pardonedAmount || 0));
+                            const delta = order.changeGiven - (order.pardonedAmount || 0);
+                            previousDaysChangeGiven += delta;
+                            if (order.changeSetAside) {
+                                previousDaysChangeGivenFromSetAside += delta;
+                            } else {
+                                previousDaysChangeGivenFromSales += delta;
+                            }
                         }
                     }
                 });
@@ -988,6 +1047,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                 const todayMiscExpenses: MiscExpense[] = [];
                 miscExpensesSnapshot.docs.forEach(doc => {
                     const expense = { id: doc.id, ...doc.data() } as MiscExpense;
+                    if (!expense.timestamp) return;
                     const expenseDate = expense.timestamp.toDate();
                     if (expenseDate >= todayStart && expenseDate <= todayEnd) {
                         todayMiscExpenses.push(expense);
@@ -1019,6 +1079,8 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                     settledUnpaidCash,
                     settledUnpaidMomo,
                     previousDaysChangeGiven,
+                    previousDaysChangeGivenFromSales,
+                    previousDaysChangeGivenFromSetAside,
                     totalRewardDiscount,
                     orders: todayOrders,
                     itemStats
@@ -1077,7 +1139,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
         let expected = stats.cashSales;
         expected += stats.settledUnpaidCash; // Only cash collections from previous days
         expected -= stats.miscCashExpenses;
-        expected -= stats.previousDaysChangeGiven;
+        expected -= stats.previousDaysChangeGivenFromSales;
         return expected;
     }, [stats]);
 
