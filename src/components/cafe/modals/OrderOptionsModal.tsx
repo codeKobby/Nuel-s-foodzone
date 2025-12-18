@@ -306,16 +306,20 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           orderData.lastPaymentTimestamp = serverTimestamp();
           orderData.lastPaymentAmount = paymentAmounts.totalPaidNow;
 
+          // Firestore doesn't support serverTimestamp() inside arrays.
+          // Use a concrete Timestamp for per-entry history.
+          const historyTimestamp = Timestamp.now();
+
           const existingHistory = Array.isArray(editingOrder.paymentHistory)
             ? editingOrder.paymentHistory
             : [];
           const newHistoryEntries: any[] = [];
           if (newCashPayment > 0) {
-            newHistoryEntries.push({ amount: newCashPayment, method: 'cash', timestamp: serverTimestamp() });
+            newHistoryEntries.push({ amount: newCashPayment, method: 'cash', timestamp: historyTimestamp });
           }
           if (newMomoPayment > 0) {
             // Treat card as momo for now (momo/card are displayed together).
-            newHistoryEntries.push({ amount: newMomoPayment, method: 'momo', timestamp: serverTimestamp() });
+            newHistoryEntries.push({ amount: newMomoPayment, method: 'momo', timestamp: historyTimestamp });
           }
           if (newHistoryEntries.length > 0) {
             orderData.paymentHistory = [...existingHistory, ...newHistoryEntries];
@@ -390,12 +394,15 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
             newOrderWithId.lastPaymentTimestamp = serverTimestamp();
             newOrderWithId.lastPaymentAmount = paymentAmounts.totalPaidNow;
 
+            // Firestore doesn't support serverTimestamp() inside arrays.
+            const historyTimestamp = Timestamp.now();
+
             const newHistoryEntries: any[] = [];
             if (newCashPayment > 0) {
-              newHistoryEntries.push({ amount: newCashPayment, method: 'cash', timestamp: serverTimestamp() });
+              newHistoryEntries.push({ amount: newCashPayment, method: 'cash', timestamp: historyTimestamp });
             }
             if (newMomoPayment > 0) {
-              newHistoryEntries.push({ amount: newMomoPayment, method: 'momo', timestamp: serverTimestamp() });
+              newHistoryEntries.push({ amount: newMomoPayment, method: 'momo', timestamp: historyTimestamp });
             }
             if (newHistoryEntries.length > 0) {
               (newOrderWithId as any).paymentHistory = newHistoryEntries;

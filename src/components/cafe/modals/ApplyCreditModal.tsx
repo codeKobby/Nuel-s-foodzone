@@ -31,19 +31,19 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
     const [isProcessing, setIsProcessing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const { toast } = useToast();
-    
+
     const availableCredit = Math.abs(sourceOrder.balanceDue);
 
     useEffect(() => {
         const q = query(
             collection(db, "orders"),
-            where("paymentStatus", "in", ["Unpaid", "Partially Paid"]),
             where("balanceDue", ">", 0)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedOrders = snapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as Order))
+                .filter(order => order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid')
                 .filter(order => order.id !== sourceOrder.id); // Exclude self
             setUnpaidOrders(fetchedOrders);
             setLoading(false);
@@ -63,7 +63,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
             return newSet;
         });
     };
-    
+
     const selectedOrdersTotal = useMemo(() => {
         return unpaidOrders
             .filter(o => selectedOrderIds.has(o.id))
@@ -71,9 +71,9 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
     }, [unpaidOrders, selectedOrderIds]);
 
     const creditToApply = Math.min(availableCredit, selectedOrdersTotal);
-    
+
     const filteredOrders = useMemo(() => {
-        return unpaidOrders.filter(order => 
+        return unpaidOrders.filter(order =>
             order.simplifiedId.toLowerCase().includes(searchQuery.toLowerCase()) ||
             order.tag?.toLowerCase().includes(searchQuery.toLowerCase())
         );
@@ -115,9 +115,9 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
                             className="pl-10"
                         />
                     </div>
-                     <ScrollArea className="h-60 border rounded-md p-2">
-                        {loading ? <LoadingSpinner/> : filteredOrders.length > 0 ? (
-                             <div className="space-y-2">
+                    <ScrollArea className="h-60 border rounded-md p-2">
+                        {loading ? <LoadingSpinner /> : filteredOrders.length > 0 ? (
+                            <div className="space-y-2">
                                 {filteredOrders.map(order => (
                                     <div key={order.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-secondary">
                                         <Checkbox
@@ -139,7 +139,7 @@ const ApplyCreditModal: React.FC<ApplyCreditModalProps> = ({ sourceOrder, onClos
                             <p className="text-center text-muted-foreground py-10">No other unpaid orders found.</p>
                         )}
                     </ScrollArea>
-                    
+
                     {selectedOrderIds.size > 0 && (
                         <Alert>
                             <AlertCircle className="h-4 w-4" />

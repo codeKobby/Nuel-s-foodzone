@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { collection, doc, writeBatch, serverTimestamp, getDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp, getDoc, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatCurrency } from '@/lib/utils';
 import type { Order, CustomerReward } from '@/lib/types';
@@ -177,7 +177,10 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 
         try {
             const batch = writeBatch(db);
-            const now = serverTimestamp();
+            // Firestore doesn't support serverTimestamp() inside arrays.
+            // Use server timestamp for top-level fields, and a concrete Timestamp for history entries.
+            const nowServer = serverTimestamp();
+            const nowClient = Timestamp.now();
             let paymentToApply = amountPaidNum;
 
             // This will hold the total payments applied to each order
@@ -223,7 +226,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 
                 const updateData: any = {
                     amountPaid: newAmountPaid,
-                    lastPaymentTimestamp: now,
+                    lastPaymentTimestamp: nowServer,
                     lastPaymentAmount: totalApplied,
                     paymentMethod: finalPaymentMethod,
                     paymentBreakdown: newBreakdown
@@ -234,11 +237,11 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     : [];
                 const newHistoryEntries: any[] = [];
                 if (cashApplied > 0) {
-                    newHistoryEntries.push({ amount: cashApplied, method: 'cash', timestamp: now });
+                    newHistoryEntries.push({ amount: cashApplied, method: 'cash', timestamp: nowClient });
                 }
                 if (momoApplied > 0) {
                     // Treat card as momo for now (momo/card are displayed together).
-                    newHistoryEntries.push({ amount: momoApplied, method: 'momo', timestamp: now });
+                    newHistoryEntries.push({ amount: momoApplied, method: 'momo', timestamp: nowClient });
                 }
                 if (newHistoryEntries.length > 0) {
                     updateData.paymentHistory = [...existingHistory, ...newHistoryEntries];
@@ -264,7 +267,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                     finalUpdate.balanceDue = -(change - changeGivenAmount);
                     finalUpdate.changeGiven = (lastOrder.changeGiven || 0) + changeGivenAmount;
                     finalUpdate.paymentStatus = newChangeStillDue < 0.01 ? 'Paid' : 'Partially Paid';
-                    finalUpdate.settledOn = newChangeStillDue < 0.01 ? now : null;
+                    finalUpdate.settledOn = newChangeStillDue < 0.01 ? nowServer : null;
                 }
                 else if (deficit > 0 && pardonDeficit) {
                     finalUpdate.pardonedAmount = (lastOrder.pardonedAmount || 0) + deficit;
