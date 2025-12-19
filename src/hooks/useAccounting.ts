@@ -238,14 +238,16 @@ export const useAccounting = () => {
                 }
               }
 
-              const changeSettlementDate = order.lastChangeSettlementAt?.toDate();
+              const changeSettlementDate =
+                order.lastChangeSettlementAt?.toDate();
               if (
                 changeSettlementDate &&
                 changeSettlementDate >= todayStart &&
                 changeSettlementDate <= todayEnd &&
                 !isTodayOrder
               ) {
-                const settledChangeAmount = order.lastChangeSettlementAmount || 0;
+                const settledChangeAmount =
+                  order.lastChangeSettlementAmount || 0;
                 if (settledChangeAmount > 0.01) {
                   previousDaysChangeGiven += settledChangeAmount;
 
