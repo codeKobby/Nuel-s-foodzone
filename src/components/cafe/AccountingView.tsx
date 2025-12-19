@@ -25,31 +25,7 @@ import { collection, doc, serverTimestamp, query, onSnapshot, orderBy, writeBatc
 import { format, isToday } from 'date-fns';
 import { AuthContext } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import type { Order, MiscExpense, ReconciliationReport } from '@/lib/types';
-
-interface PeriodStats {
-    totalSales: number;
-    totalItemsSold: number;
-    cashSales: number;
-    momoSales: number;
-    miscCashExpenses: number;
-    miscMomoExpenses: number;
-    netRevenue: number;
-    todayUnpaidOrdersValue: number;
-    allTimeUnpaidOrdersValue: number;
-    previousUnpaidOrdersValue: number;
-    totalPardonedAmount: number;
-    changeOwedForPeriod: number;
-    settledUnpaidOrdersValue: number;
-    settledUnpaidCash: number;
-    settledUnpaidMomo: number;
-    previousDaysChangeGiven: number;
-    previousDaysChangeGivenFromSales: number;
-    previousDaysChangeGivenFromSetAside: number;
-    totalRewardDiscount: number;
-    orders: Order[];
-    itemStats: Record<string, { count: number; totalValue: number }>;
-}
+import type { Order, MiscExpense, ReconciliationReport, PeriodStats } from '@/lib/types';
 
 const StatCard: React.FC<{ icon: React.ReactNode, title: string, value: string | number, color?: string, description?: string | React.ReactNode, onClick?: () => void }> = ({ icon, title, value, color, description, onClick }) => (
     <Card className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""} onClick={onClick}>
@@ -871,16 +847,18 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                 const unpaidOrdersList: Order[] = [];
 
                 const todayOrders: Order[] = [];
+                const activityOrders: Order[] = [];
                 const itemStats: Record<string, { count: number; totalValue: number }> = {};
 
                 const allOrders = allOrdersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
 
                 allOrders.forEach(order => {
                     if (!order.timestamp) return;
+                    let hasPaymentActivityToday = false;
                     const orderDate = order.timestamp.toDate();
                     const isTodayOrder = orderDate >= todayStart && orderDate <= todayEnd;
 
-                    if (orderDate < todayStart && (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid')) {
+                    if (orderDate < todayStart && order.balanceDue > 0 && (order.paymentStatus === 'Unpaid' || order.paymentStatus === 'Partially Paid')) {
                         previousUnpaidOrdersValue += order.balanceDue;
                         unpaidOrdersList.push(order);
                     }
@@ -920,6 +898,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         order.paymentHistory.forEach(payment => {
                             const paymentDate = payment.timestamp?.toDate();
                             if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
+                                hasPaymentActivityToday = true;
                                 const paymentAmount = payment.amount || 0;
                                 if (payment.method === 'cash') {
                                     cashPaid += paymentAmount;
@@ -956,8 +935,9 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                             momoSales += Math.min(orderNetTotal, momoPaid);
                         }
                     } else {
-                        const paymentDate = order.lastPaymentTimestamp?.toDate();
+                        const paymentDate = order.lastPaymentTimestamp?.toDate() || order.timestamp?.toDate?.();
                         if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
+                            hasPaymentActivityToday = true;
 
                             // Legacy fallback: amountPaid is cumulative; only count what was paid on the latest payment.
                             const amountPaidTowardsOrder = order.lastPaymentAmount || 0;
@@ -965,9 +945,10 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                             // Only add to momo/cash sales if the order itself was created today.
                             // For previous-day orders, today's payment should be tracked as a collection instead.
                             if (isTodayOrder) {
+                                const reward = order.rewardDiscount || 0;
+                                const orderNetTotal = (order.total || 0) - reward;
+
                                 if (order.paymentBreakdown) {
-                                    const reward = order.rewardDiscount || 0;
-                                    const orderNetTotal = (order.total || 0) - reward;
                                     if (order.paymentBreakdown.cash) {
                                         cashSales += Math.min(orderNetTotal, order.paymentBreakdown.cash);
                                     }
@@ -975,11 +956,10 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                         momoSales += Math.min(orderNetTotal, order.paymentBreakdown.momo);
                                     }
                                 } else {
-                                    const reward = order.rewardDiscount || 0;
-                                    const orderNetTotal = (order.total || 0) - reward;
-                                    const revenueAmount = Math.min(amountPaidTowardsOrder, orderNetTotal);
-
-                                    if (order.paymentMethod === 'cash') {
+                                    // Fallback for legacy orders created today without a breakdown.
+                                    const netPaid = Math.max(0, (order.amountPaid || 0) - (order.changeGiven || 0));
+                                    const revenueAmount = Math.min(netPaid > 0 ? netPaid : amountPaidTowardsOrder, orderNetTotal);
+                                    if (order.paymentMethod === 'cash' || order.paymentMethod === 'split') {
                                         cashSales += revenueAmount;
                                     } else if (order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
                                         momoSales += revenueAmount;
@@ -1029,17 +1009,21 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         }
                     }
 
-                    const settledDate = order.settledOn?.toDate();
-                    if (settledDate && settledDate >= todayStart && settledDate <= todayEnd && !isTodayOrder) {
-                        if (order.changeGiven > (order.pardonedAmount || 0)) {
-                            const delta = order.changeGiven - (order.pardonedAmount || 0);
-                            previousDaysChangeGiven += delta;
+                    const changeSettlementDate = order.lastChangeSettlementAt?.toDate();
+                    if (changeSettlementDate && changeSettlementDate >= todayStart && changeSettlementDate <= todayEnd && !isTodayOrder) {
+                        const settledChangeAmount = order.lastChangeSettlementAmount || 0;
+                        if (settledChangeAmount > 0.01) {
+                            previousDaysChangeGiven += settledChangeAmount;
                             if (order.changeSetAside) {
-                                previousDaysChangeGivenFromSetAside += delta;
+                                previousDaysChangeGivenFromSetAside += settledChangeAmount;
                             } else {
-                                previousDaysChangeGivenFromSales += delta;
+                                previousDaysChangeGivenFromSales += settledChangeAmount;
                             }
                         }
+                    }
+
+                    if (isTodayOrder || hasPaymentActivityToday) {
+                        activityOrders.push(order);
                     }
                 });
 
@@ -1059,8 +1043,17 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
                 const allTimeUnpaidOrdersValue = previousUnpaidOrdersValue + todayUnpaidOrdersValue;
                 const totalMiscExpenses = miscCashExpenses + miscMomoExpenses;
-                const totalRevenueToday = cashSales + momoSales;
-                const netRevenue = totalRevenueToday - totalMiscExpenses - totalRewardDiscount;
+                const totalRevenueToday = cashSales + momoSales + settledUnpaidOrdersValue;
+                // Reward discounts are already subtracted when calculating cashSales/momoSales
+                // (we use orderNetTotal = total - rewardDiscount). Don't subtract again.
+                const netRevenue = totalRevenueToday - totalMiscExpenses;
+
+                const expectedCash =
+                    cashSales +
+                    settledUnpaidCash -
+                    miscCashExpenses -
+                    previousDaysChangeGivenFromSales;
+                const expectedMomo = momoSales + settledUnpaidMomo - miscMomoExpenses;
 
                 setStats({
                     totalSales,
@@ -1069,6 +1062,8 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                     momoSales,
                     miscCashExpenses,
                     miscMomoExpenses,
+                    expectedCash,
+                    expectedMomo,
                     netRevenue,
                     todayUnpaidOrdersValue,
                     allTimeUnpaidOrdersValue,
@@ -1083,6 +1078,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                     previousDaysChangeGivenFromSetAside,
                     totalRewardDiscount,
                     orders: todayOrders,
+                    activityOrders,
                     itemStats
                 });
 
@@ -1242,34 +1238,49 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                                                 onClick={() => {
                                                                     // compute orders contributing to cash sales
                                                                     const ordersList: any[] = [];
-                                                                    (stats.orders || []).forEach((order: any) => {
-                                                                        // payments in history for today
+                                                                    const todayStart = new Date();
+                                                                    todayStart.setHours(0, 0, 0, 0);
+                                                                    const todayEnd = new Date();
+                                                                    todayEnd.setHours(23, 59, 59, 999);
+
+                                                                    (stats.activityOrders || stats.orders || []).forEach((order: any) => {
+                                                                        // payments in history for today only
                                                                         if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
                                                                             const amt = order.paymentHistory.reduce((sum: number, p: any) => {
+                                                                                const d = p.timestamp?.toDate?.();
+                                                                                if (!d || d < todayStart || d > todayEnd) return sum;
                                                                                 if (p.method === 'cash') return sum + (p.amount || 0);
                                                                                 return sum;
                                                                             }, 0);
                                                                             if (amt > 0) ordersList.push({ order, amount: amt, method: 'cash' });
-                                                                        } else if (order.paymentBreakdown && order.paymentBreakdown.cash) {
-                                                                            const amt = order.paymentBreakdown.cash || 0;
-                                                                            if (amt > 0) ordersList.push({ order, amount: amt, method: 'cash' });
-                                                                        } else if (order.paymentMethod === 'cash') {
-                                                                            // fallback: attribute full paid amount (amountPaid - changeGiven)
-                                                                            const amt = Math.max(0, (order.amountPaid || 0) - (order.changeGiven || 0));
-                                                                            if (amt > 0) ordersList.push({ order, amount: amt, method: 'cash' });
+                                                                        } else {
+                                                                            const paymentDate = order.lastPaymentTimestamp?.toDate?.() || order.timestamp?.toDate?.();
+                                                                            if (!paymentDate || paymentDate < todayStart || paymentDate > todayEnd) return;
+
+                                                                            if (order.paymentBreakdown && order.paymentBreakdown.cash) {
+                                                                                const amt = order.paymentBreakdown.cash || 0;
+                                                                                if (amt > 0) ordersList.push({ order, amount: amt, method: 'cash' });
+                                                                            } else if (order.paymentMethod === 'cash' || order.paymentMethod === 'split') {
+                                                                                // fallback: attribute net paid amount (amountPaid - changeGiven)
+                                                                                const amt = Math.max(0, (order.amountPaid || 0) - (order.changeGiven || 0));
+                                                                                if (amt > 0) ordersList.push({ order, amount: amt, method: 'cash' });
+                                                                            } else if (order.lastPaymentAmount && (order.paymentMethod === 'cash')) {
+                                                                                const amt = order.lastPaymentAmount || 0;
+                                                                                if (amt > 0) ordersList.push({ order, amount: amt, method: 'cash' });
+                                                                            }
                                                                         }
                                                                     });
                                                                     setSelectedSalesOrders(ordersList);
                                                                     setShowCashModal(true);
                                                                 }}
                                                             >
-                                                                {formatCurrency(stats.cashSales)}
+                                                                {formatCurrency(stats.cashSales + stats.settledUnpaidCash)}
                                                             </button>
                                                         </div>
                                                         <div className="text-xs text-muted-foreground space-y-0.5">
                                                             <div className="flex justify-between">
                                                                 <span>Today's sales:</span>
-                                                                <span className="font-medium">{formatCurrency(stats.cashSales - stats.settledUnpaidCash)}</span>
+                                                                <span className="font-medium">{formatCurrency(stats.cashSales)}</span>
                                                             </div>
                                                             {stats.settledUnpaidCash > 0 && (
                                                                 <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
@@ -1292,32 +1303,47 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                                                 className="underline font-semibold"
                                                                 onClick={() => {
                                                                     const ordersList: any[] = [];
-                                                                    (stats.orders || []).forEach((order: any) => {
+                                                                    const todayStart = new Date();
+                                                                    todayStart.setHours(0, 0, 0, 0);
+                                                                    const todayEnd = new Date();
+                                                                    todayEnd.setHours(23, 59, 59, 999);
+
+                                                                    (stats.activityOrders || stats.orders || []).forEach((order: any) => {
                                                                         if (order.paymentHistory && Array.isArray(order.paymentHistory)) {
                                                                             const amt = order.paymentHistory.reduce((sum: number, p: any) => {
+                                                                                const d = p.timestamp?.toDate?.();
+                                                                                if (!d || d < todayStart || d > todayEnd) return sum;
                                                                                 if (p.method === 'momo' || p.method === 'card') return sum + (p.amount || 0);
                                                                                 return sum;
                                                                             }, 0);
                                                                             if (amt > 0) ordersList.push({ order, amount: amt, method: 'momo' });
-                                                                        } else if (order.paymentBreakdown && order.paymentBreakdown.momo) {
-                                                                            const amt = order.paymentBreakdown.momo || 0;
-                                                                            if (amt > 0) ordersList.push({ order, amount: amt, method: 'momo' });
-                                                                        } else if (order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
-                                                                            const amt = Math.max(0, (order.amountPaid || 0) - (order.changeGiven || 0));
-                                                                            if (amt > 0) ordersList.push({ order, amount: amt, method: order.paymentMethod });
+                                                                        } else {
+                                                                            const paymentDate = order.lastPaymentTimestamp?.toDate?.() || order.timestamp?.toDate?.();
+                                                                            if (!paymentDate || paymentDate < todayStart || paymentDate > todayEnd) return;
+
+                                                                            if (order.paymentBreakdown && order.paymentBreakdown.momo) {
+                                                                                const amt = order.paymentBreakdown.momo || 0;
+                                                                                if (amt > 0) ordersList.push({ order, amount: amt, method: 'momo' });
+                                                                            } else if (order.paymentMethod === 'momo' || order.paymentMethod === 'card') {
+                                                                                const amt = Math.max(0, (order.amountPaid || 0) - (order.changeGiven || 0));
+                                                                                if (amt > 0) ordersList.push({ order, amount: amt, method: order.paymentMethod });
+                                                                            } else if (order.lastPaymentAmount && (order.paymentMethod === 'momo' || order.paymentMethod === 'card')) {
+                                                                                const amt = order.lastPaymentAmount || 0;
+                                                                                if (amt > 0) ordersList.push({ order, amount: amt, method: order.paymentMethod });
+                                                                            }
                                                                         }
                                                                     });
                                                                     setSelectedSalesOrders(ordersList);
                                                                     setShowMomoModal(true);
                                                                 }}
                                                             >
-                                                                {formatCurrency(stats.momoSales)}
+                                                                {formatCurrency(stats.momoSales + stats.settledUnpaidMomo)}
                                                             </button>
                                                         </div>
                                                         <div className="text-xs text-muted-foreground space-y-0.5">
                                                             <div className="flex justify-between">
                                                                 <span>Today's sales:</span>
-                                                                <span className="font-medium">{formatCurrency(stats.momoSales - stats.settledUnpaidMomo)}</span>
+                                                                <span className="font-medium">{formatCurrency(stats.momoSales)}</span>
                                                             </div>
                                                             {stats.settledUnpaidMomo > 0 && (
                                                                 <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
@@ -1379,35 +1405,45 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                             </CardContent>
                                             <CardFooter>
                                                 <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                                                    <div className="flex justify-between items-baseline">
-                                                        <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Total Revenue</Label>
-                                                        <p className="text-3xl font-bold">{formatCurrency(stats.cashSales + stats.momoSales)}</p>
-                                                    </div>
+                                                    {(() => {
+                                                        const totalExpenses = (stats.miscCashExpenses + stats.miscMomoExpenses);
+                                                        const todaysSalesOnly = (stats.totalSales - stats.totalPardonedAmount - stats.todayUnpaidOrdersValue);
+                                                        const totalRevenue = todaysSalesOnly + stats.settledUnpaidOrdersValue - totalExpenses;
 
-                                                    <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 text-sm space-y-1">
-                                                        <div className="flex justify-between items-center text-green-700 dark:text-green-300">
-                                                            <span className="font-bold">Today's Sales Only:</span>
-                                                            <span className="font-bold">{formatCurrency((stats.cashSales - stats.settledUnpaidCash) + (stats.momoSales - stats.settledUnpaidMomo) - (stats.miscCashExpenses + stats.miscMomoExpenses))}</span>
-                                                        </div>
-                                                        {stats.settledUnpaidOrdersValue > 0 && (
-                                                            <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
-                                                                <span>+ Collections from previous:</span>
-                                                                <button
-                                                                    onClick={() => setShowCollectionsModal(true)}
-                                                                    className="font-semibold underline"
-                                                                    title="View orders contributing to collections"
-                                                                >
-                                                                    {formatCurrency(stats.settledUnpaidOrdersValue)}
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                        {(stats.miscCashExpenses + stats.miscMomoExpenses) > 0 && (
-                                                            <div className="flex justify-between items-center text-rose-600 dark:text-rose-400 text-xs">
-                                                                <span>Expenses deducted:</span>
-                                                                <span>-{formatCurrency(stats.miscCashExpenses + stats.miscMomoExpenses)}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                        return (
+                                                            <>
+                                                                <div className="flex justify-between items-baseline">
+                                                                    <Label className="text-sm font-semibold text-green-700 dark:text-green-300">Total Revenue</Label>
+                                                                    <p className="text-3xl font-bold">{formatCurrency(totalRevenue)}</p>
+                                                                </div>
+
+                                                                <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 text-sm space-y-1">
+                                                                    <div className="flex justify-between items-center text-green-700 dark:text-green-300">
+                                                                        <span className="font-bold">Today's Sales Only:</span>
+                                                                        <span className="font-bold">{formatCurrency(todaysSalesOnly)}</span>
+                                                                    </div>
+                                                                    {stats.settledUnpaidOrdersValue > 0 && (
+                                                                        <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
+                                                                            <span>+ Collections from previous:</span>
+                                                                            <button
+                                                                                onClick={() => setShowCollectionsModal(true)}
+                                                                                className="font-semibold underline"
+                                                                                title="View orders contributing to collections"
+                                                                            >
+                                                                                {formatCurrency(stats.settledUnpaidOrdersValue)}
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                    {totalExpenses > 0 && (
+                                                                        <div className="flex justify-between items-center text-rose-600 dark:text-rose-400 text-xs">
+                                                                            <span>Expenses deducted:</span>
+                                                                            <span>-{formatCurrency(totalExpenses)}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </CardFooter>
                                         </Card>

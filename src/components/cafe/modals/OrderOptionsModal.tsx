@@ -294,12 +294,11 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
         const customerStillOwes = balanceDue > 0.01;
         const changeOutstanding = balanceDue < -0.01 || hasOutstandingChange;
 
-        if (!customerStillOwes && !changeOutstanding) {
+        // If the customer doesn't owe money, the order is paid even if change is outstanding.
+        if (!customerStillOwes) {
           orderData.paymentStatus = 'Paid';
-        } else if (customerStillOwes) {
-          orderData.paymentStatus = orderData.amountPaid > 0 ? 'Partially Paid' : 'Unpaid';
         } else {
-          orderData.paymentStatus = 'Partially Paid';
+          orderData.paymentStatus = orderData.amountPaid > 0 ? 'Partially Paid' : 'Unpaid';
         }
 
         if (paymentAmounts.totalPaidNow > 0) {
@@ -358,9 +357,10 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           const customerStillOwes = balanceDue > 0.01;
           const changeOutstanding = balanceDue < -0.01 || hasOutstandingChange;
 
-          if (isPaid && !customerStillOwes && !changeOutstanding) {
+          // If the customer doesn't owe money, the order is paid even if change is outstanding.
+          if (isPaid && !customerStillOwes) {
             orderData.paymentStatus = 'Paid';
-          } else if (isPaid && (customerStillOwes || changeOutstanding)) {
+          } else if (isPaid && customerStillOwes) {
             orderData.paymentStatus = 'Partially Paid';
           } else {
             orderData.paymentStatus = 'Unpaid';

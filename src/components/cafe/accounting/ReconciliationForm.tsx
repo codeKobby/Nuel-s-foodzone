@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useContext } from 'react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { AuthContext } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -96,7 +96,23 @@ export const ReconciliationForm: React.FC<ReconciliationFormProps> = ({ stats, a
                 cashierId: session?.uid || 'unknown',
                 cashierName: session?.fullName || session?.username || 'Unknown',
             };
-            await addDoc(collection(db, "reconciliationReports"), reportData);
+            const batch = writeBatch(db);
+            const reportRef = doc(collection(db, "reconciliationReports"));
+            batch.set(reportRef, reportData);
+
+            const period = reportData.period as string;
+            (stats.orders || [])
+                .filter((o) => (o.balanceDue || 0) < 0)
+                .forEach((o) => {
+                    if (!o.id) return;
+                    batch.update(doc(db, 'orders', o.id), {
+                        changeSetAside: deductCustomerChange,
+                        changeSetAsidePeriod: period,
+                        changeSetAsideAt: serverTimestamp(),
+                    });
+                });
+
+            await batch.commit();
 
             toast({
                 title: "Day Closed Successfully",

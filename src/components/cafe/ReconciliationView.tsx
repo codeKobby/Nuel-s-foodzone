@@ -5,7 +5,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import type { Order } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { ArrowLeft, Ban, Calculator, CheckCircle, Smartphone, Banknote, X, Coins, ArrowRightLeft, FileText, ClipboardCheck, Search, AlertTriangle as AlertTriangleIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -164,7 +164,25 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                 changeOwedForPeriod: stats.changeOwedForPeriod,
                 changeOwedSetAside: deductCustomerChange,
             };
-            const docRef = await addDoc(collection(db, "reconciliationReports"), reportData);
+            const batch = writeBatch(db);
+            const reportRef = doc(collection(db, "reconciliationReports"));
+            batch.set(reportRef, reportData);
+
+            const period = reportData.period as string;
+            (orders || [])
+                .filter((o) => (o.balanceDue || 0) < 0)
+                .forEach((o) => {
+                    if (!o.id) return;
+                    batch.update(doc(db, 'orders', o.id), {
+                        changeSetAside: deductCustomerChange,
+                        changeSetAsidePeriod: period,
+                        changeSetAsideAt: serverTimestamp(),
+                    });
+                });
+
+            await batch.commit();
+
+            const docRef = reportRef;
             // Send the report to the email recipient and trigger AI analysis
             // via the server API route. We include some of the report data so
             // the server can compose the email and analysis.

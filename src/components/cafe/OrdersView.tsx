@@ -391,6 +391,8 @@ const OrdersView: React.FC<{ setActiveView: (view: string) => void }> = ({ setAc
           balanceDue: newBalance,
           changeGiven: newChangeGiven,
           lastPaymentTimestamp: serverTimestamp(),
+          lastChangeSettlementAt: serverTimestamp(),
+          lastChangeSettlementAmount: settleAmount,
           settledOn: isFullSettlement ? serverTimestamp() : orderDoc.data().settledOn || null,
           paymentMethod: newPaymentMethod,
           paymentStatus: newPaymentStatus,

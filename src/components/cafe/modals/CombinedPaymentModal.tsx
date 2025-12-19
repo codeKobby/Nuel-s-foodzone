@@ -140,10 +140,15 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
 
     const finalTotal = Math.max(0, totalToPay - (reward?.discount ?? 0));
 
-    const amountPaidNum = parseFloat(amountPaidInput) || 0;
-
-    const deficit = amountPaidNum < finalTotal ? finalTotal - amountPaidNum : 0;
-    const change = amountPaidNum > finalTotal ? amountPaidNum - finalTotal : 0;
+    // Guard against floating-point issues around cents.
+    const finalTotalRounded = Number(finalTotal.toFixed(2));
+    const amountPaidNum = Number((parseFloat(amountPaidInput) || 0).toFixed(2));
+    const deficit = amountPaidNum + 0.009 < finalTotalRounded
+        ? Number((finalTotalRounded - amountPaidNum).toFixed(2))
+        : 0;
+    const change = amountPaidNum > finalTotalRounded + 0.009
+        ? Number((amountPaidNum - finalTotalRounded).toFixed(2))
+        : 0;
 
     const rawChangeInput = parseFloat(changeGivenInput);
     const normalizedChangeInput = Number.isFinite(rawChangeInput)
@@ -152,7 +157,7 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
     const changeGivenAmount = change > 0
         ? Math.min(normalizedChangeInput, change)
         : 0;
-    const changeStillDue = change > 0
+    const changeStillDue = change > 0.009
         ? Math.max(0, Number((change - changeGivenAmount).toFixed(2)))
         : 0;
     const hasOutstandingChange = changeStillDue > 0.009;
@@ -262,11 +267,12 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 const lastOrderRef = doc(db, "orders", lastOrder.id);
                 let finalUpdate: any = {};
 
-                if (change > 0) {
+                if (change > 0.009) {
                     const newChangeStillDue = Math.max(0, Number((change - changeGivenAmount).toFixed(2)));
                     finalUpdate.balanceDue = -(change - changeGivenAmount);
                     finalUpdate.changeGiven = (lastOrder.changeGiven || 0) + changeGivenAmount;
-                    finalUpdate.paymentStatus = newChangeStillDue < 0.01 ? 'Paid' : 'Partially Paid';
+                    // Customer is fully paid even if change is still outstanding.
+                    finalUpdate.paymentStatus = 'Paid';
                     finalUpdate.settledOn = newChangeStillDue < 0.01 ? nowServer : null;
                 }
                 else if (deficit > 0 && pardonDeficit) {

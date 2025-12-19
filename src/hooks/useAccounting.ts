@@ -84,7 +84,9 @@ export const useAccounting = () => {
                 (order.paymentStatus === "Unpaid" ||
                   order.paymentStatus === "Partially Paid")
               ) {
-                previousUnpaidOrdersValue += order.balanceDue;
+                if (order.balanceDue > 0) {
+                  previousUnpaidOrdersValue += order.balanceDue;
+                }
               }
 
               if (isTodayOrder) {
@@ -156,7 +158,12 @@ export const useAccounting = () => {
                   momoSales += Math.min(orderNetTotal, momoPaid);
                 }
               } else {
-                const paymentDate = order.lastPaymentTimestamp?.toDate(); // Fallback for old orders
+                // Fallback for orders without paymentHistory.
+                // Some legacy/edge-case orders may not set lastPaymentTimestamp even though the
+                // payment happened at order creation time.
+                const paymentDate =
+                  order.lastPaymentTimestamp?.toDate() ||
+                  order.timestamp?.toDate?.();
                 if (
                   paymentDate &&
                   paymentDate >= todayStart &&
@@ -231,23 +238,23 @@ export const useAccounting = () => {
                 }
               }
 
-              const settledDate = order.settledOn?.toDate();
+              const changeSettlementDate = order.lastChangeSettlementAt?.toDate();
               if (
-                settledDate &&
-                settledDate >= todayStart &&
-                settledDate <= todayEnd &&
+                changeSettlementDate &&
+                changeSettlementDate >= todayStart &&
+                changeSettlementDate <= todayEnd &&
                 !isTodayOrder
               ) {
-                if (order.changeGiven > (order.pardonedAmount || 0)) {
-                  const delta = order.changeGiven - (order.pardonedAmount || 0);
-                  previousDaysChangeGiven += delta;
+                const settledChangeAmount = order.lastChangeSettlementAmount || 0;
+                if (settledChangeAmount > 0.01) {
+                  previousDaysChangeGiven += settledChangeAmount;
 
                   // If the original change was set aside on the day it was generated,
-                  // settling it on a later day should NOT reduce that day's expected cash.
+                  // paying it later should not reduce today's expected cash.
                   if (order.changeSetAside) {
-                    previousDaysChangeGivenFromSetAside += delta;
+                    previousDaysChangeGivenFromSetAside += settledChangeAmount;
                   } else {
-                    previousDaysChangeGivenFromSales += delta;
+                    previousDaysChangeGivenFromSales += settledChangeAmount;
                   }
                 }
               }

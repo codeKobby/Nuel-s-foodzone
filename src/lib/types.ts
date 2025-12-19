@@ -54,6 +54,10 @@ export interface Order {
   lastPaymentTimestamp?: Timestamp;
   lastPaymentAmount?: number;
   settledOn?: Timestamp;
+  // Explicit change settlement tracking (when change owed from a previous day is actually paid out)
+  // Used for accurate "Previous Change Given" stats without guessing from cumulative fields.
+  lastChangeSettlementAt?: Timestamp;
+  lastChangeSettlementAmount?: number;
   // If an order ended the day owing change (balanceDue < 0), the cashier can decide
   // at End-of-Day whether that change is physically set aside (reserved) or left in
   // the drawer to be treated as usable cash. This flag is used to decide whether

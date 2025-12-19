@@ -177,6 +177,8 @@ const POSView: React.FC<{ setActiveView: (view: string) => void }> = ({ setActiv
                     balanceDue: newBalance,
                     changeGiven: newChangeGiven,
                     lastPaymentTimestamp: serverTimestamp(),
+                    lastChangeSettlementAt: serverTimestamp(),
+                    lastChangeSettlementAmount: settleAmount,
                     settledOn: isFullSettlement ? serverTimestamp() : orderDoc.data().settledOn || null,
                     paymentMethod: newPaymentMethod,
                     paymentStatus: newPaymentStatus,
