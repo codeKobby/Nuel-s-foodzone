@@ -887,7 +887,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
                         totalPardonedAmount += order.pardonedAmount || 0;
                         totalRewardDiscount += order.rewardDiscount || 0;
-                        if (order.balanceDue < 0) {
+                        if ((order.balanceDue < 0) && !order.changeSetAside) {
                             changeOwedForPeriod += Math.abs(order.balanceDue);
                         }
                     }
@@ -1502,7 +1502,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                                                     )}
                                                                 </div>
                                                                 <DialogFooter>
-                                                                    <Button variant="ghost" onClick={() => setShowCollectionsModal(false)}>Close</Button>
+                                                                    <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowCollectionsModal(false)}>Close</Button>
                                                                 </DialogFooter>
                                                             </DialogContent>
                                                         </Dialog>
@@ -1546,7 +1546,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                         )}
                                     </div>
                                     <DialogFooter>
-                                        <Button variant="ghost" onClick={() => setShowCashModal(false)}>Close</Button>
+                                        <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowCashModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -1582,7 +1582,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                         )}
                                     </div>
                                     <DialogFooter>
-                                        <Button variant="ghost" onClick={() => setShowMomoModal(false)}>Close</Button>
+                                        <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowMomoModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -1619,7 +1619,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                         )}
                                     </div>
                                     <DialogFooter>
-                                        <Button variant="ghost" onClick={() => setShowTotalSalesModal(false)}>Close</Button>
+                                        <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowTotalSalesModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -1659,7 +1659,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                         )}
                                     </div>
                                     <DialogFooter>
-                                        <Button variant="ghost" onClick={() => setShowUnpaidModal(false)}>Close</Button>
+                                        <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowUnpaidModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -1698,7 +1698,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                         )}
                                     </div>
                                     <DialogFooter>
-                                        <Button variant="ghost" onClick={() => setShowExpensesModal(false)}>Close</Button>
+                                        <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowExpensesModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -1738,7 +1738,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                         )}
                                     </div>
                                     <DialogFooter>
-                                        <Button variant="ghost" onClick={() => setShowRewardsModal(false)}>Close</Button>
+                                        <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowRewardsModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -1778,7 +1778,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                         )}
                                     </div>
                                     <DialogFooter>
-                                        <Button variant="ghost" onClick={() => setShowPardonedModal(false)}>Close</Button>
+                                        <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowPardonedModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -1818,7 +1818,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                         )}
                                     </div>
                                     <DialogFooter>
-                                        <Button variant="ghost" onClick={() => setShowChangeOwedModal(false)}>Close</Button>
+                                        <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowChangeOwedModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -1854,7 +1854,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                         )}
                                     </div>
                                     <DialogFooter>
-                                        <Button variant="ghost" onClick={() => setShowPrevChangeModal(false)}>Close</Button>
+                                        <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowPrevChangeModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
