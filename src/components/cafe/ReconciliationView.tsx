@@ -408,20 +408,25 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
     const BalanceIcon = balanceStatus.icon;
 
     return (
-        <div className="h-full flex flex-col min-h-0">
-            <ScrollArea className="flex-1 min-h-0">
-                <div className="p-4 md:p-6 flex flex-col min-h-0">
-                    <div className="flex items-center gap-4 mb-6">
-                        <Button variant="outline" size="icon" onClick={onBack} title="Back" aria-label="Back">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                        <div>
-                            <h1 className="text-2xl md:text-3xl font-bold text-foreground">End-of-Day Reconciliation</h1>
-                            <p className="text-muted-foreground">Complete daily cash reconciliation for {format(today, "EEEE, MMMM dd, yyyy")}</p>
-                        </div>
+        <div className="h-full flex flex-col">
+            {/* Header */}
+            <div className="p-4 md:p-6 border-b">
+                <div className="flex items-center gap-4">
+                    <Button variant="outline" size="icon" onClick={onBack} title="Back" aria-label="Back">
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <div>
+                        <h1 className="text-2xl md:text-3xl font-bold text-foreground">End-of-Day Reconciliation</h1>
+                        <p className="text-muted-foreground">Complete daily cash reconciliation for {format(today, "EEEE, MMMM dd, yyyy")}</p>
                     </div>
+                </div>
+            </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
+            {/* Scrollable Content */}
+            <ScrollArea className="flex-1">
+                <div className="p-4 md:p-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Left Column */}
                         <div className="lg:col-span-2 space-y-6">
                             {/* Physical Cash Count */}
                             <Card>
@@ -550,7 +555,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                             )}
                         </div>
 
-                        {/* Right Column - Summary */}
+                        {/* Right Column */}
                         <div className="space-y-6">
                             {/* Reconciliation Summary */}
                             <Card>
@@ -590,10 +595,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                                                 <p className="font-semibold">{formatCurrency(totalCountedMomo)}</p>
                                             </div>
                                             <Separator />
-                                            <div className={`flex justify-between items-center font-bold ${momoBalanceDifference === 0
-                                                ? 'text-green-600'
-                                                : 'text-red-600'
-                                                }`}>
+                                            <div className={`flex justify-between items-center font-bold ${momoBalanceDifference === 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 <p>MoMo Discrepancy</p>
                                                 <p>{formatCurrency(momoBalanceDifference)}</p>
                                             </div>
@@ -630,50 +632,47 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                                     />
                                 </CardContent>
                             </Card>
-
-                            {/* Action Buttons */}
-                            <div className="space-y-3 pt-4 mt-auto">
-                                <Button variant="outline" className="w-full" onClick={() => setShowAuditModal(true)}>
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    Cross-Check Orders
-                                </Button>
-                                <Button
-                                    className="w-full h-12 text-lg font-semibold"
-                                    onClick={() => setShowConfirm(true)}
-                                    disabled={isSubmitting}
-                                >
-                                    {isSubmitting ? (
-                                        <LoadingSpinner />
-                                    ) : (Math.abs(totalDiscrepancy) < 0.01) ? (
-                                        "Finalize Day"
-                                    ) : (
-                                        "Finalize with Discrepancy"
-                                    )}
-                                </Button>
-                            </div>
                         </div>
                     </div>
                 </div>
-                {showAuditModal && <AdvancedReconciliationModal />}
-                {showConfirm && (
-                    <AlertDialog open onOpenChange={setShowConfirm}>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    {confirmationDescription}
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleSaveReport}>
-                                    Continue
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                )}
             </ScrollArea>
+
+            {/* Action Footer */}
+            <div className="p-4 md:p-6 border-t bg-background mt-auto">
+                <div className="flex flex-col md:flex-row gap-3">
+                    <Button variant="outline" className="w-full" onClick={() => setShowAuditModal(true)}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Cross-Check Orders
+                    </Button>
+                    <Button
+                        className="w-full h-12 text-lg font-semibold"
+                        onClick={() => setShowConfirm(true)}
+                        disabled={isSubmitting}
+                    >
+                        {isSubmitting ? <LoadingSpinner /> : (Math.abs(totalDiscrepancy) < 0.01) ? "Finalize Day" : "Finalize with Discrepancy"}
+                    </Button>
+                </div>
+            </div>
+
+            {showAuditModal && <AdvancedReconciliationModal />}
+            {showConfirm && (
+                <AlertDialog open onOpenChange={setShowConfirm}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {confirmationDescription}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleSaveReport}>
+                                Continue
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
         </div>
     );
 };

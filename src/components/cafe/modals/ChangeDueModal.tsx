@@ -72,9 +72,9 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ order, onClose, onSettl
                     </div>
                     {error && <AlertDescription className="text-red-500 text-xs">{error}</AlertDescription>}
                 </div>
-                <DialogFooter>
-                    <Button onClick={onClose} variant="secondary">Settle Later</Button>
-                    <Button onClick={handleSettle} className="bg-green-500 hover:bg-green-600">Settle Amount</Button>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
+                    <Button onClick={handleSettle} className="w-full sm:w-auto bg-green-500 hover:bg-green-600">Settle Amount</Button>
+                    <Button onClick={onClose} variant="secondary" className="w-full sm:w-auto">Settle Later</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

@@ -55,7 +55,7 @@ const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalProps> = 
 
     return (
         <Dialog open onOpenChange={onClose}>
-            <DialogContent className="max-w-3xl">
+            <DialogContent className="max-w-4xl h-full flex flex-col sm:h-auto">
                 <DialogHeader>
                     <DialogTitle>Advanced Reconciliation Audit</DialogTitle>
                     <DialogDescription>
@@ -63,8 +63,8 @@ const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalProps> = 
                     </DialogDescription>
                 </DialogHeader>
                 
-                <div className="flex flex-col md:flex-row gap-4 py-4">
-                    <div className="flex-1 space-y-4">
+                <div className="flex-1 flex flex-col md:flex-row gap-4 py-4 min-h-0">
+                    <div className="flex-1 flex flex-col space-y-4 min-h-0">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -74,7 +74,7 @@ const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalProps> = 
                                 className="pl-10"
                             />
                         </div>
-                        <ScrollArea className="h-96 border rounded-md">
+                        <ScrollArea className="flex-1 border rounded-md">
                             <div className="p-2 space-y-2">
                                 {filteredOrders.length > 0 ? filteredOrders.map(order => (
                                     <div key={order.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-secondary">
@@ -121,7 +121,7 @@ const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalProps> = 
                 </div>
 
                 <DialogFooter>
-                    <Button onClick={onClose} variant="secondary">Close Audit</Button>
+                    <Button onClick={onClose} variant="secondary" className="w-full sm:w-auto">Close Audit</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
