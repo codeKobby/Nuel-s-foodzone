@@ -476,107 +476,57 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl w-[95vw] flex flex-col max-h-[90vh] min-h-[70vh] overflow-hidden p-4 sm:p-6">
-        {isApplyingReward ? <RewardContent total={total} onApplyReward={handleApplyReward} onBack={() => setIsApplyingReward(false)} /> : step === 1 ? (
+      <DialogContent className="sm:max-w-2xl w-[95vw] flex flex-col max-h-[90vh]">
+        {isApplyingReward ? (
+          <RewardContent total={total} onApplyReward={handleApplyReward} onBack={() => setIsApplyingReward(false)} />
+        ) : step === 1 ? (
           <>
             <DialogHeader>
-              <DialogTitle>
-                {editingOrder ? `Update Order ${editingOrder.simplifiedId}` : 'New Order Setup'}
-              </DialogTitle>
+              <DialogTitle>{editingOrder ? `Update Order ${editingOrder.simplifiedId}` : 'New Order Setup'}</DialogTitle>
               <DialogDescription>
-                {editingOrder
-                  ? 'Update the order details and proceed to payment if needed.'
-                  : 'Configure the order details before payment.'
-                }
+                {editingOrder ? 'Update the order details and proceed to payment if needed.' : 'Configure the order details before payment.'}
               </DialogDescription>
             </DialogHeader>
-
-            <div className="space-y-4 py-4">
+            <div className="flex-1 space-y-4 py-4 overflow-y-auto">
               {editingOrder && (
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertTitle>Order Edit</AlertTitle>
-                  <AlertDescription>
-                    Total changed from {formatCurrency(editingOrder?.total || 0)} to {formatCurrency(total)}
-                  </AlertDescription>
+                  <AlertDescription>Total changed from {formatCurrency(editingOrder?.total || 0)} to {formatCurrency(total)}</AlertDescription>
                 </Alert>
               )}
-
               <div>
                 <Label>Order Type</Label>
                 <div className="grid grid-cols-3 gap-2 mt-2">
                   {(['Dine-In', 'Takeout', 'Delivery'] as const).map(type => (
-                    <Button
-                      key={type}
-                      onClick={() => setOrderType(type)}
-                      variant={orderType === type ? 'default' : 'outline'}
-                      size="sm"
-                      className="text-xs"
-                    >
-                      {type}
-                    </Button>
+                    <Button key={type} onClick={() => setOrderType(type)} variant={orderType === type ? 'default' : 'outline'} size="sm" className="text-xs">{type}</Button>
                   ))}
                 </div>
               </div>
-
               <div>
                 <Label htmlFor="tag">Tag (Customer Name / Table No.) *</Label>
-                <Input
-                  id="tag"
-                  type="text"
-                  value={orderTag}
-                  onChange={(e) => setOrderTag(e.target.value)}
-                  placeholder="e.g., 'Table 5' or 'John D.'"
-                  className="mt-2"
-                />
+                <Input id="tag" type="text" value={orderTag} onChange={(e) => setOrderTag(e.target.value)} placeholder="e.g., 'Table 5' or 'John D.'" className="mt-2" />
               </div>
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+              {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
             </div>
-
-            <DialogFooter className="grid grid-cols-2 gap-2">
-              <Button
-                onClick={handlePayLater}
-                disabled={isProcessing}
-                variant="secondary"
-                className="bg-yellow-500 hover:bg-yellow-600 text-white"
-              >
-                {isProcessing ? <LoadingSpinner /> : 'Save Unpaid'}
-              </Button>
-              <Button onClick={handleProceedToPayment}>
-                Add Payment
-              </Button>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button onClick={handlePayLater} disabled={isProcessing} variant="secondary" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-white">{isProcessing ? <LoadingSpinner /> : 'Save Unpaid'}</Button>
+              <Button onClick={handleProceedToPayment} className="w-full sm:w-auto">Add Payment</Button>
             </DialogFooter>
           </>
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>
-                {editingOrder ? `Add Payment - ${editingOrder.simplifiedId}` : 'Process Payment'}
-              </DialogTitle>
+              <DialogTitle>{editingOrder ? `Add Payment - ${editingOrder.simplifiedId}` : 'Process Payment'}</DialogTitle>
               <div className="space-y-1 text-center pt-2">
-                {reward && (
-                  <p className="text-sm text-muted-foreground line-through">{formatCurrency(total)}</p>
-                )}
+                {reward && <p className="text-sm text-muted-foreground line-through">{formatCurrency(total)}</p>}
                 <p className="text-3xl font-bold text-primary">{formatCurrency(finalTotal)}</p>
-                {reward && (
-                  <Badge variant="secondary">
-                    <Gift className="h-3 w-3 mr-1.5" />
-                    {formatCurrency(reward.discount)} discount applied
-                  </Badge>
-                )}
+                {reward && <Badge variant="secondary"><Gift className="h-3 w-3 mr-1.5" />{formatCurrency(reward.discount)} discount applied</Badge>}
               </div>
             </DialogHeader>
-
-            <ScrollArea className="flex-1">
-              <div className="space-y-4">
+            <div className="flex-1 overflow-y-auto -mx-4 px-4">
+              <div className="space-y-4 py-4">
                 {renderBalanceBreakdown()}
-
                 {!isOverpaid ? (
                   <div className="space-y-4 p-4 border rounded-lg">
                     <div className="space-y-2">
@@ -587,44 +537,21 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                       <Label htmlFor="amountPaidMomo">Amount Paid (MoMo/Card)</Label>
                       <Input id="amountPaidMomo" type="number" value={amountPaidMomoInput} onChange={(e) => setAmountPaidMomoInput(e.target.value)} placeholder="0.00" className="h-12 text-lg" />
                     </div>
-
                     {balances.change > 0 && (
                       <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                        <p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">
-                          Change Due: {formatCurrency(balances.change)}
-                        </p>
+                        <p className="font-semibold text-red-600 dark:text-red-400 text-center mb-2">Change Due: {formatCurrency(balances.change)}</p>
                         <Label htmlFor="changeGiven">Amount Given as Change</Label>
-                        <Input
-                          id="changeGiven"
-                          type="number"
-                          value={changeGivenInput}
-                          onChange={(e) => setChangeGivenInput(e.target.value)}
-                          placeholder={formatCurrency(balances.change)}
-                          max={balances.change}
-                          className="text-center mt-2"
-                        />
-                        <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">
-                          Enter amount given. Leave empty if change not given yet.
-                        </p>
-                        {hasOutstandingChange && (
-                          <p className="text-xs text-orange-600 dark:text-orange-300 mt-1 text-center">
-                            Remaining change owed: {formatCurrency(changeStillDue)}
-                          </p>
-                        )}
-                        {exceedsChangeDue && (
-                          <p className="text-xs text-amber-600 dark:text-amber-300 mt-1 text-center">
-                            Amount exceeds required change and will be capped at {formatCurrency(balances.change)}.
-                          </p>
-                        )}
+                        <Input id="changeGiven" type="number" value={changeGivenInput} onChange={(e) => setChangeGivenInput(e.target.value)} placeholder={formatCurrency(balances.change)} max={balances.change} className="text-center mt-2" />
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-1 text-center">Enter amount given. Leave empty if change not given yet.</p>
+                        {hasOutstandingChange && <p className="text-xs text-orange-600 dark:text-orange-300 mt-1 text-center">Remaining change owed: {formatCurrency(changeStillDue)}</p>}
+                        {exceedsChangeDue && <p className="text-xs text-amber-600 dark:text-amber-300 mt-1 text-center">Amount exceeds required change and will be capped at {formatCurrency(balances.change)}.</p>}
                       </div>
                     )}
                     {showDeficitOptions && (
                       <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
                         <AlertTriangle className="h-4 w-4 text-orange-600" />
                         <AlertTitle className="text-orange-800 dark:text-orange-200">Payment Insufficient</AlertTitle>
-                        <AlertDescription className="text-orange-700 dark:text-orange-300">
-                          Customer still owes: <span className="font-bold">{formatCurrency(balances.deficit)}</span>
-                        </AlertDescription>
+                        <AlertDescription className="text-orange-700 dark:text-orange-300">Customer still owes: <span className="font-bold">{formatCurrency(balances.deficit)}</span></AlertDescription>
                       </Alert>
                     )}
                   </div>
@@ -632,73 +559,25 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
                   <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
                     <Info className="h-4 w-4 text-green-600" />
                     <AlertTitle className="text-green-800 dark:text-green-200">Customer Overpaid</AlertTitle>
-                    <AlertDescription className="text-green-700 dark:text-green-300">
-                      The customer's previous payment covers the new total.
-                      A change of <span className="font-bold">{formatCurrency(Math.abs(amountOwedNow))}</span> is now due.
-                    </AlertDescription>
+                    <AlertDescription className="text-green-700 dark:text-green-300">The customer's previous payment covers the new total. A change of <span className="font-bold">{formatCurrency(Math.abs(amountOwedNow))}</span> is now due.</AlertDescription>
                   </Alert>
                 )}
-
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Error</AlertTitle>
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
+                {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
               </div>
-            </ScrollArea>
-
-            <DialogFooter className="grid grid-cols-1 gap-3 pt-4 border-t">
-              {!isOverpaid && (
-                <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
-                  <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
-                </Button>
-              )}
+            </div>
+            <DialogFooter className="flex-col gap-2 pt-4 border-t">
+              {!isOverpaid && <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}><Gift className="h-4 w-4 mr-2" /> Apply Reward Discount</Button>}
               {isOverpaid ? (
-                <Button
-                  onClick={() => processOrder({ isPaid: true })}
-                  disabled={isProcessing}
-                  className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg"
-                >
-                  {isProcessing ? <LoadingSpinner /> : "Confirm & Settle Change"}
-                </Button>
+                <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing} className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-lg">{isProcessing ? <LoadingSpinner /> : "Confirm & Settle Change"}</Button>
               ) : showDeficitOptions ? (
                 <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    onClick={() => processOrder({ isPaid: true, pardonDeficit: true })}
-                    disabled={isProcessing}
-                    className="bg-green-500 hover:bg-green-600 text-white"
-                    size="sm"
-                  >
-                    {isProcessing ? <LoadingSpinner /> : 'Pardon Deficit'}
-                  </Button>
-                  <Button
-                    onClick={() => processOrder({ isPaid: true, pardonDeficit: false })}
-                    disabled={isProcessing}
-                    className="bg-yellow-500 hover:bg-yellow-600 text-white"
-                    size="sm"
-                  >
-                    {isProcessing ? <LoadingSpinner /> : 'Keep Balance'}
-                  </Button>
+                  <Button onClick={() => processOrder({ isPaid: true, pardonDeficit: true })} disabled={isProcessing} className="w-full bg-green-500 hover:bg-green-600 text-white" size="sm">{isProcessing ? <LoadingSpinner /> : 'Pardon Deficit'}</Button>
+                  <Button onClick={() => processOrder({ isPaid: true, pardonDeficit: false })} disabled={isProcessing} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white" size="sm">{isProcessing ? <LoadingSpinner /> : 'Keep Balance'}</Button>
                 </div>
               ) : (
-                <Button
-                  onClick={() => processOrder({ isPaid: true })}
-                  disabled={isProcessing || !canConfirmPayment}
-                  className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg"
-                >
-                  {isProcessing ? <LoadingSpinner /> : 'Process Payment'}
-                </Button>
+                <Button onClick={() => processOrder({ isPaid: true })} disabled={isProcessing || !canConfirmPayment} className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-lg">{isProcessing ? <LoadingSpinner /> : 'Process Payment'}</Button>
               )}
-              <Button
-                onClick={() => setStep(1)}
-                variant="outline"
-                size="sm"
-                className="mt-2"
-              >
-                ← Back to Details
-              </Button>
+              <Button onClick={() => setStep(1)} variant="outline" size="sm" className="w-full">← Back to Details</Button>
             </DialogFooter>
           </>
         )}
