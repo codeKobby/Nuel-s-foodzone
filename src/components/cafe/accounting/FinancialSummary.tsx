@@ -168,7 +168,16 @@ export const FinancialSummary: React.FC<FinancialSummaryProps> = ({ stats }) => 
                             <StatCard icon={<Gift className="text-muted-foreground" />} title="Reward Discounts" value={formatCurrency(stats.totalRewardDiscount)} description="Total discounts from rewards" />
                             <StatCard icon={<Ban className="text-muted-foreground" />} title="Pardoned Deficits" value={formatCurrency(stats.totalPardonedAmount)} description="Unplanned discounts given today" />
                             <StatCard icon={<ArrowRightLeft className="text-muted-foreground" />} title="Change Owed" value={formatCurrency(stats.changeOwedForPeriod)} description="Total change owed to customers today" />
-                            <StatCard icon={<Coins className="text-muted-foreground" />} title="Previous Change Given" value={formatCurrency(stats.previousDaysChangeGiven)} description="Change for old orders given today" />
+                            <StatCard
+                                icon={<Coins className="text-muted-foreground" />}
+                                title="Previous Change Given"
+                                value={formatCurrency(stats.previousDaysChangeGiven)}
+                                description={
+                                    stats.previousDaysChangeGivenFromSetAside > 0
+                                        ? <span>From Sales: {formatCurrency(stats.previousDaysChangeGivenFromSales)} | From Set-Aside: {formatCurrency(stats.previousDaysChangeGivenFromSetAside)}</span>
+                                        : "Change for old orders given today"
+                                }
+                            />
                         </CardContent>
                         <CardFooter>
                             <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">

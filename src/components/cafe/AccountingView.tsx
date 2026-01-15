@@ -1399,7 +1399,11 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                                     icon={<Coins className="text-muted-foreground" />}
                                                     title="Previous Change Given"
                                                     value={formatCurrency(stats.previousDaysChangeGiven)}
-                                                    description="Change for old orders given today"
+                                                    description={
+                                                        stats.previousDaysChangeGivenFromSetAside > 0
+                                                            ? <span>From Sales: {formatCurrency(stats.previousDaysChangeGivenFromSales)} | From Set-Aside: {formatCurrency(stats.previousDaysChangeGivenFromSetAside)}</span>
+                                                            : "Change for old orders given today"
+                                                    }
                                                     onClick={() => setShowPrevChangeModal(true)}
                                                 />
                                             </CardContent>
