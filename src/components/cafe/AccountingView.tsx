@@ -598,12 +598,7 @@ const ReconciliationView: React.FC<{
                                                         <div className="flex justify-between"><span>Today's Cash Sales:</span><span className="font-medium">{formatCurrency(stats.cashSales)}</span></div>
                                                         <div className="flex justify-between text-red-600"><span>(-) Cash Expenses:</span><span className="font-medium">-{formatCurrency(stats.miscCashExpenses)}</span></div>
                                                         {stats.settledUnpaidCash > 0 && <div className="flex justify-between text-green-600"><span>(+) Collections (Cash):</span><span className="font-medium">+{formatCurrency(stats.settledUnpaidCash)}</span></div>}
-                                                        {stats.previousDaysChangeGivenFromSales > 0 && (
-                                                            <div className="flex justify-between text-orange-600">
-                                                                <span>(-) Previous Days Change (From Sales):</span>
-                                                                <span className="font-medium">-{formatCurrency(stats.previousDaysChangeGivenFromSales)}</span>
-                                                            </div>
-                                                        )}
+
                                                         {stats.previousDaysChangeGivenFromSetAside > 0 && (
                                                             <div className="flex justify-between text-muted-foreground">
                                                                 <span>Previous Change Paid (From Set Aside):</span>
@@ -1051,8 +1046,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                 const expectedCash =
                     cashSales +
                     settledUnpaidCash -
-                    miscCashExpenses -
-                    previousDaysChangeGivenFromSales;
+                    miscCashExpenses;
                 const expectedMomo = momoSales + settledUnpaidMomo - miscMomoExpenses;
 
                 setStats({
@@ -1135,7 +1129,6 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
         let expected = stats.cashSales;
         expected += stats.settledUnpaidCash; // Only cash collections from previous days
         expected -= stats.miscCashExpenses;
-        expected -= stats.previousDaysChangeGivenFromSales;
         return expected;
     }, [stats]);
 
@@ -1395,17 +1388,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                                     description="Total change owed to customers today"
                                                     onClick={() => setShowChangeOwedModal(true)}
                                                 />
-                                                <StatCard
-                                                    icon={<Coins className="text-muted-foreground" />}
-                                                    title="Previous Change Given"
-                                                    value={formatCurrency(stats.previousDaysChangeGiven)}
-                                                    description={
-                                                        stats.previousDaysChangeGivenFromSetAside > 0
-                                                            ? <span>From Sales: {formatCurrency(stats.previousDaysChangeGivenFromSales)} | From Set-Aside: {formatCurrency(stats.previousDaysChangeGivenFromSetAside)}</span>
-                                                            : "Change for old orders given today"
-                                                    }
-                                                    onClick={() => setShowPrevChangeModal(true)}
-                                                />
+
                                             </CardContent>
                                             <CardFooter>
                                                 <div className="w-full p-4 border rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
