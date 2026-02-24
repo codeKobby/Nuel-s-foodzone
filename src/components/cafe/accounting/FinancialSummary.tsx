@@ -219,14 +219,14 @@ export const FinancialSummary: React.FC<FinancialSummaryProps> = ({ stats }) => 
             </div>
 
             <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-                <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
+                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                         <DialogTitle>{selectedMethod === 'cash' ? 'Cash Sales' : 'Momo/Card Sales'} Details</DialogTitle>
                         <DialogDescription>
                             Total: {formatCurrency(totalForMethod)}
                         </DialogDescription>
                     </DialogHeader>
-                    <Table>
+                    <div className="flex-1 overflow-y-auto p-6"><Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Order ID</TableHead>
@@ -253,7 +253,7 @@ export const FinancialSummary: React.FC<FinancialSummaryProps> = ({ stats }) => 
                                 </TableRow>
                             )}
                         </TableBody>
-                    </Table>
+                    </Table></div>
                 </DialogContent>
             </Dialog>
         </div>

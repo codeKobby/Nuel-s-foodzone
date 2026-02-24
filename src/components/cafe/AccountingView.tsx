@@ -292,8 +292,8 @@ const ReconciliationView: React.FC<{
 
         return (
             <Dialog open={isAdvancedModalOpen} onOpenChange={setIsAdvancedModalOpen}>
-                <DialogContent className="max-w-4xl max-h-[85vh]">
-                    <DialogHeader>
+                <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-0 gap-0">
+                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                         <DialogTitle className="flex items-center gap-2">
                             <FileText className="h-5 w-5" />
                             Cross-Check Digital vs Written Orders
@@ -302,8 +302,8 @@ const ReconciliationView: React.FC<{
                             Compare your digital orders against physical kitchen tickets to identify missing or extra orders.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 py-4">
-                        <div className="lg:col-span-3 space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 flex-1 overflow-hidden h-full">
+                        <div className="lg:col-span-3 flex flex-col h-full space-y-4 overflow-hidden">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
@@ -313,7 +313,7 @@ const ReconciliationView: React.FC<{
                                     className="pl-10"
                                 />
                             </div>
-                            <ScrollArea className="h-96 border rounded-lg">
+                            <ScrollArea className="flex-1 border rounded-lg">
                                 <div className="p-4 space-y-3">
                                     {filteredOrders.length > 0 ? filteredOrders.map(order => (
                                         <div
@@ -403,7 +403,7 @@ const ReconciliationView: React.FC<{
                             </Card>
                         </div>
                     </div>
-                    <DialogFooter className="border-t pt-4">
+                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
                         <Button variant="outline" onClick={() => setIsAdvancedModalOpen(false)}>
                             Close Audit
                         </Button>
@@ -416,8 +416,8 @@ const ReconciliationView: React.FC<{
     return (
         <>
             <Dialog open={true} onOpenChange={(open) => !open && onBack()}>
-                <DialogContent className="max-w-7xl max-h-[90vh]">
-                    <DialogHeader className="pb-4 border-b">
+                <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col p-0 gap-0">
+                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                         <DialogTitle className="text-2xl font-bold">End-of-Day Reconciliation</DialogTitle>
                         <DialogDescription className="text-base">
                             Complete daily cash reconciliation and account for all transactions for {format(today, "EEEE, MMMM dd, yyyy")}
@@ -425,8 +425,8 @@ const ReconciliationView: React.FC<{
                     </DialogHeader>
 
                     {!stats ? <LoadingSpinner /> : (
-                        <ScrollArea className="max-h-[70vh]">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-6 pr-4">
+                        <ScrollArea className="flex-1 p-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 <div className="lg:col-span-1 space-y-6">
                                     <Card>
                                         <CardHeader>
@@ -654,7 +654,7 @@ const ReconciliationView: React.FC<{
                         </ScrollArea>
                     )}
 
-                    <DialogFooter className="pt-6 border-t">
+                    <DialogFooter className="p-6 pt-6 border-t shrink-0">
                         <Button variant="secondary" onClick={onBack} disabled={isSubmitting}>Cancel</Button>
                         <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting || !stats} className="w-full md:w-auto h-12 text-lg font-bold bg-green-600 hover:bg-green-700">
                             {isSubmitting ? <LoadingSpinner /> : 'Save & Finalize Report'}
@@ -1461,12 +1461,12 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
                                                     {showCollectionsModal && (
                                                         <Dialog open={showCollectionsModal} onOpenChange={setShowCollectionsModal}>
-                                                            <DialogContent className="max-w-3xl max-h-[80vh]">
-                                                                <DialogHeader>
+                                                            <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                                                <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                                                     <DialogTitle>Collections From Previous Orders</DialogTitle>
                                                                     <DialogDescription>Payments received today for orders placed on previous days.</DialogDescription>
                                                                 </DialogHeader>
-                                                                <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                                                <div className="p-6 space-y-3 overflow-y-auto flex-1">
                                                                     {previousCollections.length === 0 ? (
                                                                         <p className="text-muted-foreground">No collections recorded.</p>
                                                                     ) : (
@@ -1488,7 +1488,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                                                         ))
                                                                     )}
                                                                 </div>
-                                                                <DialogFooter>
+                                                                <DialogFooter className="p-6 pt-4 border-t shrink-0">
                                                                     <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowCollectionsModal(false)}>Close</Button>
                                                                 </DialogFooter>
                                                             </DialogContent>
@@ -1505,12 +1505,12 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         )}
                         {showCashModal && (
                             <Dialog open={showCashModal} onOpenChange={setShowCashModal}>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                    <DialogHeader>
+                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Cash Sales - Orders</DialogTitle>
                                         <DialogDescription>Orders contributing to today's cash sales.</DialogDescription>
                                     </DialogHeader>
-                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                    <div className="p-6 space-y-3 overflow-y-auto flex-1">
                                         {selectedSalesOrders.length === 0 ? (
                                             <p className="text-muted-foreground">No cash sales found.</p>
                                         ) : (
@@ -1532,7 +1532,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                             ))
                                         )}
                                     </div>
-                                    <DialogFooter>
+                                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
                                         <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowCashModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
@@ -1541,12 +1541,12 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
                         {showMomoModal && (
                             <Dialog open={showMomoModal} onOpenChange={setShowMomoModal}>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                    <DialogHeader>
+                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>MoMo/Card Sales - Orders</DialogTitle>
                                         <DialogDescription>Orders contributing to today's momo/card sales.</DialogDescription>
                                     </DialogHeader>
-                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                    <div className="p-6 space-y-3 overflow-y-auto flex-1">
                                         {selectedSalesOrders.length === 0 ? (
                                             <p className="text-muted-foreground">No momo/card sales found.</p>
                                         ) : (
@@ -1568,7 +1568,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                             ))
                                         )}
                                     </div>
-                                    <DialogFooter>
+                                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
                                         <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowMomoModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
@@ -1578,12 +1578,12 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Total Sales Modal */}
                         {showTotalSalesModal && stats && (
                             <Dialog open={showTotalSalesModal} onOpenChange={setShowTotalSalesModal}>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                    <DialogHeader>
+                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Total Sales - All Orders</DialogTitle>
                                         <DialogDescription>All completed orders contributing to today's sales.</DialogDescription>
                                     </DialogHeader>
-                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                    <div className="p-6 space-y-3 overflow-y-auto flex-1">
                                         {stats.orders.filter((o: Order) => o.status === 'Completed').length === 0 ? (
                                             <p className="text-muted-foreground">No completed orders found.</p>
                                         ) : (
@@ -1605,7 +1605,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                             ))
                                         )}
                                     </div>
-                                    <DialogFooter>
+                                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
                                         <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowTotalSalesModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
@@ -1615,12 +1615,12 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Unpaid Orders Modal */}
                         {showUnpaidModal && (
                             <Dialog open={showUnpaidModal} onOpenChange={setShowUnpaidModal}>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                    <DialogHeader>
+                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Unpaid Orders</DialogTitle>
                                         <DialogDescription>Orders with outstanding balances.</DialogDescription>
                                     </DialogHeader>
-                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                    <div className="p-6 space-y-3 overflow-y-auto flex-1">
                                         {allUnpaidOrders.length === 0 ? (
                                             <p className="text-muted-foreground">No unpaid orders found.</p>
                                         ) : (
@@ -1645,7 +1645,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                             ))
                                         )}
                                     </div>
-                                    <DialogFooter>
+                                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
                                         <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowUnpaidModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
@@ -1655,12 +1655,12 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Misc Expenses Modal */}
                         {showExpensesModal && (
                             <Dialog open={showExpensesModal} onOpenChange={setShowExpensesModal}>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                    <DialogHeader>
+                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Miscellaneous Expenses</DialogTitle>
                                         <DialogDescription>All expenses recorded today.</DialogDescription>
                                     </DialogHeader>
-                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                    <div className="p-6 space-y-3 overflow-y-auto flex-1">
                                         {miscExpenses.length === 0 ? (
                                             <p className="text-muted-foreground">No expenses recorded today.</p>
                                         ) : (
@@ -1684,7 +1684,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                             ))
                                         )}
                                     </div>
-                                    <DialogFooter>
+                                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
                                         <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowExpensesModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
@@ -1694,12 +1694,12 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Rewards Discounts Modal */}
                         {showRewardsModal && stats && (
                             <Dialog open={showRewardsModal} onOpenChange={setShowRewardsModal}>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                    <DialogHeader>
+                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Reward Discounts</DialogTitle>
                                         <DialogDescription>Orders with reward discounts applied today.</DialogDescription>
                                     </DialogHeader>
-                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                    <div className="p-6 space-y-3 overflow-y-auto flex-1">
                                         {stats.orders.filter((o: Order) => (o.rewardDiscount || 0) > 0).length === 0 ? (
                                             <p className="text-muted-foreground">No reward discounts applied today.</p>
                                         ) : (
@@ -1724,7 +1724,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                             ))
                                         )}
                                     </div>
-                                    <DialogFooter>
+                                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
                                         <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowRewardsModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
@@ -1734,12 +1734,12 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Pardoned Deficits Modal */}
                         {showPardonedModal && stats && (
                             <Dialog open={showPardonedModal} onOpenChange={setShowPardonedModal}>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                    <DialogHeader>
+                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Pardoned Deficits</DialogTitle>
                                         <DialogDescription>Orders with pardoned amounts today.</DialogDescription>
                                     </DialogHeader>
-                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                    <div className="p-6 space-y-3 overflow-y-auto flex-1">
                                         {stats.orders.filter((o: Order) => (o.pardonedAmount || 0) > 0).length === 0 ? (
                                             <p className="text-muted-foreground">No pardoned amounts today.</p>
                                         ) : (
@@ -1764,7 +1764,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                             ))
                                         )}
                                     </div>
-                                    <DialogFooter>
+                                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
                                         <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowPardonedModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
@@ -1774,12 +1774,12 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Change Owed Modal */}
                         {showChangeOwedModal && stats && (
                             <Dialog open={showChangeOwedModal} onOpenChange={setShowChangeOwedModal}>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                    <DialogHeader>
+                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Change Owed to Customers</DialogTitle>
                                         <DialogDescription>Orders where change is still owed to customers.</DialogDescription>
                                     </DialogHeader>
-                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                    <div className="p-6 space-y-3 overflow-y-auto flex-1">
                                         {stats.orders.filter((o: Order) => o.changeGiven > 0 && o.paymentStatus === 'Paid').length === 0 ? (
                                             <p className="text-muted-foreground">No change transactions today.</p>
                                         ) : (
@@ -1804,7 +1804,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                             ))
                                         )}
                                     </div>
-                                    <DialogFooter>
+                                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
                                         <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowChangeOwedModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
@@ -1814,12 +1814,12 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Previous Change Given Modal */}
                         {showPrevChangeModal && stats && (
                             <Dialog open={showPrevChangeModal} onOpenChange={setShowPrevChangeModal}>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                    <DialogHeader>
+                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Previous Change Given</DialogTitle>
                                         <DialogDescription>Change given today for orders from previous days.</DialogDescription>
                                     </DialogHeader>
-                                    <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+                                    <div className="p-6 space-y-3 overflow-y-auto flex-1">
                                         {previousCollections.filter((c: any) => c.isChangeGiven).length === 0 ? (
                                             <p className="text-muted-foreground">No previous change given today.</p>
                                         ) : (
@@ -1840,7 +1840,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                                             ))
                                         )}
                                     </div>
-                                    <DialogFooter>
+                                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
                                         <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setShowPrevChangeModal(false)}>Close</Button>
                                     </DialogFooter>
                                 </DialogContent>
