@@ -48,8 +48,8 @@ export const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalPr
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[85vh]">
-                <DialogHeader>
+            <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-0 gap-0">
+                <DialogHeader className="p-6 pb-4 border-b shrink-0">
                     <DialogTitle className="flex items-center gap-2">
                         <FileText className="h-5 w-5" />
                         Cross-Check Digital vs Written Orders
@@ -58,8 +58,8 @@ export const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalPr
                         Compare your digital orders against physical kitchen tickets to identify missing or extra orders.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 py-4">
-                    <div className="lg:col-span-3 space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 flex-1 overflow-hidden h-full">
+                    <div className="lg:col-span-3 flex flex-col h-full space-y-4 overflow-hidden">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -69,7 +69,7 @@ export const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalPr
                                 className="pl-10"
                             />
                         </div>
-                        <ScrollArea className="h-96 border rounded-lg">
+                        <ScrollArea className="flex-1 border rounded-lg">
                             <div className="p-4 space-y-3">
                                 {filteredOrders.length > 0 ? filteredOrders.map(order => (
                                     <div
@@ -159,7 +159,7 @@ export const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalPr
                         </Card>
                     </div>
                 </div>
-                <DialogFooter className="border-t pt-4">
+                <DialogFooter className="p-6 pt-4 border-t shrink-0">
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
                         Close Audit
                     </Button>

@@ -181,16 +181,16 @@ export const ReconciliationForm: React.FC<ReconciliationFormProps> = ({ stats, a
     return (
         <>
             <Dialog open={true} onOpenChange={(open) => !open && onBack()}>
-                <DialogContent className="max-w-7xl max-h-[90vh]">
-                    <DialogHeader className="pb-4 border-b">
+                <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col p-0 gap-0">
+                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                         <DialogTitle className="text-2xl font-bold">End-of-Day Reconciliation</DialogTitle>
                         <DialogDescription className="text-base">
                             Complete daily cash reconciliation and account for all transactions for {format(today, "EEEE, MMMM dd, yyyy")}
                         </DialogDescription>
                     </DialogHeader>
 
-                    <ScrollArea className="max-h-[70vh]">
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-6 pr-4">
+                    <ScrollArea className="flex-1">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
                             <div className="lg:col-span-1 space-y-6">
                                 <CashCountSection
                                     denominationQuantities={denominationQuantities}
@@ -332,7 +332,7 @@ export const ReconciliationForm: React.FC<ReconciliationFormProps> = ({ stats, a
                         </div>
                     </ScrollArea>
 
-                    <DialogFooter className="pt-6 border-t">
+                    <DialogFooter className="p-6 pt-6 border-t shrink-0">
                         <Button variant="secondary" onClick={onBack} disabled={isSubmitting}>Cancel</Button>
                         <Button onClick={() => setShowConfirm(true)} disabled={isSubmitting || !stats} className="w-full md:w-auto h-12 text-lg font-bold bg-green-600 hover:bg-green-700">
                             {isSubmitting ? <LoadingSpinner /> : 'Save & Finalize Report'}
