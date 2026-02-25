@@ -11,7 +11,6 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowRightLeft, FileText, TrendingUp, TrendingDown, CheckCircle, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { CASH_DENOMINATIONS } from '@/lib/constants';
@@ -189,7 +188,7 @@ export const ReconciliationForm: React.FC<ReconciliationFormProps> = ({ stats, a
                         </DialogDescription>
                     </DialogHeader>
 
-                    <ScrollArea className="flex-1">
+                    <div className="flex-1 overflow-y-auto">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
                             <div className="lg:col-span-1 space-y-6">
                                 <CashCountSection
@@ -330,7 +329,7 @@ export const ReconciliationForm: React.FC<ReconciliationFormProps> = ({ stats, a
                                 </Card>
                             </div>
                         </div>
-                    </ScrollArea>
+                    </div>
 
                     <DialogFooter className="p-6 pt-6 border-t shrink-0">
                         <Button variant="secondary" onClick={onBack} disabled={isSubmitting}>Cancel</Button>

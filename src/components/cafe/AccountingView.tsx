@@ -313,7 +313,7 @@ const ReconciliationView: React.FC<{
                                     className="pl-10"
                                 />
                             </div>
-                            <ScrollArea className="flex-1 border rounded-lg">
+                            <div className="flex-1 border rounded-lg overflow-y-auto">
                                 <div className="p-4 space-y-3">
                                     {filteredOrders.length > 0 ? filteredOrders.map(order => (
                                         <div
@@ -357,7 +357,7 @@ const ReconciliationView: React.FC<{
                                         </div>
                                     )}
                                 </div>
-                            </ScrollArea>
+                            </div>
                         </div>
                         <div className="space-y-4">
                             <Card>
@@ -425,7 +425,7 @@ const ReconciliationView: React.FC<{
                     </DialogHeader>
 
                     {!stats ? <LoadingSpinner /> : (
-                        <ScrollArea className="flex-1 p-6">
+                        <div className="flex-1 p-6 overflow-y-auto">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 <div className="lg:col-span-1 space-y-6">
                                     <Card>
@@ -651,7 +651,7 @@ const ReconciliationView: React.FC<{
                                     </Card>
                                 </div>
                             </div>
-                        </ScrollArea>
+                        </div>
                     )}
 
                     <DialogFooter className="p-6 pt-6 border-t shrink-0">
@@ -1147,7 +1147,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
     return (
         <div className="h-full flex flex-col overflow-hidden">
-            <ScrollArea className="flex-1">
+            <div className="flex-1 overflow-y-auto">
                 <div className="px-3 py-2 md:p-4 bg-background">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
                         <h1 className="text-lg md:text-xl font-bold truncate">Accounting</h1>
@@ -1848,9 +1848,9 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         )}
                     </TabsContent>
                     <TabsContent value="history" className="flex-1 overflow-hidden mt-4">
-                        <ScrollArea className="h-full">
+                        <div className="h-full overflow-y-auto">
                             <HistoryView />
-                        </ScrollArea>
+                        </div>
                     </TabsContent>
                 </Tabs>
                 {stats && showUnpaidOrdersWarning && (
@@ -1865,7 +1865,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         </AlertDialogContent>
                     </AlertDialog>
                 )}
-            </ScrollArea>
+            </div>
         </div>
     );
 };

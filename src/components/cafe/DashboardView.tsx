@@ -552,7 +552,7 @@ const DashboardView: React.FC = () => {
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
       <form
         onSubmit={handleSubmit}
         className="flex-shrink-0 p-4 border-t bg-background flex gap-2"
@@ -578,7 +578,7 @@ const DashboardView: React.FC = () => {
             A complete list of all orders with an outstanding balance ({allUnpaidOrders.length} orders).
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="flex-1 p-6">
+        <div className="flex-1 p-6 overflow-y-auto">
           <div className="space-y-4">
             {allUnpaidOrders.length > 0 ? (
               allUnpaidOrders
@@ -608,7 +608,7 @@ const DashboardView: React.FC = () => {
               <p className="text-center text-muted-foreground py-8">🎉 No unpaid orders found!</p>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -783,7 +783,7 @@ const DashboardView: React.FC = () => {
                 ) : (
                   <p className="text-center text-muted-foreground italic py-8">{itemSearchQuery ? 'No items match your search.' : 'No items sold in this period.'}</p>
                 )}
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -792,7 +792,7 @@ const DashboardView: React.FC = () => {
       <Dialog open={isAnalysisModalOpen} onOpenChange={setIsAnalysisModalOpen}>
         <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0 gap-0">
           <DialogHeader className="p-6 pb-4 border-b shrink-0"><DialogTitle className="flex items-center gap-2"><Sparkles className="text-primary h-5 w-5" />AI Business Performance Analysis</DialogTitle><DialogDescription>An AI-generated report on your business performance for the selected period.</DialogDescription></DialogHeader>
-          <ScrollArea className="flex-1 p-6"><div className="prose dark:prose-invert max-w-none">{isGeneratingAnalysis ? <div className="flex flex-col items-center justify-center h-48"><LoadingSpinner /><p className="mt-4 text-muted-foreground">Generating your report...</p></div> : <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">{analysisContent}</ReactMarkdown>}</div></ScrollArea>
+          <div className="flex-1 p-6 overflow-y-auto"><div className="prose dark:prose-invert max-w-none">{isGeneratingAnalysis ? <div className="flex flex-col items-center justify-center h-48"><LoadingSpinner /><p className="mt-4 text-muted-foreground">Generating your report...</p></div> : <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">{analysisContent}</ReactMarkdown>}</div></div>
         </DialogContent>
       </Dialog>
 
