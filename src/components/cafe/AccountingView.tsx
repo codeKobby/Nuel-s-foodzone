@@ -8,7 +8,6 @@ import { AlertTriangle, FileSignature, ShoppingCart, CheckCircle, Banknote, Smar
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import HistoryView from '@/components/cafe/HistoryView';
-import { ScrollArea } from '../ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

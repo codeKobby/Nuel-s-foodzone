@@ -35,7 +35,6 @@ import { addDays, format, startOfWeek, endOfWeek, startOfMonth, startOfToday, en
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '../ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
@@ -495,7 +494,7 @@ const DashboardView: React.FC = () => {
 
   const renderChatContent = () => (
     <div className="flex-grow flex flex-col overflow-hidden h-full">
-      <ScrollArea className="flex-grow p-4" ref={chatContainerRef}>
+      <div className="flex-grow p-4 overflow-y-auto" ref={chatContainerRef}>
         <div className="space-y-4">
           {messages.length === 0 && !isChatLoading && (
             <div className="text-center text-muted-foreground pt-16">
@@ -764,7 +763,7 @@ const DashboardView: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-96 pr-4">
+              <div className="h-96 pr-4 overflow-y-auto">
                 {sortedItemSales.length > 0 ? (
                   <div className="space-y-3">
                     {sortedItemSales.map((item, index) => (
