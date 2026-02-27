@@ -570,14 +570,14 @@ const DashboardView: React.FC = () => {
 
   const UnpaidOrdersModal = () => (
     <Dialog open={isUnpaidOrdersModalOpen} onOpenChange={setIsUnpaidOrdersModalOpen}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 gap-0">
         <DialogHeader className="p-6 pb-4 border-b shrink-0">
           <DialogTitle>All Unpaid Orders</DialogTitle>
           <DialogDescription>
             A complete list of all orders with an outstanding balance ({allUnpaidOrders.length} orders).
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-1 p-6 overflow-y-auto">
+        <div className="flex-1 p-6 overflow-y-auto min-h-0">
           <div className="space-y-4">
             {allUnpaidOrders.length > 0 ? (
               allUnpaidOrders
@@ -789,9 +789,9 @@ const DashboardView: React.FC = () => {
       </Tabs>
 
       <Dialog open={isAnalysisModalOpen} onOpenChange={setIsAnalysisModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0 gap-0">
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0">
           <DialogHeader className="p-6 pb-4 border-b shrink-0"><DialogTitle className="flex items-center gap-2"><Sparkles className="text-primary h-5 w-5" />AI Business Performance Analysis</DialogTitle><DialogDescription>An AI-generated report on your business performance for the selected period.</DialogDescription></DialogHeader>
-          <div className="flex-1 p-6 overflow-y-auto"><div className="prose dark:prose-invert max-w-none">{isGeneratingAnalysis ? <div className="flex flex-col items-center justify-center h-48"><LoadingSpinner /><p className="mt-4 text-muted-foreground">Generating your report...</p></div> : <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">{analysisContent}</ReactMarkdown>}</div></div>
+          <div className="flex-1 p-6 overflow-y-auto min-h-0"><div className="prose dark:prose-invert max-w-none">{isGeneratingAnalysis ? <div className="flex flex-col items-center justify-center h-48"><LoadingSpinner /><p className="mt-4 text-muted-foreground">Generating your report...</p></div> : <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-content">{analysisContent}</ReactMarkdown>}</div></div>
         </DialogContent>
       </Dialog>
 

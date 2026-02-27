@@ -291,7 +291,7 @@ const ReconciliationView: React.FC<{
 
         return (
             <Dialog open={isAdvancedModalOpen} onOpenChange={setIsAdvancedModalOpen}>
-                <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-0 gap-0">
+                <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0">
                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                         <DialogTitle className="flex items-center gap-2">
                             <FileText className="h-5 w-5" />
@@ -312,7 +312,7 @@ const ReconciliationView: React.FC<{
                                     className="pl-10"
                                 />
                             </div>
-                            <div className="flex-1 border rounded-lg overflow-y-auto">
+                            <div className="flex-1 border rounded-lg overflow-y-auto min-h-0">
                                 <div className="p-4 space-y-3">
                                     {filteredOrders.length > 0 ? filteredOrders.map(order => (
                                         <div
@@ -424,7 +424,7 @@ const ReconciliationView: React.FC<{
                     </DialogHeader>
 
                     {!stats ? <LoadingSpinner /> : (
-                        <div className="flex-1 p-6 overflow-y-auto">
+                        <div className="flex-1 p-6 overflow-y-auto min-h-0">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 <div className="lg:col-span-1 space-y-6">
                                     <Card>
@@ -1460,7 +1460,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
                                                     {showCollectionsModal && (
                                                         <Dialog open={showCollectionsModal} onOpenChange={setShowCollectionsModal}>
-                                                            <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                                            <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 gap-0">
                                                                 <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                                                     <DialogTitle>Collections From Previous Orders</DialogTitle>
                                                                     <DialogDescription>Payments received today for orders placed on previous days.</DialogDescription>
@@ -1504,7 +1504,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         )}
                         {showCashModal && (
                             <Dialog open={showCashModal} onOpenChange={setShowCashModal}>
-                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 gap-0">
                                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Cash Sales - Orders</DialogTitle>
                                         <DialogDescription>Orders contributing to today's cash sales.</DialogDescription>
@@ -1540,7 +1540,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
 
                         {showMomoModal && (
                             <Dialog open={showMomoModal} onOpenChange={setShowMomoModal}>
-                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 gap-0">
                                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>MoMo/Card Sales - Orders</DialogTitle>
                                         <DialogDescription>Orders contributing to today's momo/card sales.</DialogDescription>
@@ -1577,7 +1577,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Total Sales Modal */}
                         {showTotalSalesModal && stats && (
                             <Dialog open={showTotalSalesModal} onOpenChange={setShowTotalSalesModal}>
-                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 gap-0">
                                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Total Sales - All Orders</DialogTitle>
                                         <DialogDescription>All completed orders contributing to today's sales.</DialogDescription>
@@ -1614,7 +1614,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Unpaid Orders Modal */}
                         {showUnpaidModal && (
                             <Dialog open={showUnpaidModal} onOpenChange={setShowUnpaidModal}>
-                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 gap-0">
                                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Unpaid Orders</DialogTitle>
                                         <DialogDescription>Orders with outstanding balances.</DialogDescription>
@@ -1654,7 +1654,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Misc Expenses Modal */}
                         {showExpensesModal && (
                             <Dialog open={showExpensesModal} onOpenChange={setShowExpensesModal}>
-                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 gap-0">
                                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Miscellaneous Expenses</DialogTitle>
                                         <DialogDescription>All expenses recorded today.</DialogDescription>
@@ -1693,7 +1693,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Rewards Discounts Modal */}
                         {showRewardsModal && stats && (
                             <Dialog open={showRewardsModal} onOpenChange={setShowRewardsModal}>
-                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 gap-0">
                                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Reward Discounts</DialogTitle>
                                         <DialogDescription>Orders with reward discounts applied today.</DialogDescription>
@@ -1733,7 +1733,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Pardoned Deficits Modal */}
                         {showPardonedModal && stats && (
                             <Dialog open={showPardonedModal} onOpenChange={setShowPardonedModal}>
-                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 gap-0">
                                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Pardoned Deficits</DialogTitle>
                                         <DialogDescription>Orders with pardoned amounts today.</DialogDescription>
@@ -1773,7 +1773,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Change Owed Modal */}
                         {showChangeOwedModal && stats && (
                             <Dialog open={showChangeOwedModal} onOpenChange={setShowChangeOwedModal}>
-                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 gap-0">
                                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Change Owed to Customers</DialogTitle>
                                         <DialogDescription>Orders where change is still owed to customers.</DialogDescription>
@@ -1813,7 +1813,7 @@ const AccountingView: React.FC<{ setActiveView: (view: string) => void }> = ({ s
                         {/* Previous Change Given Modal */}
                         {showPrevChangeModal && stats && (
                             <Dialog open={showPrevChangeModal} onOpenChange={setShowPrevChangeModal}>
-                                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+                                <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 gap-0">
                                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                                         <DialogTitle>Previous Change Given</DialogTitle>
                                         <DialogDescription>Change given today for orders from previous days.</DialogDescription>

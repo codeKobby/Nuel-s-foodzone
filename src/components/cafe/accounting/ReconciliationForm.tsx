@@ -180,7 +180,7 @@ export const ReconciliationForm: React.FC<ReconciliationFormProps> = ({ stats, a
     return (
         <>
             <Dialog open={true} onOpenChange={(open) => !open && onBack()}>
-                <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col p-0 gap-0">
+                <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0 gap-0">
                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                         <DialogTitle className="text-2xl font-bold">End-of-Day Reconciliation</DialogTitle>
                         <DialogDescription className="text-base">
@@ -188,7 +188,7 @@ export const ReconciliationForm: React.FC<ReconciliationFormProps> = ({ stats, a
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto min-h-0">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
                             <div className="lg:col-span-1 space-y-6">
                                 <CashCountSection

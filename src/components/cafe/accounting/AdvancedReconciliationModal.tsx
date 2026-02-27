@@ -47,7 +47,7 @@ export const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalPr
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-0 gap-0">
+            <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0">
                 <DialogHeader className="p-6 pb-4 border-b shrink-0">
                     <DialogTitle className="flex items-center gap-2">
                         <FileText className="h-5 w-5" />
@@ -68,7 +68,7 @@ export const AdvancedReconciliationModal: React.FC<AdvancedReconciliationModalPr
                                 className="pl-10"
                             />
                         </div>
-                        <div className="flex-1 border rounded-lg overflow-y-auto">
+                        <div className="flex-1 border rounded-lg overflow-y-auto min-h-0">
                             <div className="p-4 space-y-3">
                                 {filteredOrders.length > 0 ? filteredOrders.map(order => (
                                     <div
