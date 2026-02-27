@@ -309,102 +309,102 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
         }
     };
 
-    const MainPaymentContent = () => (
-        <>
-            <DialogHeader>
-                <DialogTitle>Combined Payment</DialogTitle>
-                <DialogDescription>Settle payment for {orders.length} selected orders.</DialogDescription>
-            </DialogHeader>
-
-            <ScrollArea className="h-40 my-2 border rounded-md p-3 pr-4">
-                <div className="space-y-2">
-                    {orders.map(order => (
-                        <div key={order.id} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
-                            <div>
-                                <p className="font-semibold">{order.simplifiedId}</p>
-                                <p className="text-xs text-muted-foreground">{order.tag || 'No Tag'}</p>
-                            </div>
-                            <Badge variant={order.balanceDue > 0 ? "secondary" : "default"}>
-                                {formatCurrency(order.balanceDue > 0 ? order.balanceDue : order.total)}
-                            </Badge>
-                        </div>
-                    ))}
-                </div>
-            </ScrollArea>
-
-            <div className="text-center py-2 space-y-1">
-                {reward && <p className="text-sm text-muted-foreground line-through">{formatCurrency(totalToPay)}</p>}
-                <p className="text-4xl font-bold text-primary">{formatCurrency(finalTotal)}</p>
-                {reward && <Badge variant="secondary"><Gift className="h-3 w-3 mr-1.5" />{formatCurrency(reward.discount)} discount applied</Badge>}
-            </div>
-
-            <div className="space-y-4 pt-2 p-4 border rounded-lg">
-                <div>
-                    <Label>Payment Method</Label>
-                    <div className="grid grid-cols-2 gap-2 mt-1">
-                        <Button onClick={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'outline'} className="h-12"><Coins className="mr-2" />Cash</Button>
-                        <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'outline'} className="h-12"><CreditCard className="mr-2" />Momo</Button>
-                    </div>
-                </div>
-                <div>
-                    <Label htmlFor="amountPaid">Amount Paid ({paymentMethod})</Label>
-                    <Input id="amountPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="0.00" autoFocus className="mt-1 h-12 text-lg" />
-                </div>
-
-                {change > 0 && (
-                    <div className="text-center">
-                        <p className="font-semibold text-red-500">Change Due: {formatCurrency(change)}</p>
-                        <div className="mt-2">
-                            <Label htmlFor="changeGiven">Amount Given as Change</Label>
-                            <Input id="changeGiven" type="number" value={changeGivenInput} onChange={(e) => setChangeGivenInput(e.target.value)} placeholder={formatCurrency(change)} className="text-center" />
-                            <p className="text-xs text-red-600 mt-1">
-                                Enter amount given. Leave empty if change not given yet.
-                            </p>
-                            {hasOutstandingChange && (
-                                <p className="text-xs text-orange-600 mt-1">
-                                    Remaining change owed: {formatCurrency(changeStillDue)}
-                                </p>
-                            )}
-                            {exceedsChangeDue && (
-                                <p className="text-xs text-amber-600 mt-1">
-                                    Amount exceeds required change and will be capped at {formatCurrency(change)}.
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                )}
-                {showDeficitOptions && (
-                    <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>
-                )}
-                {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-            </div>
-
-            <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
-                <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
-                    <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
-                </Button>
-                {showDeficitOptions ? (
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button onClick={() => processCombinedPayment({ pardonDeficit: true })} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-base">
-                            {isProcessing ? <LoadingSpinner /> : 'Pardon & Complete'}
-                        </Button>
-                        <Button onClick={() => processCombinedPayment({ pardonDeficit: false })} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white h-12 text-base">
-                            {isProcessing ? <LoadingSpinner /> : 'Leave Unpaid'}
-                        </Button>
-                    </div>
-                ) : (
-                    <Button onClick={() => processCombinedPayment({})} disabled={isProcessing || !isAmountPaidEntered} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
-                        {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
-                    </Button>
-                )}
-            </DialogFooter>
-        </>
-    );
-
     return (
         <Dialog open onOpenChange={onClose}>
             <DialogContent className="sm:max-w-lg">
-                {isApplyingReward ? <RewardContent totalToPay={totalToPay} onApplyReward={handleApplyReward} onBack={() => setIsApplyingReward(false)} /> : <MainPaymentContent />}
+                {isApplyingReward ? (
+                    <RewardContent totalToPay={totalToPay} onApplyReward={handleApplyReward} onBack={() => setIsApplyingReward(false)} />
+                ) : (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle>Combined Payment</DialogTitle>
+                            <DialogDescription>Settle payment for {orders.length} selected orders.</DialogDescription>
+                        </DialogHeader>
+
+                        <ScrollArea className="h-40 my-2 border rounded-md p-3 pr-4">
+                            <div className="space-y-2">
+                                {orders.map(order => (
+                                    <div key={order.id} className="flex justify-between items-center text-sm p-2 bg-secondary rounded-md">
+                                        <div>
+                                            <p className="font-semibold">{order.simplifiedId}</p>
+                                            <p className="text-xs text-muted-foreground">{order.tag || 'No Tag'}</p>
+                                        </div>
+                                        <Badge variant={order.balanceDue > 0 ? "secondary" : "default"}>
+                                            {formatCurrency(order.balanceDue > 0 ? order.balanceDue : order.total)}
+                                        </Badge>
+                                    </div>
+                                ))}
+                            </div>
+                        </ScrollArea>
+
+                        <div className="text-center py-2 space-y-1">
+                            {reward && <p className="text-sm text-muted-foreground line-through">{formatCurrency(totalToPay)}</p>}
+                            <p className="text-4xl font-bold text-primary">{formatCurrency(finalTotal)}</p>
+                            {reward && <Badge variant="secondary"><Gift className="h-3 w-3 mr-1.5" />{formatCurrency(reward.discount)} discount applied</Badge>}
+                        </div>
+
+                        <div className="space-y-4 pt-2 p-4 border rounded-lg">
+                            <div>
+                                <Label>Payment Method</Label>
+                                <div className="grid grid-cols-2 gap-2 mt-1">
+                                    <Button onClick={() => setPaymentMethod('cash')} variant={paymentMethod === 'cash' ? 'default' : 'outline'} className="h-12"><Coins className="mr-2" />Cash</Button>
+                                    <Button onClick={() => setPaymentMethod('momo')} variant={paymentMethod === 'momo' ? 'default' : 'outline'} className="h-12"><CreditCard className="mr-2" />Momo</Button>
+                                </div>
+                            </div>
+                            <div>
+                                <Label htmlFor="amountPaid">Amount Paid ({paymentMethod})</Label>
+                                <Input id="amountPaid" type="number" value={amountPaidInput} onChange={(e) => setAmountPaidInput(e.target.value)} placeholder="0.00" autoFocus className="mt-1 h-12 text-lg" />
+                            </div>
+
+                            {change > 0 && (
+                                <div className="text-center">
+                                    <p className="font-semibold text-red-500">Change Due: {formatCurrency(change)}</p>
+                                    <div className="mt-2">
+                                        <Label htmlFor="changeGiven">Amount Given as Change</Label>
+                                        <Input id="changeGiven" type="number" value={changeGivenInput} onChange={(e) => setChangeGivenInput(e.target.value)} placeholder={formatCurrency(change)} className="text-center" />
+                                        <p className="text-xs text-red-600 mt-1">
+                                            Enter amount given. Leave empty if change not given yet.
+                                        </p>
+                                        {hasOutstandingChange && (
+                                            <p className="text-xs text-orange-600 mt-1">
+                                                Remaining change owed: {formatCurrency(changeStillDue)}
+                                            </p>
+                                        )}
+                                        {exceedsChangeDue && (
+                                            <p className="text-xs text-amber-600 mt-1">
+                                                Amount exceeds required change and will be capped at {formatCurrency(change)}.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {showDeficitOptions && (
+                                <p className="font-semibold text-orange-500 text-center">Deficit: {formatCurrency(deficit)}</p>
+                            )}
+                            {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+                        </div>
+
+                        <DialogFooter className="grid grid-cols-1 gap-3 pt-6">
+                            <Button variant="outline" size="sm" onClick={() => setIsApplyingReward(true)}>
+                                <Gift className="h-4 w-4 mr-2" /> Apply Reward Discount
+                            </Button>
+                            {showDeficitOptions ? (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button onClick={() => processCombinedPayment({ pardonDeficit: true })} disabled={isProcessing} className="bg-green-500 hover:bg-green-600 text-white h-12 text-base">
+                                        {isProcessing ? <LoadingSpinner /> : 'Pardon & Complete'}
+                                    </Button>
+                                    <Button onClick={() => processCombinedPayment({ pardonDeficit: false })} disabled={isProcessing} className="bg-yellow-500 hover:bg-yellow-600 text-white h-12 text-base">
+                                        {isProcessing ? <LoadingSpinner /> : 'Leave Unpaid'}
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button onClick={() => processCombinedPayment({})} disabled={isProcessing || !isAmountPaidEntered} className="bg-green-500 hover:bg-green-600 text-white h-12 text-lg">
+                                    {isProcessing ? <LoadingSpinner /> : 'Confirm Payment'}
+                                </Button>
+                            )}
+                        </DialogFooter>
+                    </>
+                )}
             </DialogContent>
         </Dialog>
     );

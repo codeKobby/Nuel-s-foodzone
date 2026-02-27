@@ -357,8 +357,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
     const BalanceIcon = balanceStatus.icon;
 
     return (
-        <div className="h-full">
-            <ScrollArea className="h-full">
+        <div className="h-full flex flex-col overflow-hidden">
+            <ScrollArea className="h-full flex flex-col overflow-hidden">
                 <div className="p-4 md:p-6 flex flex-col">
                     <div className="flex items-center gap-4 mb-6">
                         <Button variant="outline" size="icon" onClick={onBack} title="Back" aria-label="Back">
