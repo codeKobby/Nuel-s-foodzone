@@ -302,7 +302,7 @@ const ReconciliationView: React.FC<{
                             Compare your digital orders against physical kitchen tickets to identify missing or extra orders.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 flex-1 overflow-hidden h-full">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 flex-1 overflow-hidden">
                         <div className="lg:col-span-3 flex flex-col h-full space-y-4 overflow-hidden">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -425,8 +425,8 @@ const ReconciliationView: React.FC<{
                     </DialogHeader>
 
                     {!stats ? <LoadingSpinner /> : (
-                        <ScrollArea className="flex-1 p-6 overflow-hidden">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
+                        <ScrollArea className="flex-1">
+                            <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
                                 <div className="lg:col-span-1 space-y-6">
                                     <Card>
                                         <CardHeader>
