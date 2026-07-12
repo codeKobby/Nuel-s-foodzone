@@ -416,7 +416,7 @@ const ReconciliationView: React.FC<{
     return (
         <>
             <Dialog open={true} onOpenChange={(open) => !open && onBack()}>
-                <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col p-0 gap-0">
+                <DialogContent className="max-w-7xl max-h-[90vh] h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                         <DialogTitle className="text-2xl font-bold">End-of-Day Reconciliation</DialogTitle>
                         <DialogDescription className="text-base">
@@ -425,8 +425,8 @@ const ReconciliationView: React.FC<{
                     </DialogHeader>
 
                     {!stats ? <LoadingSpinner /> : (
-                        <ScrollArea className="flex-1 p-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <ScrollArea className="flex-1 p-6 overflow-hidden">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
                                 <div className="lg:col-span-1 space-y-6">
                                     <Card>
                                         <CardHeader>
