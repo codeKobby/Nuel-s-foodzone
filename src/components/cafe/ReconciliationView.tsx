@@ -279,8 +279,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
 
         return (
             <Dialog open={showAuditModal} onOpenChange={setShowAuditModal}>
-                <DialogContent className="max-w-4xl max-h-[85vh]">
-                    <DialogHeader>
+                <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-0 gap-0">
+                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                         <DialogTitle className="flex items-center gap-2">
                             <ClipboardCheck className="h-5 w-5" />
                             Cross-Check Digital vs Written Orders
@@ -289,8 +289,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                             Compare your digital orders against physical kitchen tickets to identify missing or extra orders.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 py-4">
-                        <div className="lg:col-span-3 space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 flex-1 overflow-hidden h-full">
+                        <div className="lg:col-span-3 flex flex-col h-full space-y-4 overflow-hidden">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
@@ -300,7 +300,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                                     className="pl-10"
                                 />
                             </div>
-                            <ScrollArea className="h-96 border rounded-lg">
+                            <ScrollArea className="flex-1 border rounded-lg">
                                 <div className="p-4 space-y-3">
                                     {filteredOrders.length > 0 ? filteredOrders.map(order => (
                                         <div
@@ -346,7 +346,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                                 </div>
                             </ScrollArea>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-4 overflow-y-auto max-h-full">
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="text-lg">Audit Summary</CardTitle>
@@ -390,7 +390,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                             </Card>
                         </div>
                     </div>
-                    <DialogFooter className="border-t pt-4">
+                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
                         <Button variant="outline" onClick={() => setShowAuditModal(false)}>
                             Close Audit
                         </Button>
