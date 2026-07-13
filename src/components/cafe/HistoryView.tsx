@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { ReconciliationReport } from '@/lib/types';
-import { formatCurrency, formatTimestamp } from '@/lib/utils';
+import { formatCurrency, formatTimestamp, floatsEqual } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -222,7 +222,7 @@ const HistoryView: React.FC = () => {
                                                                     <Separator className="bg-emerald-500/20" />
                                                                     <div className="flex justify-between text-xs font-semibold">
                                                                         <span className="text-muted-foreground">Cash Discrepancy:</span>
-                                                                        <span className={cashDiscrepancy === 0 ? 'text-emerald-600 dark:text-emerald-400' : cashDiscrepancy > 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'}>
+                                                                        <span className={floatsEqual(cashDiscrepancy, 0) ? 'text-emerald-600 dark:text-emerald-400' : cashDiscrepancy > 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'}>
                                                                             {cashDiscrepancy > 0 ? '+' : ''}{formatCurrency(cashDiscrepancy)}
                                                                         </span>
                                                                     </div>
@@ -263,7 +263,7 @@ const HistoryView: React.FC = () => {
                                                                     <Separator className="bg-violet-500/20" />
                                                                     <div className="flex justify-between text-xs font-semibold">
                                                                         <span className="text-muted-foreground">MoMo Discrepancy:</span>
-                                                                        <span className={momoDiscrepancy === 0 ? 'text-emerald-600 dark:text-emerald-400' : momoDiscrepancy > 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'}>
+                                                                        <span className={floatsEqual(momoDiscrepancy, 0) ? 'text-emerald-600 dark:text-emerald-400' : momoDiscrepancy > 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'}>
                                                                             {momoDiscrepancy > 0 ? '+' : ''}{formatCurrency(momoDiscrepancy)}
                                                                         </span>
                                                                     </div>

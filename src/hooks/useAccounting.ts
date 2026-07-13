@@ -15,16 +15,34 @@ export const useAccounting = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const todayStart = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
-  const todayEnd = useMemo(() => {
-    const d = new Date();
-    d.setHours(23, 59, 59, 999);
-    return d;
-  }, []);
+  const [todayBounds, setTodayBounds] = useState(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  });
+
+  // Refresh date boundaries at midnight so stats stay current if the app is left open
+  useEffect(() => {
+    const refresh = () => {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      setTodayBounds({ start, end });
+    };
+
+    const now = new Date();
+    const msUntilMidnight =
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() -
+      now.getTime();
+    const timer = setTimeout(refresh, msUntilMidnight);
+    return () => clearTimeout(timer);
+  }, [todayBounds]);
+
+  const todayStart = todayBounds.start;
+  const todayEnd = todayBounds.end;
 
   const isTodayClosedOut = useMemo(() => {
     return reports.some(

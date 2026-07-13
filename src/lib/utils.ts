@@ -16,6 +16,14 @@ export const formatCurrency = (amount: number) => {
     return `GH₵${amount.toFixed(2)}`;
 };
 
+/**
+ * Compare two floating-point numbers with tolerance for rounding errors.
+ * Use this instead of === for currency comparisons.
+ */
+export const floatsEqual = (a: number, b: number, tolerance: number = 0.01): boolean => {
+    return Math.abs(a - b) < tolerance;
+};
+
 export const formatTimestamp = (timestamp: any, timeOnly: boolean = false): string => {
   if (!timestamp || !timestamp.toDate) return 'N/A';
   

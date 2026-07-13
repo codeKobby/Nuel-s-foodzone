@@ -13,7 +13,7 @@ import type {
   DashboardStats,
   ChatMessage
 } from '@/lib/types';
-import { formatCurrency, formatTimestamp } from '@/lib/utils';
+import { formatCurrency, formatTimestamp, floatsEqual } from '@/lib/utils';
 import { DollarSign, ShoppingBag, TrendingUp, TrendingDown, Sparkles, User, Bot, Send, Calendar as CalendarIcon, AlertTriangle, Check, Search, Coins, Landmark, CreditCard, Hourglass, MinusCircle, FileCheck, Clock, Eye, MessageSquare, Plus, ArrowDownUp as SortDesc, ArrowUpWideNarrow as SortAsc } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -663,7 +663,7 @@ const DashboardView: React.FC = () => {
             <StatCard icon={<TrendingUp className="text-blue-500" />} title="Net Revenue" value={formatCurrency(stats.totalNetRevenue)} description={`+${formatCurrency(stats.previousDayCollections)} from collections`} />
             <StatCard icon={<MinusCircle className="text-orange-500" />} title="Expenses" value={formatCurrency(stats.totalMiscExpenses)} description="Misc. cash/momo outs" />
             <StatCard
-              icon={<Hourglass className={stats.unpaidOrdersValue === 0 ? "text-muted-foreground" : "text-amber-500"} />}
+              icon={<Hourglass className={floatsEqual(stats.unpaidOrdersValue, 0) ? "text-muted-foreground" : "text-amber-500"} />}
               title="Unpaid Orders (All Time)"
               value={formatCurrency(stats.unpaidOrdersValue)}
               description={`${stats.overdueOrdersCount} overdue`}

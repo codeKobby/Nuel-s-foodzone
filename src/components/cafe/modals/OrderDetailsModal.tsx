@@ -49,7 +49,7 @@ const Receipt = React.forwardRef<HTMLDivElement, { order: Order }>(({ order }, r
                             <td>{item.name}</td>
                             <td className="text-center">{item.quantity}</td>
                             <td className="text-right">{formatCurrency(item.price * item.quantity)}</td>
-                             <td className="text-right">{order.fulfilledItems?.some(f => f.name === item.name && f.quantity === item.quantity) ? '✓' : '...'}</td>
+                             <td className="text-right">{(() => { const fq = order.fulfilledItems?.find(f => f.name === item.name)?.quantity ?? 0; return fq >= item.quantity ? '✓' : fq > 0 ? `${fq}/${item.quantity}` : '...'; })()}</td>
                         </tr>
                     ))}
                 </tbody>

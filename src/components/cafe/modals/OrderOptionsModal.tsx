@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { doc, getDoc, updateDoc, writeBatch, serverTimestamp, collection, Timestamp, runTransaction, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { formatCurrency, generateSimpleOrderId } from '@/lib/utils';
+import { formatCurrency, generateSimpleOrderId, floatsEqual } from '@/lib/utils';
 import type { OrderItem, Order, CustomerReward, Payment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -340,8 +340,8 @@ const OrderOptionsModal: React.FC<OrderOptionsModalProps> = ({
           let finalPaymentMethod: Order['paymentMethod'] = (editingOrder as Order | null)?.paymentMethod ?? 'Unpaid';
 
           if (newBreakdown.cash > 0 && newBreakdown.momo > 0) finalPaymentMethod = 'split';
-          else if (newBreakdown.cash > 0 && newBreakdown.momo === 0) finalPaymentMethod = 'cash';
-          else if (newBreakdown.momo > 0 && newBreakdown.cash === 0) finalPaymentMethod = 'momo';
+          else if (newBreakdown.cash > 0 && floatsEqual(newBreakdown.momo, 0)) finalPaymentMethod = 'cash';
+          else if (newBreakdown.momo > 0 && floatsEqual(newBreakdown.cash, 0)) finalPaymentMethod = 'momo';
 
           orderData.paymentMethod = finalPaymentMethod;
 

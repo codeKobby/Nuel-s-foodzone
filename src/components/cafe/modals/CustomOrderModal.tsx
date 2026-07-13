@@ -41,16 +41,18 @@ const CustomOrderModal: React.FC<CustomOrderModalProps> = ({ menuItems, onAddIte
     }, [selectedItemId, menuItems]);
 
     const handleAddCustomItem = () => {
-        if (customName && customPrice) {
-            onAddItem({ name: customName, price: parseFloat(customPrice) });
+        const price = parseFloat(customPrice);
+        if (customName && Number.isFinite(price) && price > 0) {
+            onAddItem({ name: customName, price });
         }
     };
 
     const handleAddOverrideItem = () => {
-        if (selectedItem && overridePrice) {
+        const price = parseFloat(overridePrice);
+        if (selectedItem && Number.isFinite(price) && price > 0) {
             onAddItem({
                 name: `${selectedItem.name} (Custom)`,
-                price: parseFloat(overridePrice)
+                price,
             });
         }
     };

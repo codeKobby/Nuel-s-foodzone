@@ -61,10 +61,13 @@ const FulfillItemsModal: React.FC<FulfillItemsModalProps> = ({ order, onClose })
 
         try {
             const orderRef = doc(db, "orders", order.id);
-            const fulfillmentUpdates = itemsToMarkAsFulfilled.map(item => ({
-                name: item.name,
-                quantity: item.quantity,
-            }));
+            const fulfillmentUpdates = itemsToMarkAsFulfilled.map(item => {
+                const fulfilledCount = order.fulfilledItems?.filter(fi => fi.name === item.name).reduce((sum, fi) => sum + fi.quantity, 0) || 0;
+                return {
+                    name: item.name,
+                    quantity: item.quantity - fulfilledCount,
+                };
+            });
             
             await updateDoc(orderRef, {
                 fulfilledItems: arrayUnion(...fulfillmentUpdates)

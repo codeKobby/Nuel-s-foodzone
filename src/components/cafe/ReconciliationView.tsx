@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import type { Order } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, floatsEqual } from '@/lib/utils';
 import { db } from '@/lib/firebase';
 import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { ArrowLeft, Ban, Calculator, CheckCircle, Smartphone, Banknote, X, Coins, ArrowRightLeft, FileText, ClipboardCheck, Search, AlertTriangle as AlertTriangleIcon } from 'lucide-react';
@@ -595,7 +595,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ stats, orders, 
                                                 <p className="font-semibold">{formatCurrency(totalCountedMomo)}</p>
                                             </div>
                                             <Separator />
-                                            <div className={`flex justify-between items-center font-bold ${momoBalanceDifference === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            <div className={`flex justify-between items-center font-bold ${floatsEqual(momoBalanceDifference, 0) ? 'text-green-600' : 'text-red-600'}`}>
                                                 <p>MoMo Discrepancy</p>
                                                 <p>{formatCurrency(momoBalanceDifference)}</p>
                                             </div>

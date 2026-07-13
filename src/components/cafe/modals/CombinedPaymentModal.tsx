@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { collection, doc, writeBatch, serverTimestamp, getDoc, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, floatsEqual } from '@/lib/utils';
 import type { Order, CustomerReward } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -226,8 +226,8 @@ const CombinedPaymentModal: React.FC<CombinedPaymentModalProps> = ({ orders, onC
                 };
 
                 let finalPaymentMethod: 'cash' | 'momo' | 'split' = 'split';
-                if (newBreakdown.cash > 0 && newBreakdown.momo === 0) finalPaymentMethod = 'cash';
-                if (newBreakdown.momo > 0 && newBreakdown.cash === 0) finalPaymentMethod = 'momo';
+                if (newBreakdown.cash > 0 && floatsEqual(newBreakdown.momo, 0)) finalPaymentMethod = 'cash';
+                if (newBreakdown.momo > 0 && floatsEqual(newBreakdown.cash, 0)) finalPaymentMethod = 'momo';
 
                 const updateData: any = {
                     amountPaid: newAmountPaid,

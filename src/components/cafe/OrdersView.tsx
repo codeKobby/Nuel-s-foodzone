@@ -12,7 +12,7 @@ import { AlertTriangle, Tag, Coins, Hourglass, HandCoins, Check, CalendarDays, S
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, formatTimestamp, groupOrdersByDate } from '@/lib/utils';
+import { formatCurrency, formatTimestamp, groupOrdersByDate, floatsEqual } from '@/lib/utils';
 import OrderDetailsModal from './modals/OrderDetailsModal';
 import PartialSettleModal from './modals/PartialSettleModal';
 import CombinedPaymentModal from './modals/CombinedPaymentModal';
@@ -320,7 +320,7 @@ const OrdersView: React.FC<{ setActiveView: (view: string) => void }> = ({ setAc
       const newSet = new Set(prev);
       const order = orders.find(o => o.id === orderId);
 
-      const isFullyPaidAndSettled = order?.paymentStatus === 'Paid' && order.balanceDue === 0;
+      const isFullyPaidAndSettled = order?.paymentStatus === 'Paid' && floatsEqual(order.balanceDue, 0);
       if (isFullyPaidAndSettled) return prev;
 
       if (isSelected) {

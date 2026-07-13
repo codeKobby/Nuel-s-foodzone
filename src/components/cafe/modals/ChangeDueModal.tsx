@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import type { Order } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, floatsEqual } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -39,7 +39,7 @@ const ChangeDueModal: React.FC<ChangeDueModalProps> = ({ order, onClose, onSettl
             return;
         }
         setError(null);
-        const isFullSettlement = amount === changeDue;
+        const isFullSettlement = floatsEqual(amount, changeDue);
         onSettle(order.id, amount, isFullSettlement);
     };
     
