@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, Suspense, useContext } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, db, authReadyPromise } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { authReadyPromise } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Menu, LogOut, Package, Gift, LucideIcon } from 'lucide-react';
@@ -139,7 +140,7 @@ const MobileNav = ({
 
 function CafePage() {
     const router = useRouter();
-    const { session, logout, isLoading: isAuthLoading } = useContext(AuthContext);
+    const { session, signOut, isLoading: isAuthLoading } = useContext(AuthContext);
     const role = session?.role;
 
     const defaultViews = {
@@ -167,10 +168,12 @@ function CafePage() {
     };
 
     useEffect(() => {
-        let unsubscribe: (() => void) | undefined;
+        let active = true;
 
         const init = async () => {
             const authInstance = await authReadyPromise;
+
+            if (!active) return;
 
             if (!authInstance || !db) {
                 setAuthError("Firebase is not configured. Please check your environment variables.");
@@ -185,36 +188,18 @@ function CafePage() {
                 document.documentElement.classList.add(normalizedTheme);
             }
 
-            const { onAuthStateChanged, signInAnonymously } = await import('firebase/auth');
-
-            unsubscribe = onAuthStateChanged(authInstance, async (user) => {
-                try {
-                    if (!user) {
-                        await signInAnonymously(authInstance);
-                    }
-                    setIsAuthReady(true);
-                } catch (e) {
-                    console.error("Authentication Error:", e);
-                    if (e instanceof Error) {
-                        if (e.message.includes("auth/invalid-api-key")) {
-                            setAuthError("Firebase configuration is invalid. Please check your API key and other settings in your .env.local file.");
-                        } else if (e.message.includes("auth/configuration-not-found")) {
-                            setAuthError("Anonymous sign-in is not enabled in your Firebase project. Please go to the Firebase console, navigate to Authentication > Sign-in method, and enable the Anonymous provider.");
-                        } else {
-                            setAuthError("Failed to authenticate. Please check your connection and refresh the page.");
-                        }
-                    } else {
-                        setAuthError("An unknown authentication error occurred.");
-                    }
-                    setIsAuthReady(true);
-                }
-            });
+            setIsAuthReady(true);
         };
 
-        init();
+        void init().catch((error) => {
+            console.error("Authentication initialization error:", error);
+            if (!active) return;
+            setAuthError(error instanceof Error ? error.message : "Failed to initialize authentication.");
+            setIsAuthReady(true);
+        });
 
         return () => {
-            if (unsubscribe) unsubscribe();
+            active = false;
         };
     }, []);
 
@@ -227,8 +212,8 @@ function CafePage() {
         setTheme(newTheme);
     };
 
-    const handleLogout = () => {
-        logout();
+    const handleLogout = async () => {
+        await signOut();
         router.push('/backoffice');
     };
 

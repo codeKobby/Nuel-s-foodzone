@@ -1,10 +1,15 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import {
+  getApp,
+  getApps,
+  initializeApp,
+  type FirebaseApp,
+} from "firebase/app";
 import type { Auth } from "firebase/auth";
 import {
   getFirestore,
-  Firestore,
   initializeFirestore,
   memoryLocalCache,
+  type Firestore,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -16,82 +21,87 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+const firebaseConfigured = Boolean(
+  firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId
+);
+
 let app: FirebaseApp;
 let auth: Auth | undefined;
 let db: Firestore;
 
-let resolveAuth: (auth: Auth | undefined) => void = () => {};
-const authReadyPromise = new Promise<Auth | undefined>((resolve) => {
+let resolveAuth: (authInstance: Auth | undefined) => void = () => undefined;
+export const authReadyPromise = new Promise<Auth | undefined>((resolve) => {
   resolveAuth = resolve;
 });
 
-// This check is to prevent crashing during server-side rendering or in environments where env vars are not set.
-if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+/**
+ * Firebase is initialized in two modes:
+ * - Server: Firestore uses a named app and memory cache; client Auth is not
+ *   initialized because browser persistence is not available during SSR.
+ * - Browser: the default app is reused and Auth uses browser-local
+ *   persistence so Firebase remains the source of session truth.
+ */
+if (firebaseConfigured) {
   if (typeof window === "undefined") {
-    // Server-side: Use a named app to avoid conflicts and ensure memory cache
     const serverAppName = "server-app";
-    const existingApp = getApps().find((a) => a.name === serverAppName);
-
-    if (existingApp) {
-      app = existingApp;
-    } else {
-      app = initializeApp(firebaseConfig, serverAppName);
-    }
-
-    // We skip Auth initialization on the server to avoid localStorage issues.
-    // auth will be undefined on the server.
-    resolveAuth(undefined);
+    const existingServerApp = getApps().find(
+      (candidate) => candidate.name === serverAppName
+    );
+    app = existingServerApp || initializeApp(firebaseConfig, serverAppName);
 
     try {
       db = initializeFirestore(app, { localCache: memoryLocalCache() });
-    } catch (e: any) {
-      // If it's already initialized, we assume it was initialized correctly (with memory cache)
-      // because we are using a unique app name 'server-app'.
-      if (e.code === "failed-precondition") {
-        try {
-          db = getFirestore(app);
-        } catch (innerError) {
-          // If getFirestore fails, it means we can't use Firestore on the server.
-          // We leave db undefined.
-        }
+    } catch (error: unknown) {
+      const code = error && typeof error === "object" && "code" in error
+        ? (error as { code?: string }).code
+        : undefined;
+
+      if (code === "failed-precondition") {
+        db = getFirestore(app);
+      } else {
+        console.warn("Firebase server Firestore initialization warning:", error);
       }
     }
-  } else {
-    // Client-side: Use default app
-    if (!getApps().length) {
-      app = initializeApp(firebaseConfig);
-    } else {
-      app = getApp();
-    }
 
+    // Client Auth must never be initialized during SSR.
+    resolveAuth(undefined);
+  } else {
+    app = getApps().length ? getApp() : initializeApp(firebaseConfig);
     db = getFirestore(app);
 
-    // Initialize Auth dynamically to avoid server-side import issues
     import("firebase/auth")
-      .then(({ getAuth, initializeAuth, browserLocalPersistence }) => {
+      .then(({ browserLocalPersistence, getAuth, initializeAuth }) => {
         try {
-          auth = initializeAuth(app, {
+          auth = initializeAuth(app as FirebaseApp, {
             persistence: browserLocalPersistence,
           });
-        } catch (e: any) {
-          if (e.code === "auth/already-initialized") {
-            auth = getAuth(app);
+        } catch (error: unknown) {
+          const code = error && typeof error === "object" && "code" in error
+            ? (error as { code?: string }).code
+            : undefined;
+
+          if (code === "auth/already-initialized") {
+            auth = getAuth(app as FirebaseApp);
           } else {
-            console.error("Error initializing client auth:", e);
+            console.error("Firebase Auth initialization failed:", error);
           }
         }
+
         resolveAuth(auth);
       })
-      .catch((err) => {
-        console.error("Failed to load firebase/auth", err);
+      .catch((error: unknown) => {
+        console.error("Failed to load Firebase Auth:", error);
         resolveAuth(undefined);
       });
   }
 } else {
   console.warn(
-    "Firebase configuration is missing or incomplete. Firebase services will be disabled."
+    "Firebase configuration is missing or incomplete. Firebase services are disabled."
   );
   resolveAuth(undefined);
 }
 
-export { app, db, auth, authReadyPromise };
+export { app, auth, db, firebaseConfigured };

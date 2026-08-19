@@ -1,6 +1,7 @@
 import type { Timestamp } from "firebase/firestore";
 import type { AnalyzeBusinessOutputSchema } from "@/ai/schemas";
 import { z } from "zod";
+import type { BackofficeRole } from "@/lib/auth-config";
 
 export interface MenuItem {
   id: string;
@@ -163,7 +164,9 @@ export interface CashierAccount {
 
 export interface UserSession {
   uid: string;
-  role: "manager" | "cashier";
+  email: string;
+  emailVerified: boolean;
+  role: BackofficeRole;
   fullName?: string;
   username?: string;
 }

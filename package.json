@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "auth:provision-manager": "node scripts/provision-manager-auth.cjs",
+    "auth:provision-staff": "node scripts/provision-staff-auth.cjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.42",

@@ -28,10 +28,17 @@ function initializeFirebaseAdmin() {
   }
 }
 
-// Lazy getter for adminDb that initializes on first access
+// Lazy getter for Admin Firestore that initializes on first access.
 export function getAdminDb() {
   initializeFirebaseAdmin();
   return admin.firestore();
+}
+
+// Lazy getter for Admin Auth. Custom claims and staff provisioning must only
+// happen in this trusted server-side environment.
+export function getAdminAuth() {
+  initializeFirebaseAdmin();
+  return admin.auth();
 }
 
 // For backwards compatibility - but prefer getAdminDb()

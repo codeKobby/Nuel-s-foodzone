@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { MenuItem } from '@/lib/types';
@@ -27,7 +27,7 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
-import { updatePassword } from '@/lib/auth-tools';
+import { AuthContext } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { initialMenuData } from '@/data/initial-data';
@@ -87,6 +87,7 @@ const SecuritySettings = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const { changePassword } = useContext(AuthContext);
     const { toast } = useToast();
 
     const handlePasswordUpdate = async (e: React.FormEvent) => {
@@ -95,29 +96,31 @@ const SecuritySettings = () => {
             toast({ type: 'error', title: "Passwords do not match." });
             return;
         }
-        if (newPassword.length < 6) {
-            toast({ type: 'error', title: "Password must be at least 6 characters." });
+        if (newPassword.length < 8) {
+            toast({ type: 'error', title: "Password must be at least 8 characters." });
             return;
         }
+
         setIsUpdatingPassword(true);
-        const result = await updatePassword({
-            role: 'manager',
-            currentPassword: currentPassword,
-            newPassword: newPassword,
-        });
-
-        toast({
-            type: result.success ? 'success' : 'error',
-            title: result.success ? "Success" : "Error",
-            description: result.message,
-        });
-
-        if (result.success) {
+        try {
+            await changePassword({ currentPassword, newPassword });
+            toast({
+                type: 'success',
+                title: "Password updated",
+                description: "Your Firebase Auth password has been changed.",
+            });
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
+        } catch (error) {
+            toast({
+                type: 'error',
+                title: "Unable to update password",
+                description: error instanceof Error ? error.message : "Please try again.",
+            });
+        } finally {
+            setIsUpdatingPassword(false);
         }
-        setIsUpdatingPassword(false);
     };
 
     return (

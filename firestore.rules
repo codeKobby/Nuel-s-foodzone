@@ -1,10 +1,82 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read and write access to all documents
-    // if the user is authenticated (even anonymously).
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.email_verified == true;
+    }
+
+    function hasRole(role) {
+      return signedIn() && request.auth.token.role == role;
+    }
+
+    function isManager() {
+      return hasRole('manager')
+        && request.auth.token.email == 'nuelgee54@gmail.com';
+    }
+
+    function isCashier() {
+      return hasRole('cashier');
+    }
+
+    function isStaff() {
+      return isManager() || isCashier();
+    }
+
+    // Public menu reads are needed by the public Dinner website. Menu writes
+    // are manager-only until the server-side pricing workflow is introduced.
+    match /menuItems/{menuItemId} {
+      allow read: if true;
+      allow create, update, delete: if isManager();
+    }
+
+    // Transitional staff access for existing operational screens. Phase 2
+    // will move order/payment/stock writes behind server-validated endpoints
+    // and replace these collection-wide staff writes with field-level rules.
+    match /orders/{orderId} {
+      allow read, create, update: if isStaff();
+      allow delete: if isManager();
+    }
+
+    match /miscExpenses/{expenseId} {
+      allow read, create, update: if isStaff();
+      allow delete: if isManager();
+    }
+
+    match /reconciliationReports/{reportId} {
+      allow read, create: if isStaff();
+      allow update, delete: if isManager();
+    }
+
+    match /rewards/{rewardId} {
+      allow read, create, update: if isStaff();
+      allow delete: if isManager();
+    }
+
+    match /cashierAccounts/{cashierId} {
+      allow read, write: if isManager();
+    }
+
+    match /staffProfiles/{uid} {
+      allow read: if isManager() || (signedIn() && request.auth.uid == uid);
+      allow write: if isManager();
+    }
+
+    // Legacy password documents must never be used as an authentication
+    // authority after Firebase Auth migration.
+    match /credentials/{credentialId} {
+      allow read, write: if false;
+    }
+
+    // Audit events are written only by trusted server code in later phases.
+    match /auditEvents/{eventId} {
+      allow read: if isManager();
+      allow write: if false;
+    }
+
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }
