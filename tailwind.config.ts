@@ -17,10 +17,14 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['"DM Sans"', "sans-serif"],
-        headline: ['"Fraunces"', "serif"],
-        display: ['"Fraunces"', "serif"],
+        body: ['"Manrope"', "sans-serif"],
+        headline: ['"Manrope"', "sans-serif"],
+        display: ['"Manrope"', "sans-serif"],
         code: ["monospace"],
+      },
+      borderRadius: {
+        brand: "18px",
+        hero: "24px",
       },
       colors: {
         background: "hsl(var(--background))",
