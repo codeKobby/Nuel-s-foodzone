@@ -17,9 +17,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['"Poppins"', "sans-serif"],
-        headline: ['"Poppins"', "sans-serif"],
-        display: ['"Poppins"', "sans-serif"],
+        body: ['"DM Sans"', "sans-serif"],
+        headline: ['"Fraunces"', "serif"],
+        display: ['"Fraunces"', "serif"],
         code: ["monospace"],
       },
       colors: {
