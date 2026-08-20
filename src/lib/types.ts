@@ -18,6 +18,7 @@ export interface OrderItem {
   price: number;
   quantity: number;
   category: string;
+  menuItemId?: string;
 }
 
 export interface FulfilledItem {

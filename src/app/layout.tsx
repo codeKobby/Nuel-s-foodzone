@@ -4,10 +4,11 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { ToastProvider } from '@/hooks/use-toast';
 import { AuthProvider } from '@/context/AuthProvider';
+import { PublicCartProvider } from '@/context/PublicCartContext';
 
 export const metadata: Metadata = {
-  title: "Nuel's Foodzone Cafe",
-  description: "Authentic Ghanaian Cuisine for dine-in, takeout, and catering.",
+  title: "Nuel’s Foodzone | Dinner & Catering",
+  description: "Nuel’s Foodzone brings Ghanaian comfort food, restaurant dinners, and memorable catering to your table.",
   icons: null,
 };
 
@@ -27,8 +28,10 @@ export default function RootLayout({
       <body className="font-body antialiased" suppressHydrationWarning>
         <AuthProvider>
           <ToastProvider>
-            {children}
-            <Toaster />
+            <PublicCartProvider>
+              {children}
+              <Toaster />
+            </PublicCartProvider>
           </ToastProvider>
         </AuthProvider>
       </body>
