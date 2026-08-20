@@ -30,3 +30,7 @@ The Behance restaurant food-delivery project is useful as a reminder that the pu
 ## Local visual verification
 
 The redesigned home page now presents an editorial split composition rather than a full-bleed hero: large Fraunces headline typography, a single anchored food image, thin rules, a three-part navigation rail, and a restrained dark CTA band. The Dinner page carries the same system with a sharper menu gateway, numbered browse/build/follow steps, and a functional explanation of the kitchen/order trail. The browser review showed the new type scale, whitespace, and asymmetry are visible at desktop width without the previous gradient-heavy card stack.
+
+## Vercel preview verification
+
+The fresh Vercel deployment reflects the new editorial system: Fraunces display typography, compact uppercase navigation, warm paper background, asymmetrical hero image, thin rules, and a more restrained red/green accent treatment. The Dinner menu preview also moved away from a rounded ecommerce grid into a dense two-column menu list with square food imagery, category tabs, simple add controls, and a persistent order entry point. This keeps the public brand expressive while making ordering faster to scan.
